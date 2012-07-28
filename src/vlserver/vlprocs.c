@@ -187,7 +187,12 @@ Init_VLdbase(struct vl_ctx *ctx,
 		return errorcode;
 	} else {		/* No errorcode */
 	    if (pass == 2) {
-		ubik_EndTrans(ctx->trans);	/* Rebuilt db. End trans, then retake original lock */
+		/* The database header was rebuilt; end the write transaction.
+		 * This will call vlsynccache() to copy the write header buffers
+		 * to the read header buffers, before calling vlsetache().
+		 * Do a third pass to re-acquire the original lock, which
+		 * may be a read lock. */
+		ubik_EndTrans(ctx->trans);
 	    } else {
 		break;		/* didn't rebuild and successful - exit */
 	    }
