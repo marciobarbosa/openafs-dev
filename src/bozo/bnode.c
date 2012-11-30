@@ -21,6 +21,7 @@
 #include <afs/afsutil.h>
 #include <afs/fileutil.h>
 #include <opr/queue.h>
+#include <opr/softsig.h>
 
 #include "bnode.h"
 #include "bnode_internal.h"
@@ -34,10 +35,16 @@
 #define BNODE_ERROR_COUNT_MAX   16   /* maximum number of retries */
 #define BNODE_ERROR_DELAY_MAX   60   /* maximum retry delay (seconds) */
 
-static PROCESS bproc_pid;	/* pid of waker-upper */
 static struct opr_queue allBnodes;	/**< List of all bnodes */
 static struct opr_queue allProcs;	/**< List of all processes for which we're waiting */
 static struct opr_queue allTypes;	/**< List of all registered type handlers */
+
+#ifdef AFS_PTHREAD_ENV
+opr_mutex_t bnode_lock;
+static opr_cv_t bproc_cv;
+#else
+static PROCESS bproc_pid;	/* pid of waker-upper */
+#endif
 
 static struct bnode_stats {
     int weirdPids;
@@ -197,7 +204,11 @@ bnode_Check(struct bnode *abnode)
 {
     if (abnode->flags & BNODE_WAIT) {
 	abnode->flags &= ~BNODE_WAIT;
+#ifdef AFS_PTHREAD_ENV
+	opr_cv_broadcast(&abnode->bn_cv);
+#else
 	LWP_NoYieldSignal(abnode);
+#endif
     }
     return 0;
 }
@@ -214,7 +225,13 @@ static void
 bnode_Wait(struct bnode *abnode)
 {
     abnode->flags |= BNODE_WAIT;
+#ifdef AFS_PTHREAD_ENV
+    do {
+	opr_cv_wait(&abnode->bn_cv, &bnode_glock);
+    } while ((abnode->flags & BNODE_WAIT));
+#else
     LWP_WaitProcess(abnode);
+#endif
 }
 
 /* wait for all bnodes to stabilize */
@@ -224,6 +241,8 @@ bnode_WaitAll(void)
     struct opr_queue *cursor;
     afs_int32 code;
     afs_int32 stat;
+
+    BNODE_ASSERT_LOCK();
 
   retry:
     for (opr_queue_Scan(&allBnodes, cursor)) {
@@ -316,6 +335,8 @@ bnode_ApplyInstance(int (*aproc) (struct bnode *tb, void *), void *arock)
     struct opr_queue *cursor, *store;
     afs_int32 code;
 
+    BNODE_ASSERT_LOCK();
+
     for (opr_queue_ScanSafe(&allBnodes, cursor, store)) {
 	struct bnode *tb = opr_queue_Entry(cursor, struct bnode, q);
 	code = (*aproc) (tb, arock);
@@ -329,6 +350,8 @@ struct bnode *
 bnode_FindInstance(char *aname)
 {
     struct opr_queue *cursor;
+
+    BNODE_ASSERT_LOCK();
 
     for (opr_queue_Scan(&allBnodes, cursor)) {
 	struct bnode *tb = opr_queue_Entry(cursor, struct bnode, q);
@@ -479,6 +502,7 @@ bnode_Delete(struct bnode *abnode)
 
     /* all clear to zap */
     opr_queue_Remove(&abnode->q);
+    opr_cv_destroy(&abnode->bn_cv);
     free(abnode->name);		/* do this first, since bnode fields may be bad after BOP_DELETE */
     code = BOP_DELETE(abnode);	/* don't play games like holding over this one */
     WriteBozoFile(0);
@@ -496,11 +520,17 @@ bnode_PendingTimeout(struct bnode *abnode)
 int
 bnode_SetTimeout(struct bnode *abnode, afs_int32 atimeout)
 {
+    BNODE_ASSERT_LOCK();
+
     if (atimeout != 0) {
 	abnode->nextTimeout = FT_ApproxTime() + atimeout;
 	abnode->flags |= BNODE_NEEDTIMEOUT;
 	abnode->period = atimeout;
+#ifdef AFS_PTHREAD_ENV
+	opr_cv_signal(&bproc_cv);
+#else
 	IOMGR_Cancel(bproc_pid);
+#endif
     } else {
 	abnode->flags &= ~BNODE_NEEDTIMEOUT;
     }
@@ -512,9 +542,12 @@ int
 bnode_InitBnode(struct bnode *abnode, struct bnode_ops *abnodeops,
 		char *aname)
 {
+    BNODE_ASSERT_LOCK();
+
     /* format the bnode properly */
     memset(abnode, 0, sizeof(struct bnode));
     opr_queue_Init(&abnode->q);
+    opr_cv_init(&abnode->bn_cv);
     abnode->ops = abnodeops;
     abnode->name = strdup(aname);
     if (!abnode->name)
@@ -529,6 +562,37 @@ bnode_InitBnode(struct bnode *abnode, struct bnode_ops *abnodeops,
     return 0;
 }
 
+#ifdef AFS_PTHREAD_ENV
+static int
+bproc_IntSleep(afs_int32 nsecs)
+{
+    struct timeval tv;
+    struct timespec ts;
+
+    BNODE_ASSERT_LOCK();
+
+    opr_Verify(gettimeofday(&tv, NULL) == 0);
+    ts.tv_sec = tv.tv_sec + nsecs;
+    ts.tv_nsec = tv.tv_usec * 1000;
+    if (opr_cv_timedwait(&bproc_cv, &bnode_glock, &ts) == 0) {
+	/* We were interrupted. */
+	return -1;
+    } else {
+	/* We timed out. */
+	return 0;
+    }
+}
+#else
+static int
+bproc_IntSleep(afs_int32 nsecs)
+{
+    struct timeval tv;
+    tv.tv_sec = nsecs;
+    tv.tv_usec = 0;
+    return IOMGR_Select(0, 0, 0, 0, &tv);
+}
+#endif
+
 /* bnode lwp executes this code repeatedly */
 static void *
 bproc(void *unused)
@@ -542,6 +606,8 @@ bproc(void *unused)
     struct timeval tv;
     int setAny;
     int status;
+
+    BNODE_LOCK();
 
     while (1) {
 	/* first figure out how long to sleep for */
@@ -564,9 +630,7 @@ bproc(void *unused)
 	else
 	    temp = 999999;
 	if (temp > 0) {
-	    tv.tv_sec = temp;
-	    tv.tv_usec = 0;
-	    code = IOMGR_Select(0, 0, 0, 0, &tv);
+	    code = bproc_IntSleep(temp);
 	} else
 	    code = 0;		/* fake timeout code */
 
@@ -791,12 +855,44 @@ hdl_notifier(struct bnode_proc *tp)
 void *
 bnode_SoftInt(void *param)
 {
-    /* int asignal = (int) param; */
+    BNODE_LOCK();
 
+#ifdef AFS_PTHREAD_ENV
+    opr_cv_signal(&bproc_cv);
+#else
     IOMGR_Cancel(bproc_pid);
+#endif
+
+    BNODE_UNLOCK();
     return NULL;
 }
 
+#ifdef AFS_PTHREAD_ENV
+void
+bnode_Int(int asignal)
+{
+    if (asignal == SIGQUIT || asignal == SIGTERM) {
+	static int shuttingdown;
+	if (!shuttingdown) {
+	    /*
+	     * We can't just run bozo_ShutdownAndExit here directly, since it
+	     * will block the signal handler thread while we wait for children
+	     * to die. So create a new thread to run the shutdown process; but
+	     * only run one, just in case we keep getting QUIT signals while
+	     * the shutdown process runs.
+	     */
+	    static pthread_t pid;
+	    pthread_attr_t attr;
+	    shuttingdown = 1;
+	    opr_Verify(pthread_attr_init(&attr) == 0);
+	    opr_Verify(pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) == 0);
+	    opr_Verify(pthread_create(&pid, &attr, bozo_ShutdownAndExit, (void *)(intptr_t) asignal) == 0);
+	}
+    } else {
+	bnode_SoftInt((void *)(intptr_t) asignal);
+    }
+}
+#else
 /* Called at signal interrupt level; queues function to be called
  * when IOMGR runs again.
  */
@@ -809,15 +905,21 @@ bnode_Int(int asignal)
 	IOMGR_SoftSig(bnode_SoftInt, (void *)(intptr_t)asignal);
     }
 }
+#endif
 
 
 /* intialize the whole system */
 int
 bnode_Init(void)
 {
+#ifdef AFS_PTHREAD_ENV
+    pthread_attr_t tattr;
+    pthread_t bproc_thread;
+#else
     PROCESS junk;
-    afs_int32 code;
     struct sigaction newaction;
+#endif
+    afs_int32 code;
     static int initDone = 0;
 
     if (initDone)
@@ -827,13 +929,27 @@ bnode_Init(void)
     opr_queue_Init(&allProcs);
     opr_queue_Init(&allBnodes);
     memset(&bnode_stats, 0, sizeof(bnode_stats));
+
+#ifdef AFS_PTHREAD_ENV
+    opr_cv_init(&bproc_cv);
+    opr_Verify(pthread_attr_init(&tattr) == 0);
+    opr_Verify(pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED) == 0);
+    code = pthread_create(&bproc_thread, &tattr, bproc, NULL);
+#else
     LWP_InitializeProcessSupport(1, &junk);	/* just in case */
     IOMGR_Initialize();
     code = LWP_CreateProcess(bproc, BNODE_LWP_STACKSIZE,
 			     /* priority */ 1, (void *) /* parm */ 0,
 			     "bnode-manager", &bproc_pid);
+#endif
     if (code)
 	return code;
+
+#ifdef AFS_PTHREAD_ENV
+    opr_Verify(opr_softsig_Register(SIGCHLD, bnode_Int) == 0);
+    opr_Verify(opr_softsig_Register(SIGQUIT, bnode_Int) == 0);
+    opr_Verify(opr_softsig_Register(SIGTERM, bnode_Int) == 0);
+#else
     memset(&newaction, 0, sizeof(newaction));
     newaction.sa_handler = bnode_Int;
     code = sigaction(SIGCHLD, &newaction, NULL);
@@ -845,7 +961,8 @@ bnode_Init(void)
     code = sigaction(SIGTERM, &newaction, NULL);
     if (code)
 	return errno;
-    return code;
+#endif
+    return 0;
 }
 
 /* free token list returned by parseLine */
@@ -931,6 +1048,7 @@ bnode_NewProc(struct bnode *abnode, char *aexecString, char *coreName,
     pid_t cpid;
     char *argv[MAXVARGS];
     int i;
+    sigset_t set;
 
     code = bnode_ParseLine(aexecString, &tlist);	/* try parsing first */
     if (code)
@@ -949,7 +1067,9 @@ bnode_NewProc(struct bnode *abnode, char *aexecString, char *coreName,
     }
     argv[i] = NULL;		/* null-terminated */
 
-    cpid = spawnprocve(argv[0], argv, environ, -1);
+    /* Don't block any signals in child procs. */
+    sigemptyset(&set);
+    cpid = spawnprocve_sig(argv[0], argv, environ, -1, &set);
     osi_audit(BOSSpawnProcEvent, 0, AUD_STR, aexecString, AUD_END);
 
     if (cpid == (pid_t) - 1) {
