@@ -537,7 +537,7 @@ Unlock(struct cmd_syndesc *as, void *arock)
 {
     afs_int32 code, rcode = 0;
     afs_int32 count;
-    afs_int32 server;
+    afs_in_addr_s server;
     char name[MAXKTCNAMELEN];
     char instance[MAXKTCNAMELEN];
 
@@ -1271,7 +1271,7 @@ int init = 0, noauth;
 char name[MAXKTCNAMELEN];
 char instance[MAXKTCNAMELEN];
 char newCell[MAXKTCREALMLEN];
-afs_uint32 serverList[MAXSERVERS];
+afs_in_addr serverList[MAXSERVERS];
 
 int
 NoAuth(struct cmd_syndesc *as, void *arock)

@@ -20,7 +20,7 @@
 
 
 typedef struct util_databaseServerEntry {
-    int serverAddress;
+    afs_in_addr_s serverAddress;
     char serverName[UTIL_MAX_DATABASE_SERVER_NAME];
 } util_databaseServerEntry_t, *util_databaseServerEntry_p;
 
@@ -41,7 +41,7 @@ extern int ADMINAPI util_DatabaseServerGetDone(const void *iterationId,
 					       afs_status_p st);
 
 extern int ADMINAPI util_AdminServerAddressGetFromName(const char *serverName,
-						       int *serverAddress,
+						       afs_in_addr_s *serverAddress,
 						       afs_status_p st);
 
 extern int ADMINAPI CellHandleIsValid(const void *cellHandle,

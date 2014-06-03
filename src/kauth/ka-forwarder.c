@@ -67,7 +67,7 @@ void
 setup_servers(int argc, char **argv)
 {
     int i;
-    u_int fwdaddr;
+    afs_in_addr fwdaddr;
     u_short fwdport;
 
     num_servers = argc;

@@ -184,7 +184,7 @@ tkt_DecodeTicket5(char *ticket, afs_int32 ticket_len,
 		  int (*get_key) (void *, int, struct ktc_encryptionKey *),
 		  rxkad_get_key_enctype_func get_key_enctype,
 		  char *get_key_rock, int serv_kvno, char *name, char *inst,
-		  char *cell, struct ktc_encryptionKey *session_key, afs_int32 * host,
+		  char *cell, struct ktc_encryptionKey *session_key, afs_in_addr_s * host,
 		  afs_uint32 * start, afs_uint32 * end, afs_int32 disableCheckdot)
 {
     char plain[MAXKRB5TICKETLEN];

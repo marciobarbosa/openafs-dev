@@ -1975,9 +1975,9 @@ afsclient_AFSServerGetBegin(const void *cellHandle, void **iterationIdP,
 	 */
 
 	for (iserv = 0; iserv < serv->total; iserv++) {
-	    int addr = htonl(serv->server[iserv].serverAddress[0]);
+	    afs_in_addr_s addr = htonl(serv->server[iserv].serverAddress[0]);
 	    LOCK_GLOBAL_MUTEX;
-	    host = gethostbyaddr((const char *)&addr, sizeof(int), AF_INET);
+	    host = gethostbyaddr((const char *)&addr, sizeof(addr), AF_INET);
 	    if (host != NULL) {
 		strncpy(serv->server[iserv].serverName, host->h_name,
 			 AFS_MAX_SERVER_NAME_LEN);

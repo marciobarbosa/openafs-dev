@@ -61,8 +61,8 @@ init_afs_cb(void)
      */
     long rx_mtu = -1;
     int code;
-    int cm_IPAddr[CM_MAXINTERFACE_ADDR];	/* client's IP address in host order */
-    int cm_SubnetMask[CM_MAXINTERFACE_ADDR];	/* client's subnet mask in host order */
+    afs_in_addr_s cm_IPAddr[CM_MAXINTERFACE_ADDR];	/* client's IP address in host order */
+    afs_in_addr_s cm_SubnetMask[CM_MAXINTERFACE_ADDR];	/* client's subnet mask in host order */
     int cm_NetMtu[CM_MAXINTERFACE_ADDR];	/* client's MTU sizes */
     int cm_NetFlags[CM_MAXINTERFACE_ADDR];	/* network flags */
 

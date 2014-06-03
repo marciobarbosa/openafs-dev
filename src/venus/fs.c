@@ -1622,7 +1622,7 @@ WhereIsCmd(struct cmd_syndesc *as, void *arock)
     struct ViceIoctl blob;
     struct cmd_item *ti;
     int j;
-    afs_int32 *hosts;
+    afs_in_addr_s *hosts;
     char *tp;
     int error = 0;
 
@@ -2449,7 +2449,7 @@ CallBackRxConnCmd(struct cmd_syndesc *as, void *arock)
     afs_int32 code;
     struct ViceIoctl blob;
     struct cmd_item *ti;
-    afs_int32 hostAddr;
+    afs_in_addr_s hostAddr;
     struct hostent *thp;
 
     ti = as->parms[0].items;
@@ -2459,14 +2459,14 @@ CallBackRxConnCmd(struct cmd_syndesc *as, void *arock)
 	    fprintf(stderr, "host %s not found in host table.\n", ti->data);
 	    return 1;
 	}
-	else memcpy(&hostAddr, thp->h_addr, sizeof(afs_int32));
+	else memcpy(&hostAddr, thp->h_addr, sizeof(hostAddr));
     } else {
         hostAddr = 0;   /* means don't set host */
     }
 
     /* now do operation */
-    blob.in_size = sizeof(afs_int32);
-    blob.out_size = sizeof(afs_int32);
+    blob.in_size = sizeof(hostAddr);
+    blob.out_size = sizeof(hostAddr);
     blob.in = (char *) &hostAddr;
     blob.out = (char *) &hostAddr;
 
@@ -2484,7 +2484,7 @@ NukeNFSCredsCmd(struct cmd_syndesc *as, void *arock)
     afs_int32 code;
     struct ViceIoctl blob;
     struct cmd_item *ti;
-    afs_int32 hostAddr;
+    afs_in_addr_s hostAddr;
     struct hostent *thp;
 
     ti = as->parms[0].items;
@@ -2493,11 +2493,11 @@ NukeNFSCredsCmd(struct cmd_syndesc *as, void *arock)
 	fprintf(stderr, "host %s not found in host table.\n", ti->data);
 	return 1;
     }
-    else memcpy(&hostAddr, thp->h_addr, sizeof(afs_int32));
+    else memcpy(&hostAddr, thp->h_addr, sizeof(hostAddr));
 
     /* now do operation */
-    blob.in_size = sizeof(afs_int32);
-    blob.out_size = sizeof(afs_int32);
+    blob.in_size = sizeof(hostAddr);
+    blob.out_size = sizeof(hostAddr);
     blob.in = (char *) &hostAddr;
     blob.out = (char *) &hostAddr;
 
@@ -2563,8 +2563,8 @@ NewCellCmd(struct cmd_syndesc *as, void *arock)
 		    "%s: Host %s not found in host table, skipping it.\n", pn,
 		    ti->data);
 	} else {
-	    memcpy(tp, thp->h_addr, sizeof(afs_int32));
-	    tp += sizeof(afs_int32);
+	    memcpy(tp, thp->h_addr, sizeof(afs_in_addr_s));
+	    tp += sizeof(afs_in_addr_s);
 	}
     }
     if (as->parms[2].items) {
@@ -2717,7 +2717,7 @@ MonitorCmd(struct cmd_syndesc *as, void *arock)
     afs_int32 code;
     struct ViceIoctl blob;
     struct cmd_item *ti;
-    afs_int32 hostAddr;
+    afs_in_addr_s hostAddr;
     struct hostent *thp;
     char *tp;
     int setp;
@@ -2741,7 +2741,7 @@ MonitorCmd(struct cmd_syndesc *as, void *arock)
 		    return 1;
 		}
 	    } else
-		memcpy(&hostAddr, thp->h_addr, sizeof(afs_int32));
+		memcpy(&hostAddr, thp->h_addr, sizeof(hostAddr));
 	}
     } else {
 	hostAddr = 0;		/* means don't set host */
@@ -2749,8 +2749,8 @@ MonitorCmd(struct cmd_syndesc *as, void *arock)
     }
 
     /* now do operation */
-    blob.in_size = sizeof(afs_int32);
-    blob.out_size = sizeof(afs_int32);
+    blob.in_size = sizeof(hostAddr);
+    blob.out_size = sizeof(hostAddr);
     blob.in = (char *)&hostAddr;
     blob.out = (char *)&hostAddr;
     code = pioctl(0, VIOC_AFS_MARINER_HOST, &blob, 1);
@@ -3157,7 +3157,7 @@ addServer(char *name, afs_int32 rank)
 
 	sp = (struct spref *)(gblob.in + gblob.in_size);
 	memcpy(&(sp->server.s_addr), thostent->h_addr_list[t],
-	       sizeof(afs_uint32));
+	       sizeof(sp->server.s_addr));
 	sp->rank = (rank > MAXUSHORT ? MAXUSHORT : rank);
 	gblob.in_size += sizeof(struct spref);
 	ssp->num_servers++;

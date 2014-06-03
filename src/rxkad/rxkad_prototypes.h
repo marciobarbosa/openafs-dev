@@ -136,14 +136,14 @@ extern afs_int32 rxkad_SetConfiguration(struct rx_securityClass *aobj,
 extern int tkt_DecodeTicket(char *asecret, afs_int32 ticketLen,
 			    struct ktc_encryptionKey *key, char *name,
 			    char *inst, char *cell, struct ktc_encryptionKey *sessionKey,
-			    afs_int32 * host, afs_uint32 * start,
+			    afs_in_addr_s * host, afs_uint32 * start,
 			    afs_uint32 * end);
 extern int tkt_MakeTicket(char *ticket, int *ticketLen,
 			  struct ktc_encryptionKey *key, char *name,
 			  char *inst, char *cell, afs_uint32 start,
 			  afs_uint32 end,
 			  struct ktc_encryptionKey *sessionKey,
-			  afs_uint32 host, char *sname, char *sinst);
+			  afs_in_addr host, char *sname, char *sinst);
 extern int tkt_CheckTimes(afs_uint32 start, afs_uint32 end, afs_uint32 now);
 extern afs_int32 ktohl(char flags, afs_int32 l);
 extern afs_uint32 life_to_time(afs_uint32 start, unsigned char life);
@@ -160,7 +160,7 @@ extern int tkt_DecodeTicket5(char *ticket, afs_int32 ticket_len,
 			     rxkad_get_key_enctype_func get_key2,
 			     char *get_key_rock, int serv_kvno, char *name,
 			     char *inst, char *cell, struct ktc_encryptionKey *session_key,
-			     afs_int32 * host, afs_uint32 * start,
+			     afs_in_addr_s * host, afs_uint32 * start,
 			     afs_uint32 * end, afs_int32 disableDotCheck);
 extern int tkt_MakeTicket5(char *ticket, int *ticketLen, int enctype, int *kvno,
 			   void *key, size_t keylen,

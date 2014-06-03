@@ -88,7 +88,7 @@ afs_kmutex_t rx_if_mutex;
  * failure. Port must be in network byte order.
  */
 osi_socket
-rxi_GetHostUDPSocket(u_int ahost, u_short port)
+rxi_GetHostUDPSocket(afs_in_addr ahost, u_short port)
 {
     int binds, code = 0;
     osi_socket socketFd = OSI_NULLSOCKET;
@@ -282,15 +282,15 @@ osi_Free(void *x, afs_int32 size)
 #define	ADDRSPERSITE	16
 
 
-static afs_uint32 rxi_NetAddrs[ADDRSPERSITE];	/* host order */
+static afs_in_addr rxi_NetAddrs[ADDRSPERSITE];	/* host order */
 static int myNetMTUs[ADDRSPERSITE];
-static int myNetMasks[ADDRSPERSITE];
+static afs_in_addr myNetMasks[ADDRSPERSITE];
 static int myNetFlags[ADDRSPERSITE];
 static u_int rxi_numNetAddrs;
 static int Inited = 0;
 
 #if defined(AFS_NT40_ENV)
-int
+afs_in_addr_s
 rxi_getaddr(void)
 {
     /* The IP address list can change so we must query for it */
@@ -669,7 +669,7 @@ rx_GetIFInfo(void)
 void
 rxi_InitPeerParams(struct rx_peer *pp)
 {
-    afs_uint32 ppaddr;
+    afs_in_addr ppaddr;
     u_short rxmtu;
     int ix;
 #ifdef AFS_ADAPT_PMTU

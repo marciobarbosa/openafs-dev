@@ -62,7 +62,7 @@ struct ubik_client {
     short initializationState;	/*!< ubik client init state */
     short states[MAXSERVERS];	/*!< state bits */
     struct rx_connection *conns[MAXSERVERS];
-    afs_int32 syncSite;
+    afs_in_addr_s syncSite;
 #ifdef AFS_PTHREAD_ENV
     pthread_mutex_t cm;
 #endif
@@ -278,7 +278,7 @@ extern int (*ubik_SyncWriterCacheProc) (void);
  */
 struct ubik_server {
     struct ubik_server *next;	/*!< next ptr */
-    afs_uint32 addr[UBIK_MAX_INTERFACE_ADDR];	/*!< network order, addr[0] is primary */
+    afs_in_addr addr[UBIK_MAX_INTERFACE_ADDR];	/*!< network order, addr[0] is primary */
     afs_int32 lastVoteTime;	/*!< last time yes vote received */
     afs_int32 lastBeaconSent;	/*!< last time beacon attempted */
     struct ubik_version version;	/*!< version, only used during recovery */
@@ -324,7 +324,7 @@ extern short ubik_callPortal;
 
 extern afs_int32 ubik_quorum;	/* min hosts in quorum */
 extern struct ubik_dbase *ubik_dbase;	/* the database handled by this server */
-extern afs_uint32 ubik_host[UBIK_MAX_INTERFACE_ADDR];	/* this host addr, in net order */
+extern afs_in_addr ubik_host[UBIK_MAX_INTERFACE_ADDR];	/* this host addr, in net order */
 extern int ubik_amSyncSite;	/* sleep on this waiting to be sync site */
 extern struct ubik_stats {	/* random stats */
     afs_int32 escapes;
@@ -378,15 +378,15 @@ struct vote_data {
     struct ubik_tid ubik_dbTid;		/* sync site's tid, or 0 if none */
     /* Used by all sites in nominating new sync sites */
     afs_int32 ubik_lastYesTime;		/* time we sent the last yes vote */
-    afs_uint32 lastYesHost;		/* host to which we sent yes vote */
+    afs_in_addr lastYesHost;		/* host to which we sent yes vote */
     /* Next is time sync site began this vote: guarantees sync site until this + SMALLTIME */
     afs_int32 lastYesClaim;
     int lastYesState;			/* did last site we voted for claim to be sync site? */
     /* Used to guarantee that nomination process doesn't loop */
     afs_int32 lowestTime;
-    afs_uint32 lowestHost;
+    afs_in_addr lowestHost;
     afs_int32 syncTime;
-    afs_int32 syncHost;
+    afs_in_addr_s syncHost;
 };
 
 #define UBIK_VOTE_LOCK opr_mutex_enter(&vote_globals.vote_lock)
@@ -490,7 +490,7 @@ extern afs_int32 ContactQuorum_DISK_SetVersion(struct ubik_trans *atrans,
 extern void panic(char *format, ...)
     AFS_ATTRIBUTE_FORMAT(__printf__, 1, 2);
 
-extern afs_uint32 ubikGetPrimaryInterfaceAddr(afs_uint32 addr);
+extern afs_in_addr ubikGetPrimaryInterfaceAddr(afs_in_addr addr);
 
 extern int ubik_CheckAuth(struct rx_call *);
 
@@ -502,12 +502,12 @@ extern void ubeacon_InitSecurityClass(void);
 extern void ubeacon_ReinitServer(struct ubik_server *ts);
 extern void ubeacon_Debug(struct ubik_debug *aparm);
 extern int ubeacon_AmSyncSite(void);
-extern int ubeacon_InitServerListByInfo(afs_uint32 ame,
+extern int ubeacon_InitServerListByInfo(afs_in_addr ame,
 					struct afsconf_cell *info,
 					char clones[]);
-extern int ubeacon_InitServerList(afs_uint32 ame, afs_uint32 aservers[]);
+extern int ubeacon_InitServerList(afs_in_addr ame, afs_in_addr aservers[]);
 extern void *ubeacon_Interact(void *);
-extern int ubeacon_updateUbikNetworkAddress(afs_uint32 ubik_host[]);
+extern int ubeacon_updateUbikNetworkAddress(afs_in_addr ubik_host[]);
 extern struct beacon_data beacon_globals;
 extern struct addr_data addr_globals;
 
@@ -539,7 +539,7 @@ extern void ulock_Debug(struct ubik_debug *aparm);
 
 /*! \name vote.c */
 extern int uvote_ShouldIRun(void);
-extern afs_int32 uvote_GetSyncSite(void);
+extern afs_in_addr_s uvote_GetSyncSite(void);
 extern int uvote_Init(void);
 extern void ubik_vprint(const char *format, va_list ap)
     AFS_ATTRIBUTE_FORMAT(__printf__, 1, 0);
@@ -568,12 +568,12 @@ extern afs_int32 ubik_nBuffers;
 
 /*! \name ubik.c */
 struct afsconf_cell;
-extern int ubik_ServerInitByInfo(afs_uint32 myHost, short myPort,
+extern int ubik_ServerInitByInfo(afs_in_addr myHost, short myPort,
 				 struct afsconf_cell *info, char clones[],
 				 const char *pathName,
 				 struct ubik_dbase **dbase);
-extern int ubik_ServerInit(afs_uint32 myHost, short myPort,
-			   afs_uint32 serverList[],
+extern int ubik_ServerInit(afs_in_addr myHost, short myPort,
+			   afs_in_addr serverList[],
 			   const char *pathName, struct ubik_dbase **dbase);
 extern int ubik_BeginTrans(struct ubik_dbase *dbase,
 			   afs_int32 transMode, struct ubik_trans **transPtr);
@@ -611,7 +611,7 @@ extern struct version_data version_globals;
 
 /*! \name ubikclient.c */
 
-extern int ubik_ParseClientList(int argc, char **argv, afs_uint32 * aothers);
+extern int ubik_ParseClientList(int argc, char **argv, afs_in_addr * aothers);
 extern unsigned int afs_random(void);
 extern int ubik_ClientInit(struct rx_connection **serverconns,
 			   struct ubik_client **aclient);
@@ -632,8 +632,8 @@ extern afs_int32 ubik_Call_New(int (*aproc) (), struct ubik_client
 /*\}*/
 
 /* \name ubikcmd.c */
-extern int ubik_ParseServerList(int argc, char **argv, afs_uint32 *ahost,
-				afs_uint32 *aothers);
+extern int ubik_ParseServerList(int argc, char **argv, afs_in_addr *ahost,
+				afs_in_addr *aothers);
 /*\}*/
 
 /* \name uinit.c */
@@ -649,7 +649,7 @@ extern int ugen_ClientInitCell(struct afsconf_dir *dir,
 extern int ugen_ClientInitServer(const char *confDir, char *cellName,
 				 int secFlags, struct ubik_client **uclientp,
 				 int maxservers, char *serviceid,
-				 int deadtime, afs_uint32 server,
+				 int deadtime, afs_in_addr server,
 			         afs_uint32 port);
 extern int ugen_ClientInitFlags(const char *confDir, char *cellName,
 				int secFlags, struct ubik_client **uclientp,
@@ -665,7 +665,7 @@ extern afs_int32 ugen_ClientInit(int noAuthFlag, const char *confDir,
 				 char *funcName,
 				 afs_int32 gen_rxkad_level,
 				 afs_int32 maxservers, char *serviceid,
-				 afs_int32 deadtime, afs_uint32 server,
+				 afs_int32 deadtime, afs_in_addr server,
 				 afs_uint32 port, afs_int32 usrvid);
 
 #endif /* UBIK_H */

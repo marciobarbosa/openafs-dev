@@ -32,7 +32,7 @@ File servers in NW byte order.
 */
 
 static afs_int32 server_count = 0;
-static afs_int32 server_id[256];
+static afs_in_addr server_id[256];
 
 static struct ubik_client *client;
 
@@ -52,7 +52,7 @@ ListServers(void)
     struct VLCallBack vlcb;
     struct VLCallBack spare3;
     bulkaddrs addrs, m_addrs;
-    afs_uint32 ip;
+    afs_in_addr ip;
     afs_int32 base, index;
     afsUUID m_uuid;
     afs_int32 m_uniq = 0;
@@ -126,7 +126,7 @@ InvalidateCache(struct cmd_syndesc *as, void *arock)
     afs_int32 spare2, spare3;
 
     afs_int32 id[256];
-    afs_int32 ip[256];
+    afs_in_addr_s ip[256];
 
     struct ViceIds vid;
     struct IPAddrs ipa;

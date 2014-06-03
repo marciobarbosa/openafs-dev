@@ -39,7 +39,7 @@
 afs_int32(*rxkad_AlternateTicketDecoder) (afs_int32, char *, afs_int32,
 		                          char *, char *, char *,
 					  struct ktc_encryptionKey *,
-					  afs_int32 *, afs_uint32 *,
+					  afs_in_addr_s *, afs_uint32 *,
 					  afs_uint32 *);
 
 static struct rx_securityOps rxkad_server_ops = {
@@ -277,7 +277,7 @@ rxkad_CheckResponse(struct rx_securityClass *aobj,
     /* ticket contents */
     struct ktc_principal client;
     struct ktc_encryptionKey sessionkey;
-    afs_int32 host;
+    afs_in_addr_s host;
     afs_uint32 start;
     afs_uint32 end;
     unsigned int pos;

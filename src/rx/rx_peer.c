@@ -18,7 +18,7 @@
 #include "rx_clock.h"
 #include "rx_peer.h"
 
-afs_uint32 rx_HostOf(struct rx_peer *peer) {
+afs_in_addr rx_HostOf(struct rx_peer *peer) {
     return peer->host;
 }
 

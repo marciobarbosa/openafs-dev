@@ -37,7 +37,7 @@ struct VenusFid {
 };
 
 int
-statfile(char *path, char *cellname, afs_uint32 * server, struct AFSFid *f)
+statfile(char *path, char *cellname, afs_in_addr * server, struct AFSFid *f)
 {
 
     struct ViceIoctl v;
@@ -117,7 +117,7 @@ statfile(char *path, char *cellname, afs_uint32 * server, struct AFSFid *f)
     if (v.out_size <= sizeof(afs_int32))
 	return EINVAL;
 
-    memcpy(server, srvbuf, sizeof(afs_int32));
+    memcpy(server, srvbuf, sizeof(*server));
     return 0;
 }
 
@@ -197,7 +197,7 @@ int
 main(int argc, char **argv)
 {
     char scell[MAXCELLCHARS], dcell[MAXCELLCHARS];
-    afs_uint32 ssrv, dsrv;
+    afs_in_addr ssrv, dsrv;
     char *databuffer, *srcf = NULL, *destd = NULL, *destf = NULL, *destpath = NULL;
     struct stat statbuf;
 

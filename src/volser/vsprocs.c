@@ -177,12 +177,12 @@ static int DoVolClone(struct rx_connection *aconn, afs_uint32 avolid,
 		      char *typestring, char *pname, char *vname, char *suffix,
 		      struct volser_status *volstatus, afs_int32 *transPtr);
 static int DoVolDelete(struct rx_connection *aconn, afs_uint32 avolid,
-		       afs_int32 apart, char *typestring, afs_uint32 atoserver,
+		       afs_int32 apart, char *typestring, afs_in_addr atoserver,
 		       struct volser_status *volstatus, char *pprefix);
-static afs_int32 CheckVolume(volintInfo * volumeinfo, afs_uint32 aserver,
+static afs_int32 CheckVolume(volintInfo * volumeinfo, afs_in_addr aserver,
 			     afs_int32 apart, afs_int32 * modentry,
 			     afs_uint32 * maxvolid, struct nvldbentry *aentry);
-static afs_int32 VolumeExists(afs_uint32 server, afs_int32 partition,
+static afs_int32 VolumeExists(afs_in_addr server, afs_int32 partition,
                               afs_uint32 volumeid);
 static afs_int32 CheckVldbRWBK(struct nvldbentry * entry,
                                afs_int32 * modified);
@@ -619,7 +619,7 @@ EnumerateEntry(struct nvldbentry *entry)
 
 /* forcibly remove a volume.  Very dangerous call */
 int
-UV_NukeVolume(afs_uint32 server, afs_int32 partid, afs_uint32 volid)
+UV_NukeVolume(afs_in_addr server, afs_int32 partid, afs_uint32 volid)
 {
     struct rx_connection *tconn;
     afs_int32 code;
@@ -635,7 +635,7 @@ UV_NukeVolume(afs_uint32 server, afs_int32 partid, afs_uint32 volid)
 
 /* like df. Return usage of <pname> on <server> in <partition> */
 int
-UV_PartitionInfo64(afs_uint32 server, char *pname,
+UV_PartitionInfo64(afs_in_addr server, char *pname,
 		   struct diskPartition64 *partition)
 {
     struct rx_connection *aconn;
@@ -666,7 +666,7 @@ UV_PartitionInfo64(afs_uint32 server, char *pname,
 
 /* old interface to create volumes */
 int
-UV_CreateVolume(afs_uint32 aserver, afs_int32 apart, char *aname,
+UV_CreateVolume(afs_in_addr aserver, afs_int32 apart, char *aname,
 		afs_uint32 * anewid)
 {
     afs_int32 code;
@@ -677,7 +677,7 @@ UV_CreateVolume(afs_uint32 aserver, afs_int32 apart, char *aname,
 
 /* less old interface to create volumes */
 int
-UV_CreateVolume2(afs_uint32 aserver, afs_int32 apart, char *aname,
+UV_CreateVolume2(afs_in_addr aserver, afs_int32 apart, char *aname,
 		 afs_int32 aquota, afs_int32 aspare1, afs_int32 aspare2,
 		 afs_int32 aspare3, afs_int32 aspare4, afs_uint32 * anewid)
 {
@@ -704,7 +704,7 @@ UV_CreateVolume2(afs_uint32 aserver, afs_int32 apart, char *aname,
  * @return 0 on success, error code otherwise.
  */
 int
-UV_CreateVolume3(afs_uint32 aserver, afs_int32 apart, char *aname,
+UV_CreateVolume3(afs_in_addr aserver, afs_int32 apart, char *aname,
 		 afs_int32 aquota, afs_int32 aspare1, afs_int32 aspare2,
 		 afs_int32 aspare3, afs_int32 aspare4, afs_uint32 * anewid,
 		 afs_uint32 * aroid, afs_uint32 * abkid)
@@ -843,7 +843,7 @@ UV_CreateVolume3(afs_uint32 aserver, afs_int32 apart, char *aname,
 /* create a volume, given a server, partition number, volume name --> sends
 * back new vol id in <anewid>*/
 int
-UV_AddVLDBEntry(afs_uint32 aserver, afs_int32 apart, char *aname,
+UV_AddVLDBEntry(afs_in_addr aserver, afs_int32 apart, char *aname,
 		afs_uint32 aid)
 {
     struct rx_connection *aconn;
@@ -898,7 +898,7 @@ UV_AddVLDBEntry(afs_uint32 aserver, afs_int32 apart, char *aname,
  * becomes zero
  */
 int
-UV_DeleteVolume(afs_uint32 aserver, afs_int32 apart, afs_uint32 avolid)
+UV_DeleteVolume(afs_in_addr aserver, afs_int32 apart, afs_uint32 avolid)
 {
     struct rx_connection *aconn = (struct rx_connection *)0;
     afs_int32 ttid = 0;
@@ -1145,7 +1145,7 @@ sigint_handler(int x)
 
 static int
 DoVolDelete(struct rx_connection *aconn, afs_uint32 avolid,
-	    afs_int32 apart, char *ptypestring, afs_uint32 atoserver,
+	    afs_int32 apart, char *ptypestring, afs_in_addr atoserver,
 	    struct volser_status *volstatus, char *pprefix)
 {
     afs_int32 ttid = 0, code, rcode, error = 0;
@@ -1342,16 +1342,16 @@ cfail:
  */
 
 int
-UV_ConvertRO(afs_uint32 server, afs_uint32 partition, afs_uint32 volid,
+UV_ConvertRO(afs_in_addr server, afs_uint32 partition, afs_uint32 volid,
 		struct nvldbentry *entry)
 {
     afs_int32 code, i, same;
     struct nvldbentry checkEntry, storeEntry;
     afs_int32 vcode;
     afs_int32 rwindex = 0;
-    afs_uint32 rwserver = 0;
+    afs_in_addr rwserver = 0;
     afs_int32 roindex = 0;
-    afs_uint32 roserver = 0;
+    afs_in_addr roserver = 0;
     struct rx_connection *aconn;
 
     vcode =
@@ -1497,8 +1497,8 @@ UV_ConvertRO(afs_uint32 server, afs_uint32 partition, afs_uint32 volid,
  */
 
 int
-UV_MoveVolume2(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
-	       afs_uint32 atoserver, afs_int32 atopart, int flags)
+UV_MoveVolume2(afs_uint32 afromvol, afs_in_addr afromserver, afs_int32 afrompart,
+	       afs_in_addr atoserver, afs_int32 atopart, int flags)
 {
     /* declare stuff 'volatile' that may be used from setjmp/longjmp and may
      * be changing during the move */
@@ -2288,8 +2288,8 @@ UV_MoveVolume2(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
 
 
 int
-UV_MoveVolume(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
-	      afs_uint32 atoserver, afs_int32 atopart)
+UV_MoveVolume(afs_uint32 afromvol, afs_in_addr afromserver, afs_int32 afrompart,
+	      afs_in_addr atoserver, afs_int32 atopart)
 {
     return UV_MoveVolume2(afromvol, afromserver, afrompart,
 			  atoserver, atopart, 0);
@@ -2308,8 +2308,8 @@ UV_MoveVolume(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
  *     RV_NOCLONE - don't use a copy clone
  */
 int
-UV_CopyVolume2(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
-	       char *atovolname, afs_uint32 atoserver, afs_int32 atopart,
+UV_CopyVolume2(afs_uint32 afromvol, afs_in_addr afromserver, afs_int32 afrompart,
+	       char *atovolname, afs_in_addr atoserver, afs_int32 atopart,
 	       afs_uint32 atovolid, int flags)
 {
     /* declare stuff 'volatile' that may be used from setjmp/longjmp and may
@@ -2785,8 +2785,8 @@ cpincr:
 
 
 int
-UV_CopyVolume(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
-	      char *atovolname, afs_uint32 atoserver, afs_int32 atopart)
+UV_CopyVolume(afs_uint32 afromvol, afs_in_addr afromserver, afs_int32 afrompart,
+	      char *atovolname, afs_in_addr atoserver, afs_int32 atopart)
 {
     return UV_CopyVolume2(afromvol, afromserver, afrompart,
                           atovolname, atoserver, atopart, 0, 0);
@@ -2799,7 +2799,7 @@ UV_CopyVolume(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
  */
 
 int
-UV_BackupVolume(afs_uint32 aserver, afs_int32 apart, afs_uint32 avolid)
+UV_BackupVolume(afs_in_addr aserver, afs_int32 apart, afs_uint32 avolid)
 {
     struct rx_connection *aconn = (struct rx_connection *)0;
     afs_int32 ttid = 0, btid = 0;
@@ -2991,7 +2991,7 @@ UV_BackupVolume(afs_uint32 aserver, afs_int32 apart, afs_uint32 avolid)
  */
 
 int
-UV_CloneVolume(afs_uint32 aserver, afs_int32 apart, afs_uint32 avolid,
+UV_CloneVolume(afs_in_addr aserver, afs_int32 apart, afs_uint32 avolid,
 	       afs_uint32 acloneid, char *aname, int flags)
 {
     struct rx_connection *aconn = (struct rx_connection *)0;
@@ -3442,7 +3442,7 @@ PutTrans(afs_int32 *vldbindex, struct replica *replicas,
  *                            REL_FULLDUMPS - force full dumps
  */
 int
-UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
+UV_ReleaseVolume(afs_uint32 afromvol, afs_in_addr afromserver,
 		 afs_int32 afrompart, int flags)
 {
     char vname[64];
@@ -4309,7 +4309,7 @@ dump_sig_handler(int x)
  * extracting parameters from the rock
  */
 int
-UV_DumpVolume(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
+UV_DumpVolume(afs_uint32 afromvol, afs_in_addr afromserver, afs_int32 afrompart,
 	      afs_int32 fromdate,
 	      afs_int32(*DumpFunction) (struct rx_call *, void *), void *rock,
 	      afs_int32 flags)
@@ -4402,7 +4402,7 @@ UV_DumpVolume(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
  * extracting parameters from the rock
  */
 int
-UV_DumpClonedVolume(afs_uint32 afromvol, afs_uint32 afromserver,
+UV_DumpClonedVolume(afs_uint32 afromvol, afs_in_addr afromserver,
 		    afs_int32 afrompart, afs_int32 fromdate,
 		    afs_int32(*DumpFunction) (struct rx_call *, void *),
 		    void *rock, afs_int32 flags)
@@ -4557,7 +4557,7 @@ UV_DumpClonedVolume(afs_uint32 afromvol, afs_uint32 afromserver,
  * after extracting params from the rock
  */
 int
-UV_RestoreVolume2(afs_uint32 toserver, afs_int32 topart, afs_uint32 tovolid,
+UV_RestoreVolume2(afs_in_addr toserver, afs_int32 topart, afs_uint32 tovolid,
 		  afs_uint32 toparentid, char tovolname[], int flags,
 		  afs_int32(*WriteData) (struct rx_call *, void *),
 		  void *rock)
@@ -4986,7 +4986,7 @@ UV_RestoreVolume2(afs_uint32 toserver, afs_int32 topart, afs_uint32 tovolid,
 }
 
 int
-UV_RestoreVolume(afs_uint32 toserver, afs_int32 topart, afs_uint32 tovolid,
+UV_RestoreVolume(afs_in_addr toserver, afs_int32 topart, afs_uint32 tovolid,
 		 char tovolname[], int flags,
 		 afs_int32(*WriteData) (struct rx_call *, void *),
 		 void *rock)
@@ -5020,7 +5020,7 @@ UV_LockRelease(afs_uint32 volid)
 
 /* old interface to add rosites */
 int
-UV_AddSite(afs_uint32 server, afs_int32 part, afs_uint32 volid,
+UV_AddSite(afs_in_addr server, afs_int32 part, afs_uint32 volid,
 	   afs_int32 valid)
 {
     return UV_AddSite2(server, part, volid, 0, valid);
@@ -5029,7 +5029,7 @@ UV_AddSite(afs_uint32 server, afs_int32 part, afs_uint32 volid,
 /*adds <server> and <part> as a readonly replication site for <volid>
 *in vldb */
 int
-UV_AddSite2(afs_uint32 server, afs_int32 part, afs_uint32 volid,
+UV_AddSite2(afs_in_addr server, afs_int32 part, afs_uint32 volid,
 	    afs_uint32 rovolid, afs_int32 valid)
 {
     int j, nro = 0, islocked = 0;
@@ -5160,7 +5160,7 @@ UV_AddSite2(afs_uint32 server, afs_int32 part, afs_uint32 volid,
 
 /*removes <server> <part> as read only site for <volid> from the vldb */
 int
-UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
+UV_RemoveSite(afs_in_addr server, afs_int32 part, afs_uint32 volid)
 {
     afs_int32 vcode;
     struct nvldbentry entry, storeEntry;
@@ -5238,7 +5238,7 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 
 /*sets <server> <part> as read/write site for <volid> in the vldb */
 int
-UV_ChangeLocation(afs_uint32 server, afs_int32 part, afs_uint32 volid)
+UV_ChangeLocation(afs_in_addr server, afs_int32 part, afs_uint32 volid)
 {
     afs_int32 vcode;
     struct nvldbentry entry, storeEntry;
@@ -5299,7 +5299,7 @@ UV_ChangeLocation(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 
 /*list all the partitions on <aserver> */
 int
-UV_ListPartitions(afs_uint32 aserver, struct partList *ptrPartList,
+UV_ListPartitions(afs_in_addr aserver, struct partList *ptrPartList,
 		  afs_int32 * cntp)
 {
     struct rx_connection *aconn;
@@ -5357,7 +5357,7 @@ UV_ListPartitions(afs_uint32 aserver, struct partList *ptrPartList,
 /*zap the list of volumes specified by volPtrArray (the volCloneId field).
  This is used by the backup system */
 int
-UV_ZapVolumeClones(afs_uint32 aserver, afs_int32 apart,
+UV_ZapVolumeClones(afs_in_addr aserver, afs_int32 apart,
 		   struct volDescription *volPtr, afs_int32 arraySize)
 {
     struct rx_connection *aconn;
@@ -5397,7 +5397,7 @@ UV_ZapVolumeClones(afs_uint32 aserver, afs_int32 apart,
 /*return a list of clones of the volumes specified by volPtrArray. Used by the
  backup system */
 int
-UV_GenerateVolumeClones(afs_uint32 aserver, afs_int32 apart,
+UV_GenerateVolumeClones(afs_in_addr aserver, afs_int32 apart,
 			struct volDescription *volPtr, afs_int32 arraySize)
 {
     struct rx_connection *aconn;
@@ -5484,7 +5484,7 @@ UV_GenerateVolumeClones(afs_uint32 aserver, afs_int32 apart,
 /*list all the volumes on <aserver> and <apart>. If all = 1, then all the
 * relevant fields of the volume are also returned. This is a heavy weight operation.*/
 int
-UV_ListVolumes(afs_uint32 aserver, afs_int32 apart, int all,
+UV_ListVolumes(afs_in_addr aserver, afs_int32 apart, int all,
 	       struct volintInfo **resultPtr, afs_int32 * size)
 {
     struct rx_connection *aconn;
@@ -5548,7 +5548,7 @@ UV_ListVolumes(afs_uint32 aserver, afs_int32 apart, int all,
  *------------------------------------------------------------------------*/
 
 int
-UV_XListVolumes(afs_uint32 a_serverID, afs_int32 a_partID, int a_all,
+UV_XListVolumes(afs_in_addr a_serverID, afs_int32 a_partID, int a_all,
 		struct volintXInfo **a_resultPP,
 		afs_int32 * a_numEntsInResultP)
 {
@@ -5595,7 +5595,7 @@ UV_XListVolumes(afs_uint32 a_serverID, afs_int32 a_partID, int a_all,
 
 /* get all the information about volume <volid> on <aserver> and <apart> */
 int
-UV_ListOneVolume(afs_uint32 aserver, afs_int32 apart, afs_uint32 volid,
+UV_ListOneVolume(afs_in_addr aserver, afs_int32 apart, afs_uint32 volid,
 		 struct volintInfo **resultPtr)
 {
     struct rx_connection *aconn;
@@ -5652,7 +5652,7 @@ UV_ListOneVolume(afs_uint32 aserver, afs_int32 apart, afs_uint32 volid,
  *------------------------------------------------------------------------*/
 
 int
-UV_XListOneVolume(afs_uint32 a_serverID, afs_int32 a_partID, afs_uint32 a_volID,
+UV_XListOneVolume(afs_in_addr a_serverID, afs_int32 a_partID, afs_uint32 a_volID,
 		  struct volintXInfo **a_resultPP)
 {
     struct rx_connection *rxConnP;	/*Rx connection to Volume Server */
@@ -5713,7 +5713,7 @@ UV_XListOneVolume(afs_uint32 a_serverID, afs_int32 a_partID, afs_uint32 a_volID,
  *    Output changed to look a lot like the "vos syncserv" otuput.
  */
 static afs_int32
-CheckVolume(volintInfo * volumeinfo, afs_uint32 aserver, afs_int32 apart,
+CheckVolume(volintInfo * volumeinfo, afs_in_addr aserver, afs_int32 apart,
 	    afs_int32 * modentry, afs_uint32 * maxvolid,
             struct nvldbentry *aentry)
 {
@@ -6202,7 +6202,7 @@ sortVolumes(const void *a, const void *b)
  *      if the volume exists on specified servers (similar to syncvldb).
  */
 int
-UV_SyncVolume(afs_uint32 aserver, afs_int32 apart, char *avolname, int flags)
+UV_SyncVolume(afs_in_addr aserver, afs_int32 apart, char *avolname, int flags)
 {
     struct rx_connection *aconn = 0;
     afs_int32 j, k, code, vcode, error = 0;
@@ -6424,7 +6424,7 @@ UV_SyncVolume(afs_uint32 aserver, afs_int32 apart, char *avolname, int flags)
  *      optionally, <apart>.
  */
 int
-UV_SyncVldb(afs_uint32 aserver, afs_int32 apart, int flags, int force)
+UV_SyncVldb(afs_in_addr aserver, afs_int32 apart, int flags, int force)
 {
     struct rx_connection *aconn;
     afs_int32 code, error = 0;
@@ -6579,7 +6579,7 @@ UV_SyncVldb(afs_uint32 aserver, afs_int32 apart, int flags, int force)
  *      still exists - so we catch these error codes.
  */
 static afs_int32
-VolumeExists(afs_uint32 server, afs_int32 partition, afs_uint32 volumeid)
+VolumeExists(afs_in_addr server, afs_int32 partition, afs_uint32 volumeid)
 {
     struct rx_connection *conn = (struct rx_connection *)0;
     afs_int32 code = -1;
@@ -6922,7 +6922,7 @@ CheckVldb(struct nvldbentry * entry, afs_int32 * modified, afs_int32 * deleted)
  *      Synchronise <aserver> <apart>(if flags = 1) with the VLDB.
  */
 int
-UV_SyncServer(afs_uint32 aserver, afs_int32 apart, int flags, int force)
+UV_SyncServer(afs_in_addr aserver, afs_int32 apart, int flags, int force)
 {
     struct rx_connection *aconn;
     afs_int32 code, error = 0;
@@ -7261,7 +7261,7 @@ UV_RenameVolume(struct nvldbentry *entry, char oldname[], char newname[])
 
 /*report on all the active transactions on volser */
 int
-UV_VolserStatus(afs_uint32 server, transDebugInfo ** rpntr, afs_int32 * rcount)
+UV_VolserStatus(afs_in_addr server, transDebugInfo ** rpntr, afs_int32 * rcount)
 {
     struct rx_connection *aconn;
     transDebugEntries transInfo;
@@ -7293,7 +7293,7 @@ UV_VolserStatus(afs_uint32 server, transDebugInfo ** rpntr, afs_int32 * rcount)
 
 /*delete the volume without interacting with the vldb */
 int
-UV_VolumeZap(afs_uint32 server, afs_int32 part, afs_uint32 volid)
+UV_VolumeZap(afs_in_addr server, afs_int32 part, afs_uint32 volid)
 {
     afs_int32 error;
     struct rx_connection *aconn;
@@ -7312,7 +7312,7 @@ UV_VolumeZap(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 }
 
 int
-UV_SetVolume(afs_uint32 server, afs_int32 partition, afs_uint32 volid,
+UV_SetVolume(afs_in_addr server, afs_int32 partition, afs_uint32 volid,
 	     afs_int32 transflag, afs_int32 setflag, int sleeptime)
 {
     struct rx_connection *conn = 0;
@@ -7362,7 +7362,7 @@ UV_SetVolume(afs_uint32 server, afs_int32 partition, afs_uint32 volid,
 }
 
 int
-UV_SetVolumeInfo(afs_uint32 server, afs_int32 partition, afs_uint32 volid,
+UV_SetVolumeInfo(afs_in_addr server, afs_int32 partition, afs_uint32 volid,
 		 volintInfo * infop)
 {
     struct rx_connection *conn = 0;
@@ -7404,7 +7404,7 @@ UV_SetVolumeInfo(afs_uint32 server, afs_int32 partition, afs_uint32 volid,
 }
 
 int
-UV_GetSize(afs_uint32 afromvol, afs_uint32 afromserver, afs_int32 afrompart,
+UV_GetSize(afs_uint32 afromvol, afs_in_addr afromserver, afs_int32 afrompart,
 	   afs_int32 fromdate, struct volintSize *vol_size)
 {
     struct rx_connection *aconn = (struct rx_connection *)0;

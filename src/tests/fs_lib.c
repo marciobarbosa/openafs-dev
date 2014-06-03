@@ -510,7 +510,7 @@ arla_debug(int inflags, int *outflags)
  */
 
 int
-fs_checkservers(char *cell, afs_int32 flags, afs_uint32 * hosts, int numhosts)
+fs_checkservers(char *cell, afs_int32 flags, afs_in_addr * hosts, int numhosts)
 {
     struct ViceIoctl a_params;
     char *in = NULL;

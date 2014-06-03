@@ -143,7 +143,7 @@ end_and_print_timer(char *str, long long bytes)
  *
  */
 
-static u_long
+static afs_in_addr
 str2addr(const char *s)
 {
     struct in_addr server;
@@ -687,7 +687,7 @@ do_client(const char *server, short port, char *filename, afs_int32 command,
           int udpbufsz, int nostats, int hotthread, int threads)
 {
     struct rx_connection *conn;
-    afs_uint32 addr;
+    afs_in_addr addr;
     struct rx_securityClass *secureobj;
     int secureindex;
     int ret;

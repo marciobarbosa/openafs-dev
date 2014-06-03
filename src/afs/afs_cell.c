@@ -1002,7 +1002,7 @@ afs_NewCell(char *acellName, afs_int32 * acellHosts, int aflags,
     for (i = 0; i < AFS_MAXCELLHOSTS; i++) {
 	/* Get server for each host and link this cell in.*/
 	struct server *ts;
-	afs_uint32 temp = acellHosts[i];
+	afs_in_addr temp = acellHosts[i];
 	if (!temp)
 	    break;
 	ts = afs_GetServer(&temp, 1, 0, tc->vlport, WRITE_LOCK, NULL, 0, NULL);

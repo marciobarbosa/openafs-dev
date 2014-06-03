@@ -86,7 +86,7 @@ extern char cml_version_number[];
 static int AllocPacketBufs(int class, int num_pkts, struct opr_queue *q);
 
 static void rxi_SendDebugPacket(struct rx_packet *apacket, osi_socket asocket,
-				afs_uint32 ahost, short aport,
+				afs_in_addr ahost, short aport,
 				afs_int32 istack);
 static struct rx_packet *rxi_AllocPacketNoLock(int class);
 
@@ -1390,7 +1390,7 @@ CountFDs(int amax)
  * the data length of the packet is stored in the packet structure.
  * The header is decoded. */
 int
-rxi_ReadPacket(osi_socket socket, struct rx_packet *p, afs_uint32 * host,
+rxi_ReadPacket(osi_socket socket, struct rx_packet *p, afs_in_addr * host,
 	       u_short * port)
 {
     struct sockaddr_in from;
@@ -1496,7 +1496,7 @@ rxi_ReadPacket(osi_socket socket, struct rx_packet *p, afs_uint32 * host,
  * last two pad bytes. */
 
 struct rx_packet *
-rxi_SplitJumboPacket(struct rx_packet *p, afs_uint32 host, short port,
+rxi_SplitJumboPacket(struct rx_packet *p, afs_in_addr host, short port,
 		     int first)
 {
     struct rx_packet *np;
@@ -1732,7 +1732,7 @@ rx_mb_to_packet(amb, free, hdr_len, data_len, phandle)
 
 struct rx_packet *
 rxi_ReceiveDebugPacket(struct rx_packet *ap, osi_socket asocket,
-		       afs_uint32 ahost, short aport, int istack)
+		       afs_in_addr ahost, short aport, int istack)
 {
     struct rx_debugIn tin;
     afs_int32 tl;
@@ -2037,7 +2037,7 @@ rxi_ReceiveDebugPacket(struct rx_packet *ap, osi_socket asocket,
 
 struct rx_packet *
 rxi_ReceiveVersionPacket(struct rx_packet *ap, osi_socket asocket,
-			 afs_uint32 ahost, short aport, int istack)
+			 afs_in_addr ahost, short aport, int istack)
 {
     afs_int32 tl;
 
@@ -2066,7 +2066,7 @@ rxi_ReceiveVersionPacket(struct rx_packet *ap, osi_socket asocket,
 /* send a debug packet back to the sender */
 static void
 rxi_SendDebugPacket(struct rx_packet *apacket, osi_socket asocket,
-		    afs_uint32 ahost, short aport, afs_int32 istack)
+		    afs_in_addr ahost, short aport, afs_int32 istack)
 {
     struct sockaddr_in taddr;
     unsigned int i, nbytes, savelen = 0;
@@ -2503,7 +2503,7 @@ rxi_SendPacketList(struct rx_call *call, struct rx_connection *conn,
 
 /* Send a raw abort packet, without any call or connection structures */
 void
-rxi_SendRawAbort(osi_socket socket, afs_uint32 host, u_short port,
+rxi_SendRawAbort(osi_socket socket, afs_in_addr host, u_short port,
 		 afs_int32 error, struct rx_packet *source, int istack)
 {
     struct rx_header theader;

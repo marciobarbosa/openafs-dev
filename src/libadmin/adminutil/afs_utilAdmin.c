@@ -426,7 +426,7 @@ util_DatabaseServerGetDone(const void *iterationId, afs_status_p st)
  */
 
 int ADMINAPI
-util_AdminServerAddressGetFromName(const char *serverName, int *serverAddress,
+util_AdminServerAddressGetFromName(const char *serverName, afs_in_addr_s *serverAddress,
 				   afs_status_p st)
 {
     int rc = 0;
@@ -454,7 +454,7 @@ util_AdminServerAddressGetFromName(const char *serverName, int *serverAddress,
 	server = gethostbyname(serverName);
 	if (server != NULL) {
 	    memcpy((void *)serverAddress, (const void *)server->h_addr,
-		   sizeof(int));
+		   sizeof(*serverAddress));
 	    *serverAddress = ntohl(*serverAddress);
 	} else {
 	    tst = ADMUTILCANTGETSERVERNAME;

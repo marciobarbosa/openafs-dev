@@ -51,11 +51,11 @@ int IsCompatible(char *, afs_int32, afs_int32);
 int NotOnHost(char *, struct filestr *);
 int update_ReceiveFile(int, struct rx_call *, struct stat *);
 
-afs_int32
+afs_in_addr_s
 GetServer(char *aname)
 {
     struct hostent *th;
-    afs_int32 addr;
+    afs_in_addr_s addr;
 
     th = gethostbyname(aname);
     if (!th) {
@@ -101,7 +101,7 @@ main(int argc, char **argv)
     afs_int32 errcode;
     int retrytime;
     unsigned int interval;
-    afs_int32 host;
+    afs_in_addr_s host;
     int a, cnt;
     rxkad_level level;
 

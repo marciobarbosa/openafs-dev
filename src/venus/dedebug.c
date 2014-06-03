@@ -55,7 +55,7 @@ CommandProc(struct cmd_syndesc *as, void *arock)
     afs_int32 port;
     struct rx_securityClass *secobj;
     int int32p;
-    afs_int32 addr;
+    afs_in_addr_s addr;
 
     hostName = as->parms[0].items->data;
     if (as->parms[1].items)

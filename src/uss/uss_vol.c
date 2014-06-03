@@ -254,7 +254,7 @@ InitThisModule(int a_noAuthFlag, char *a_confDir, char *a_cellName)
  *------------------------------------------------------------------------*/
 
 static void
-HostIDToHostName(afs_int32 a_hostID, char *a_hostName)
+HostIDToHostName(afs_in_addr_s a_hostID, char *a_hostName)
 {				/*HostIDToHostName */
 
     strcpy(a_hostName, hostutil_GetNameByINet(a_hostID));
@@ -928,7 +928,7 @@ uss_vol_DeleteVol(char *a_volName, afs_int32 a_volID, char *a_servName,
  *------------------------------------------------------------------------*/
 
 static afs_int32
-GetServerAndPart(struct nvldbentry *a_vldbEntryP, afs_int32 *a_servIDP,
+GetServerAndPart(struct nvldbentry *a_vldbEntryP, afs_in_addr_s *a_servIDP,
 		 afs_int32 *a_partIDP)
 {				/*GetServerAndPart */
 
@@ -1046,7 +1046,7 @@ uss_vol_GetVolInfoFromMountPoint(char *a_mountpoint)
     uss_VolumeStatus_t *statusP;	/*Ptr to returned status */
     afs_int32 volID;		/*Volume ID */
     struct nvldbentry vldbEntry;	/*VLDB entry for volume */
-    afs_int32 serverID;		/*Addr of host FileServer */
+    afs_in_addr_s serverID;		/*Addr of host FileServer */
     afs_int32 partID;		/*Volume's partition ID */
 
     /*

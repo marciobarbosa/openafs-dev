@@ -24,7 +24,7 @@
 #include "rx_vab.h"
 #endif
 
-static long host;
+static afs_in_addr_s host;
 static short port;
 static short count;
 static short secLevel = 0;

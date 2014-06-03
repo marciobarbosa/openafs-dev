@@ -34,18 +34,18 @@ InterruptSignal()
 
 
 /* Bogus procedure to get internet address of host */
-static u_long
+static afs_in_addr_l
 GetIpAddress(hostname)
      char *hostname;
 {
     struct hostent *hostent;
-    u_long host;
+    afs_in_addr_l host;
     hostent = gethostbyname(hostname);
     if (!hostent) {
 	printf("host %s not found", hostname);
 	exit(1);
     }
-    if (hostent->h_length != sizeof(u_long)) {
+    if (hostent->h_length != sizeof(host)) {
 	printf("host address is disagreeable length (%d)", hostent->h_length);
 	exit(1);
     }
@@ -193,7 +193,7 @@ main(argc, argv)
     int count = 1;
     int verbose = 0;
     char *hostname = NULL;
-    u_long host;
+    afs_in_addr_l host;
     struct rx_securityClass *null_securityObject;
     struct rx_connection *conn = (struct rx_connection *)0;
     gethostname(myHostName, sizeof(myHostName));

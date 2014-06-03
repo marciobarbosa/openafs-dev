@@ -123,10 +123,10 @@ GetPartitionIdFromString(const char *partition)
  * It will accept strings in the form "128.98.12.1"
  */
 
-static int
+static afs_in_addr_s
 GetAddressFromString(const char *addr_str)
 {
-    int addr = inet_addr(addr_str);
+    afs_in_addr_s addr = inet_addr(addr_str);
 
     if (addr == -1) {
 	ERR_EXT("failed to convert specified address");
@@ -315,8 +315,8 @@ DoVosFileServerAddressChange(struct cmd_syndesc *as, void *arock)
 	NEWADDRESS
     };
     afs_status_t st = 0;
-    int old_addr = 0;
-    int new_addr = 0;
+    afs_in_addr_s old_addr = 0;
+    afs_in_addr_s new_addr = 0;
 
     if (as->parms[OLDADDRESS].items) {
 	const char *addr = as->parms[OLDADDRESS].items->data;
@@ -339,7 +339,7 @@ DoVosFileServerAddressRemove(struct cmd_syndesc *as, void *arock)
 {
     enum { ADDRESS };
     afs_status_t st = 0;
-    int address = 0;
+    afs_in_addr_s address = 0;
 
     if (as->parms[ADDRESS].items) {
 	const char *addr = as->parms[ADDRESS].items->data;
@@ -1653,7 +1653,7 @@ GetServer(char *aname)
 }
 
 static void
-Print_vos_volintInfo(afs_uint32 server, afs_uint32 partition, volintInfo* pinfo, const char *prefix)
+Print_vos_volintInfo(afs_in_addr server, afs_uint32 partition, volintInfo* pinfo, const char *prefix)
 {
     static afs_uint32 server_cache;
     static int cache_valid = 0;

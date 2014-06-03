@@ -875,7 +875,7 @@ DoProbe(struct ubik_server *server)
     struct rx_connection *conns[UBIK_MAX_INTERFACE_ADDR];
     struct rx_connection *connSuccess = 0;
     int i, nconns, success_i = -1;
-    afs_uint32 addr;
+    afs_in_addr addr;
     char buffer[32];
     char hoststr[16];
 

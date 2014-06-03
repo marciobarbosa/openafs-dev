@@ -21,12 +21,12 @@
 #include "rx/rx_clock.h"
 
 /* Bogus procedure to get internet address of host */
-static u_long
+static afs_in_addr
 GetIpAddress(hostname)
      char *hostname;
 {
     struct hostent *hostent;
-    u_long host;
+    afs_in_addr host;
     hostent = gethostbyname(hostname);
     if (!hostent) {
 	printf("host %s not found", hostname);

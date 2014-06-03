@@ -23,14 +23,14 @@ extern int (*rx_almostSent) (struct rx_packet *, struct sockaddr_in *);
 extern void rx_rto_setPeerTimeoutSecs(struct rx_peer *, int secs);
 
 extern int rx_Init(u_int port);
-extern int rx_InitHost(u_int host, u_int port);
+extern int rx_InitHost(afs_in_addr host, u_int port);
 #ifdef AFS_NT40_ENV
 extern void rx_DebugOnOff(int on);
 extern void rx_StatsOnOff(int on);
 extern void rx_StartClientThread(void);
 #endif
 extern void rx_StartServer(int donateMe);
-extern struct rx_connection *rx_NewConnection(afs_uint32 shost,
+extern struct rx_connection *rx_NewConnection(afs_in_addr shost,
 					      u_short sport, u_short sservice,
 					      struct rx_securityClass
 					      *securityObject,
@@ -55,7 +55,7 @@ extern struct rx_service *rx_NewService(u_short port, u_short serviceId,
 					afs_int32(*serviceProc) (struct
 								 rx_call *
 								 acall));
-extern struct rx_service *rx_NewServiceHost(afs_uint32 host, u_short port,
+extern struct rx_service *rx_NewServiceHost(afs_in_addr host, u_short port,
 					    u_short serviceId,
 					    char *serviceName,
 					    struct rx_securityClass
@@ -90,32 +90,32 @@ extern void rx_PrintTheseStats(FILE * file, struct rx_statistics *s, int size,
 extern void rx_PrintStats(FILE * file);
 extern void rx_PrintPeerStats(FILE * file, struct rx_peer *peer);
 #endif
-extern afs_int32 rx_GetServerDebug(osi_socket socket, afs_uint32 remoteAddr,
+extern afs_int32 rx_GetServerDebug(osi_socket socket, afs_in_addr remoteAddr,
 				   afs_uint16 remotePort,
 				   struct rx_debugStats *stat,
 				   afs_uint32 * supportedValues);
-extern afs_int32 rx_GetServerStats(osi_socket socket, afs_uint32 remoteAddr,
+extern afs_int32 rx_GetServerStats(osi_socket socket, afs_in_addr remoteAddr,
 				   afs_uint16 remotePort,
 				   struct rx_statistics *stat,
 				   afs_uint32 * supportedValues);
-extern afs_int32 rx_GetServerVersion(osi_socket socket, afs_uint32 remoteAddr,
+extern afs_int32 rx_GetServerVersion(osi_socket socket, afs_in_addr remoteAddr,
 				     afs_uint16 remotePort,
 				     size_t version_length, char *version);
 extern afs_int32 rx_GetServerConnections(osi_socket socket,
-					 afs_uint32 remoteAddr,
+					 afs_in_addr remoteAddr,
 					 afs_uint16 remotePort,
 					 afs_int32 * nextConnection,
 					 int allConnections,
 					 afs_uint32 debugSupportedValues,
 					 struct rx_debugConn *conn,
 					 afs_uint32 * supportedValues);
-extern afs_int32 rx_GetServerPeers(osi_socket socket, afs_uint32 remoteAddr,
+extern afs_int32 rx_GetServerPeers(osi_socket socket, afs_in_addr remoteAddr,
 				   afs_uint16 remotePort,
 				   afs_int32 * nextPeer,
 				   afs_uint32 debugSupportedValues,
 				   struct rx_debugPeer *peer,
 				   afs_uint32 * supportedValues);
-extern afs_int32 rx_GetLocalPeers(afs_uint32 peerHost, afs_uint16 peerPort,
+extern afs_int32 rx_GetLocalPeers(afs_in_addr peerHost, afs_uint16 peerPort,
 				      struct rx_debugPeer * peerStats);
 extern void shutdown_rx(void);
 #ifndef KERNEL
@@ -161,9 +161,9 @@ extern void rx_clearPeerRPCStats(afs_uint32 clearFlag);
 extern void rx_SetRxStatUserOk(int (*proc) (struct rx_call * call));
 extern int rx_RxStatUserOk(struct rx_call *call);
 extern void rx_ClearProcessRPCStats(afs_int32 rxInterface);
-extern void rx_ClearPeerRPCStats(afs_int32 rxInterface, afs_uint32 peerHost, afs_uint16 peerPort);
+extern void rx_ClearPeerRPCStats(afs_int32 rxInterface, afs_in_addr peerHost, afs_uint16 peerPort);
 extern void *rx_CopyProcessRPCStats(afs_uint64 op);
-extern void *rx_CopyPeerRPCStats(afs_uint64 op, afs_uint32 peerHost, afs_uint16 peerPort);
+extern void *rx_CopyPeerRPCStats(afs_uint64 op, afs_in_addr peerHost, afs_uint16 peerPort);
 extern void rx_ReleaseRPCStats(void *stats);
 extern afs_int32 rx_SetSecurityConfiguration(struct rx_service *service,
 					     rx_securityConfigVariables type,
@@ -197,7 +197,7 @@ extern int osi_GetTime(struct timeval *tv);
 
 /* rx_conncache.c */
 extern void rxi_DeleteCachedConnections(void);
-extern struct rx_connection *rx_GetCachedConnection(unsigned int remoteAddr,
+extern struct rx_connection *rx_GetCachedConnection(afs_in_addr remoteAddr,
 						    unsigned short port,
 						    unsigned short service,
 						    struct rx_securityClass
@@ -225,11 +225,11 @@ extern int rxevent_RaiseEvents(struct clock *next);
 
 
 /* rx_getaddr.c */
-extern void rxi_setaddr(afs_uint32 x);
-extern afs_uint32 rxi_getaddr(void);
-extern int rx_getAllAddr(afs_uint32 * buffer, int maxSize);
-extern int rx_getAllAddrMaskMtu(afs_uint32 addrBuffer[],
-			  	 afs_uint32 maskBuffer[],
+extern void rxi_setaddr(afs_in_addr x);
+extern afs_in_addr rxi_getaddr(void);
+extern int rx_getAllAddr(afs_in_addr * buffer, int maxSize);
+extern int rx_getAllAddrMaskMtu(afs_in_addr addrBuffer[],
+			  	 afs_in_addr maskBuffer[],
 				 afs_uint32 mtuBuffer[],
 				 int maxSize);
 
@@ -261,7 +261,7 @@ extern void rxi_InitPeerParams(struct rx_peer *pp);
 extern void shutdown_rxkernel(void);
 # ifdef AFS_USERSPACE_IP_ADDR
 extern int rxi_GetcbiInfo(void);
-extern afs_int32 rxi_Findcbi(afs_uint32 addr);
+extern afs_int32 rxi_Findcbi(afs_in_addr addr);
 # else
 extern int rxi_GetIFInfo(void);
 # endif
@@ -282,7 +282,7 @@ extern void rxk_Listener(void);
 # ifndef UKERNEL
 extern void afs_rxevent_daemon(void);
 # endif
-extern rx_ifnet_t rxi_FindIfnet(afs_uint32 addr, afs_uint32 * maskp);
+extern rx_ifnet_t rxi_FindIfnet(afs_in_addr addr, afs_in_addr * maskp);
 extern void osi_StopListener(void);
 
 /* ARCH/rx_kmutex.c */
@@ -317,7 +317,7 @@ extern void osi_StopNetIfPoller(void);
 extern struct afs_ifinfo afsifinfo[ADDRSPERSITE];
 # endif
 extern void osi_StopListener(void);
-extern int rxi_FindIfMTU(afs_uint32 addr);
+extern int rxi_FindIfMTU(afs_in_addr addr);
 # if defined(UKERNEL)
 extern void rxi_ListenerProc(osi_socket usockp, int *tnop,
 			     struct rx_call **newcallp);
@@ -404,9 +404,9 @@ extern int rxi_FreePackets(int num_pkts, struct opr_queue *q);
 extern struct rx_packet *rxi_AllocSendPacket(struct rx_call *call,
 					     int want);
 extern int rxi_ReadPacket(osi_socket socket, struct rx_packet *p,
-			  afs_uint32 * host, u_short * port);
+			  afs_in_addr * host, u_short * port);
 extern struct rx_packet *rxi_SplitJumboPacket(struct rx_packet *p,
-					      afs_uint32 host, short port,
+					      afs_in_addr host, short port,
 					      int first);
 #ifndef KERNEL
 extern int osi_NetSend(osi_socket socket, void *addr, struct iovec *dvec,
@@ -414,18 +414,18 @@ extern int osi_NetSend(osi_socket socket, void *addr, struct iovec *dvec,
 #endif
 extern struct rx_packet *rxi_ReceiveDebugPacket(struct rx_packet *ap,
 						osi_socket asocket,
-						afs_uint32 ahost, short aport,
+						afs_in_addr ahost, short aport,
 						int istack);
 extern struct rx_packet *rxi_ReceiveVersionPacket(struct rx_packet
 						  *ap, osi_socket asocket,
-						  afs_uint32 ahost,
+						  afs_in_addr ahost,
 						  short aport, int istack);
 extern void rxi_SendPacket(struct rx_call *call, struct rx_connection *conn,
 			   struct rx_packet *p, int istack);
 extern void rxi_SendPacketList(struct rx_call *call,
 			       struct rx_connection *conn,
 			       struct rx_packet **list, int len, int istack);
-extern void rxi_SendRawAbort(osi_socket socket, afs_uint32 host, u_short port,
+extern void rxi_SendRawAbort(osi_socket socket, afs_in_addr host, u_short port,
 			     afs_int32 error, struct rx_packet *source,
 			     int istack);
 extern struct rx_packet *rxi_SendSpecial(struct rx_call *call,

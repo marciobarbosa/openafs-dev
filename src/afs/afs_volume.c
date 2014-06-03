@@ -969,7 +969,7 @@ LockAndInstallVolumeEntry(struct volume *av, struct vldbentry *ve, int acell)
     struct cell *cellp;
     int i, j;
     afs_int32 mask;
-    afs_uint32 temp;
+    afs_in_addr temp;
     char types = 0;
     struct server *serverHost[AFS_MAXHOSTS];
 
@@ -1047,7 +1047,7 @@ LockAndInstallNVolumeEntry(struct volume *av, struct nvldbentry *ve, int acell)
     struct cell *cellp;
     int i, j;
     afs_int32 mask;
-    afs_uint32 temp;
+    afs_in_addr temp;
     char types = 0;
     struct server *serverHost[AFS_MAXHOSTS];
 
@@ -1125,7 +1125,7 @@ LockAndInstallUVolumeEntry(struct volume *av, struct uvldbentry *ve, int acell,
     struct afs_conn *tconn;
     struct cell *cellp;
     int i, j;
-    afs_uint32 serverid;
+    afs_in_addr serverid;
     afs_int32 mask;
     int k;
     char type = 0;
@@ -1175,7 +1175,8 @@ LockAndInstallUVolumeEntry(struct volume *av, struct uvldbentry *ve, int acell,
 		&& ts->addr) {
 		/* uuid, uniquifier, and portal are the same */
 	    } else {
-		afs_uint32 *addrp, code;
+		afs_in_addr *addrp;
+		afs_uint32 code;
 		afs_int32 nentries, unique;
 		bulkaddrs addrs;
 		ListAddrByAttributes attrs;

@@ -82,7 +82,7 @@ char *logFile = NULL;
 char *configDir = NULL;
 
 #define ADDRSPERSITE 16         /* Same global is in rx/rx_user.c */
-afs_uint32 SHostAddrs[ADDRSPERSITE];
+afs_in_addr SHostAddrs[ADDRSPERSITE];
 
 #define VS_EXIT(code)  {                                          \
                           osi_audit(VS_ExitEvent, code, AUD_END); \
@@ -381,7 +381,7 @@ main(int argc, char **argv)
     afs_int32 numClasses;
     struct rx_service *service;
     int rxpackets = 100;
-    afs_uint32 host = ntohl(INADDR_ANY);
+    afs_in_addr host = ntohl(INADDR_ANY);
     VolumePackageOptions opts;
 
 #ifdef	AFS_AIX32_ENV

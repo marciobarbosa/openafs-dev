@@ -81,7 +81,7 @@ typedef struct kas_serverStats {
     int frees;
     int changePasswordRequests;
     int adminAccounts;
-    int host;
+    afs_in_addr_s host;
     unsigned int serverStartTime;
     struct timeval userTime;
     struct timeval systemTime;
@@ -118,7 +118,7 @@ typedef struct key_keyCacheItem {
 } key_keyCacheItem_t, *key_keyCacheItem_p;
 
 typedef struct kas_serverDebugInfo {
-    int host;
+    afs_in_addr_s host;
     unsigned int serverStartTime;
     unsigned int currentTime;
     int noAuth;

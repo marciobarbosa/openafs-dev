@@ -61,6 +61,12 @@ typedef short afs_int16;
 typedef unsigned short afs_uint16;
 typedef int afs_int32;
 typedef unsigned int afs_uint32;
+
+typedef afs_uint32 afs_in_addr;  /* IPv4 address */
+typedef afs_int32 afs_in_addr_s; /* variant for compatibility */
+typedef long afs_in_addr_sl;     /* variant for compatibility */
+typedef unsigned long afs_in_addr_l;  /* variant for compatibility */
+
 #if defined(AFS_NT40_ENV) && defined(_MSC_VER)
 typedef __int64 afs_int64;
 typedef unsigned __int64 afs_uint64;

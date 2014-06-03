@@ -94,7 +94,7 @@ hostutil_GetHostByName(char *ahost)
  * variable addr is in network byte order.
  */
 char *
-hostutil_GetNameByINet(afs_uint32 addr)
+hostutil_GetNameByINet(afs_in_addr addr)
 {
     struct hostent *th;
     static char tbuffer[256];
@@ -123,7 +123,7 @@ hostutil_GetNameByINet(afs_uint32 addr)
 */
 
 #define MAXBYTELEN 32
-afs_uint32
+afs_in_addr
 extractAddr(char *line, int maxSize)
 {
     char byte1[MAXBYTELEN], byte2[MAXBYTELEN];
@@ -221,7 +221,7 @@ extractAddr(char *line, int maxSize)
 
 /* same as inet_ntoa, but to a non-static buffer, must be freed by called */
 char *
-afs_inet_ntoa_r(afs_uint32 addr, char *buf)
+afs_inet_ntoa_r(afs_in_addr addr, char *buf)
 {
     int temp;
 

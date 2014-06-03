@@ -204,7 +204,7 @@ rxi_ReScheduleEvents(void)
 static void
 rxi_ListenerProc(osi_socket sock, int *tnop, struct rx_call **newcallp)
 {
-    unsigned int host;
+    afs_in_addr host;
     u_short port;
     struct rx_packet *p = (struct rx_packet *)0;
 

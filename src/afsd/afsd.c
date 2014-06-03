@@ -206,7 +206,7 @@ struct in_addr_42 {
 	struct {
 	    u_short s_w1, s_w2;
 	} S_un_w;
-	afs_uint32 S_addr;
+	afs_in_addr S_addr;
     } S_un;
 };
 
@@ -416,7 +416,7 @@ static void
 afsd_update_addresses(CFRunLoopTimerRef timer, void *info)
 {
     /* parse multihomed address files */
-    afs_uint32 addrbuf[MAXIPADDRS], maskbuf[MAXIPADDRS],
+    afs_in_addr addrbuf[MAXIPADDRS], maskbuf[MAXIPADDRS],
 	mtubuf[MAXIPADDRS];
     char reason[1024];
     int code;
@@ -1433,7 +1433,7 @@ ConfigCell(struct afsconf_cell *aci, void *arock, struct afsconf_dir *adir)
     int isHomeCell;
     int i, code;
     int cellFlags = 0;
-    afs_int32 hosts[MAXHOSTSPERCELL];
+    afs_in_addr_s hosts[MAXHOSTSPERCELL];
 
     /* figure out if this is the home cell */
     isHomeCell = (strcmp(aci->name, LclCellName) == 0);
@@ -2152,7 +2152,7 @@ afsd_run(void)
 	afsd_syscall(AFSOP_SEED_ENTROPY, seedbuf, sizeof(seedbuf));
 	memset(seedbuf, 0, sizeof(seedbuf));
 	/* parse multihomed address files */
-	afs_uint32 addrbuf[MAXIPADDRS], maskbuf[MAXIPADDRS],
+	afs_in_addr addrbuf[MAXIPADDRS], maskbuf[MAXIPADDRS],
 	    mtubuf[MAXIPADDRS];
 	char reason[1024];
 	code = afsconf_ParseNetFiles(addrbuf, maskbuf, mtubuf, MAXIPADDRS, reason,

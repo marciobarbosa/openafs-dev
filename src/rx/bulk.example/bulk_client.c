@@ -23,11 +23,11 @@
 #include "bulk.h"
 
 /* Bogus procedure to get internet address of host */
-static u_long
+static afs_in_addr_l
 GetIpAddress(char *hostname)
 {
     struct hostent *hostent;
-    u_long host;
+    afs_in_addr_l host;
     hostent = gethostbyname(hostname);
     if (!hostent) {
 	printf("host %s not found", hostname);
@@ -51,7 +51,7 @@ int
 main(int argc, char **argv)
 {
     char *localFile, *remoteFile;
-    u_long host;
+    afs_in_addr_l host;
     long length;
     struct rx_connection *conn;
     struct rx_call *call;

@@ -51,7 +51,7 @@ static int Quit(char *);
 int rxBind = 0;
 
 #define ADDRSPERSITE 16         /* Same global is in rx/rx_user.c */
-afs_uint32 SHostAddrs[ADDRSPERSITE];
+afs_in_addr SHostAddrs[ADDRSPERSITE];
 
 /* check whether caller is authorized to manage RX statistics */
 int
@@ -198,7 +198,7 @@ main(int argc, char *argv[])
     struct rx_securityClass **securityClasses;
     afs_int32 numClasses;
     struct rx_service *service;
-    afs_uint32 host = htonl(INADDR_ANY);
+    afs_in_addr host = htonl(INADDR_ANY);
 
     int a = 0;
     rxkad_level level;

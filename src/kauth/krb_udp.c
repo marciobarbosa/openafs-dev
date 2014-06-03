@@ -400,7 +400,7 @@ UDP_GetTicket(int ksoc, struct packet *pkt, afs_int32 kvno,
     char inst[MAXKTCNAMELEN];
     char cell[MAXKTCREALMLEN];
     struct ktc_encryptionKey authSessionKey;
-    afs_int32 host;
+    afs_in_addr_s host;
     Date start;
     Date authEnd;
     Date now = time(0);

@@ -191,7 +191,7 @@ print_internet_address(char *preamble, struct srvAddr *sa, char *postamble,
 {
     struct server *aserver = sa->server;
     char *ptr = "\n";
-    afs_uint32 address;
+    afs_in_addr address;
 
     AFS_STATCNT(print_internet_address);
     address = ntohl(sa->sa_ip);

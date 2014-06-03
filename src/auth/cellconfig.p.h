@@ -275,12 +275,12 @@ extern int afsconf_IsLocalRealmMatch(struct afsconf_dir *dir, afs_int32 * local,
 
 /* netrestrict.c */
 
-extern int afsconf_ParseNetRestrictFile(afs_uint32 outAddrs[],
-					afs_uint32 * mask, afs_uint32 * mtu,
+extern int afsconf_ParseNetRestrictFile(afs_in_addr outAddrs[],
+					afs_in_addr * mask, afs_uint32 * mtu,
 					afs_uint32 maxAddrs, afs_uint32 * nAddrs,
 					char reason[], const char *fileName);
 
-extern int afsconf_ParseNetFiles(afs_uint32 addrbuf[], afs_uint32 maskbuf[],
+extern int afsconf_ParseNetFiles(afs_in_addr addrbuf[], afs_in_addr maskbuf[],
 				 afs_uint32 mtubuf[], afs_uint32 max,
 				 char reason[], const char *niFileName,
 				 const char *nrFileName);

@@ -78,7 +78,7 @@ main(int argc, char **argv)
 {
     char *hostname;
     struct hostent *hostent;
-    afs_uint32 host;
+    afs_in_addr host;
     int logstdout = 0;
     struct rx_connection *conn;
     struct rx_call *call;

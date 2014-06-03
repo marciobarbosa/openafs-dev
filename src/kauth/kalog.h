@@ -13,7 +13,7 @@
 
 typedef struct {
     time_t last_use;
-    afs_int32 host;
+    afs_in_addr host;
 } kalog_elt;
 
 #define KALOG_DB_MODE 		0600
@@ -50,9 +50,9 @@ typedef struct {
 #ifdef AUTH_DBM_LOG
 #define KALOG(a,b,c,d,e,f,g) kalog_log(a,b,c,d,e,f,g)
 extern void kalog_Init(void);
-extern void kalog_log(char *, char *, char *, char *, char *, int, int);
+extern void kalog_log(char *, char *, char *, char *, char *, afs_in_addr_s, int);
 #else
 #define KALOG(a,b,c,d,e,f,g) ka_log(a,b,c,d,e,f,g)
 #endif
 
-extern void ka_log(char *, char *, char *, char *, char *, int, int);
+extern void ka_log(char *, char *, char *, char *, char *, afs_in_addr_s, int);

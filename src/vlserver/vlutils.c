@@ -21,8 +21,8 @@
 
 struct vlheader xheader;
 extern int maxnservers;
-extern afs_uint32 rd_HostAddress[MAXSERVERID + 1];
-extern afs_uint32 wr_HostAddress[MAXSERVERID + 1];
+extern afs_in_addr rd_HostAddress[MAXSERVERID + 1];
+extern afs_in_addr wr_HostAddress[MAXSERVERID + 1];
 struct extentaddr *rd_ex_addr[VL_MAX_ADDREXTBLKS] = { 0, 0, 0, 0 };
 struct extentaddr *wr_ex_addr[VL_MAX_ADDREXTBLKS] = { 0, 0, 0, 0 };
 struct vlheader rd_cheader;	/* kept in network byte order */

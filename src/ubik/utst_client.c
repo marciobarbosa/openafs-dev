@@ -29,7 +29,7 @@ main(int argc, char **argv)
 {
     afs_int32 code;
     struct ubik_client *cstruct = 0;
-    afs_uint32 serverList[MAXSERVERS];
+    afs_in_addr serverList[MAXSERVERS];
     struct rx_connection *serverconns[MAXSERVERS];
     struct rx_securityClass *sc;
     afs_int32 i;

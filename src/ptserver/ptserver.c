@@ -153,7 +153,7 @@ int rxBind = 0;
 int rxkadDisableDotCheck = 0;
 
 #define ADDRSPERSITE 16         /* Same global is in rx/rx_user.c */
-afs_uint32 SHostAddrs[ADDRSPERSITE];
+afs_in_addr SHostAddrs[ADDRSPERSITE];
 
 static struct afsconf_cell info;
 
@@ -234,7 +234,7 @@ int
 main(int argc, char **argv)
 {
     afs_int32 code;
-    afs_uint32 myHost;
+    afs_in_addr myHost;
     struct hostent *th;
     char hostname[64];
     struct rx_service *tservice;
@@ -242,7 +242,7 @@ main(int argc, char **argv)
     afs_int32 numClasses;
     int lwps = 3;
     char clones[MAXHOSTSPERCELL];
-    afs_uint32 host = htonl(INADDR_ANY);
+    afs_in_addr host = htonl(INADDR_ANY);
     struct cmd_syndesc *opts;
     struct cmd_item *list;
 
@@ -467,7 +467,7 @@ main(int argc, char **argv)
 	fprintf(stderr, "ptserver: couldn't get address of this host.\n");
 	PT_EXIT(1);
     }
-    memcpy(&myHost, th->h_addr, sizeof(afs_uint32));
+    memcpy(&myHost, th->h_addr, sizeof(myHost));
 
     /* get list of servers */
     code =

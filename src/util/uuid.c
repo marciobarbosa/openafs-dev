@@ -407,7 +407,7 @@ static int
 uuid_get_address(uuid_address_p_t addr)
 {
     afs_int32 code;
-    afs_uint32 addr1 = 0;
+    afs_in_addr addr1 = 0;
     struct hostent *he = NULL;
 
     code = gethostname(hostName1, 64);

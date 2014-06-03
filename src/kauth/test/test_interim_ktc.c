@@ -304,7 +304,7 @@ ListCellsCmd()
     long code;
     long i, j;
     char *tcp;
-    long clear;
+    afs_in_addr_sl clear;
     char space[AFS_PIOCTL_MAXSIZE];
     struct ViceIoctl blob;
 

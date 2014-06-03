@@ -152,7 +152,7 @@ rxi_StartListener(void)
 static void
 rxi_ListenerProc(fd_set * rfds, int *tnop, struct rx_call **newcallp)
 {
-    afs_uint32 host;
+    afs_in_addr host;
     u_short port;
     struct rx_packet *p = (struct rx_packet *)0;
     osi_socket socket;

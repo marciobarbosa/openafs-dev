@@ -986,16 +986,16 @@ afs_SortServers(struct server *aservers[], int count)
  * called 'afs_cb_interface'.
  *
  * struct srvAddr *sa;         remote server
- * afs_int32 addr;                one of my local addr in net order
- * afs_uint32 subnetmask;         subnet mask of local addr in net order
+ * afs_in_addr_s addr;                one of my local addr in net order
+ * afs_in_addr subnetmask;         subnet mask of local addr in net order
  *
  */
 void
-afsi_SetServerIPRank(struct srvAddr *sa, afs_int32 addr,
-		     afs_uint32 subnetmask)
+afsi_SetServerIPRank(struct srvAddr *sa, afs_in_addr_s addr,
+		     afs_in_addr subnetmask)
 {
-    afs_uint32 myAddr, myNet, mySubnet, netMask;
-    afs_uint32 serverAddr;
+    afs_in_addr myAddr, myNet, mySubnet, netMask;
+    afs_in_addr serverAddr;
 
     myAddr = ntohl(addr);	/* one of my IP addr in host order */
     serverAddr = ntohl(sa->sa_ip);	/* server's IP addr in host order */
@@ -1079,8 +1079,8 @@ afsi_SetServerIPRank(struct srvAddr *sa, rx_ifaddr_t ifa)
     void *t;
 #endif
 
-    afs_uint32 subnetmask, myAddr, myNet, myDstaddr, mySubnet, netMask;
-    afs_uint32 serverAddr;
+    afs_in_addr subnetmask, myAddr, myNet, myDstaddr, mySubnet, netMask;
+    afs_in_addr serverAddr;
 
     if (rx_ifaddr_address_family(ifa) != AF_INET)
 	return;
@@ -1588,7 +1588,7 @@ afs_SearchServer(u_short aport, afsUUID * uuidp, afs_int32 locktype,
  *      A server structure matching the request.
  */
 struct server *
-afs_GetServer(afs_uint32 *aserverp, afs_int32 nservers, afs_int32 acell,
+afs_GetServer(afs_in_addr *aserverp, afs_int32 nservers, afs_int32 acell,
 	      u_short aport, afs_int32 locktype, afsUUID * uuidp,
 	      afs_int32 addr_uniquifier, struct volume *tv)
 {

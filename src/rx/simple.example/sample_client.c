@@ -17,11 +17,11 @@
 #include "sample.h"
 
 /* Bogus procedure to get internet address of host */
-static unsigned int
+static afs_in_addr
 GetIpAddress(char *hostname)
 {
     struct hostent *hostent;
-    unsigned int host;
+    afs_in_addr host;
     hostent = gethostbyname(hostname);
     if (!hostent) {
 	printf("host %s not found", hostname);
@@ -39,7 +39,7 @@ int
 main(int argc, char **argv)
 {
     struct rx_connection *conn;
-    u_long host;
+    afs_in_addr host;
     struct rx_securityClass *null_securityObject;
     int i;
 

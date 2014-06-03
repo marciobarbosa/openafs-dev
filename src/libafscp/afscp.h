@@ -19,7 +19,7 @@ struct afscp_server {
     int index;
     int cell;
     int naddrs;
-    afs_uint32 addrs[AFS_MAXHOSTS];
+    afs_in_addr addrs[AFS_MAXHOSTS];
     struct rx_connection *conns[AFS_MAXHOSTS];
 };
 
@@ -42,7 +42,7 @@ struct afscp_volume {
     afs_uint32 id;
     int voltype;
     int nservers;
-    int servers[AFS_MAXHOSTS];
+    afs_in_addr_s servers[AFS_MAXHOSTS];
     char name[AFSNAMEMAX];
     void *statcache;
     void *dircache;

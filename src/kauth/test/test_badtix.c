@@ -600,7 +600,7 @@ main(argc, argv)
 	    struct ktc_principal client;
 	    struct ktc_encryptionKey sessionkey;
 	    Date start, end;
-	    long host;
+	    afs_in_addr_sl host;
 
 	    code =
 		tkt_DecodeTicket(atoken.ticket, atoken.ticketLen, &akey,

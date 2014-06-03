@@ -1807,7 +1807,7 @@ get_credv5_akimpersonate(krb5_context context,
 			 time_t starttime,
 			 time_t endtime,
 			 int *allowed_enctypes,
-			 int *paddress,
+			 afs_in_addr_s *paddress,
 			 krb5_creds** out_creds /* out */ )
 {
 #if defined(USING_HEIMDAL) || (defined(HAVE_ENCODE_KRB5_ENC_TKT) && defined(HAVE_ENCODE_KRB5_TICKET) && defined(HAVE_KRB5_C_ENCRYPT))

@@ -1758,7 +1758,7 @@ GetTicket(int version,
     struct ktc_encryptionKey sessionKey;
     int ticketLen;
     char ticket[MAXKTCTICKETLEN];
-    afs_int32 host;
+    afs_in_addr_s host;
     Date start;
     Date expiration;
     Date now;

@@ -180,7 +180,7 @@ extern int sizeFunctions[];
 extern int nHTBuckets;
 
 afs_int32 DbVerify(struct rx_call *call, afs_int32 *status,
-		   afs_int32 *orphans, afs_int32 *host);
+		   afs_int32 *orphans, afs_in_addr_s *host);
 afs_int32 verifyTextChain(struct ubik_trans *ut, struct textBlock *tbPtr);
 
 
@@ -1411,7 +1411,7 @@ SBUDB_DbVerify(struct rx_call *call, afs_int32 *status, afs_int32 *orphans,
 
 afs_int32
 DbVerify(struct rx_call *call, afs_int32 *status, afs_int32 *orphans,
-	 afs_int32 *host)
+	 afs_in_addr_s *host)
 {
     struct ubik_trans *ut = 0;
     afs_int32 code = 0, tcode;
@@ -1445,7 +1445,7 @@ DbVerify(struct rx_call *call, afs_int32 *status, afs_int32 *orphans,
     if (!th)
 	*host = 0;
     else {
-	memcpy(host, th->h_addr, sizeof(afs_int32));
+	memcpy(host, th->h_addr, sizeof(*host));
 	*host = ntohl(*host);
     }
 

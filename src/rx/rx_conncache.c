@@ -50,7 +50,7 @@ afs_kmutex_t rxi_connCacheMutex;
  */
 
 typedef struct rx_connParts {
-    unsigned int hostAddr;
+    afs_in_addr hostAddr;
     unsigned short port;
     unsigned short service;
     struct rx_securityClass *securityObject;
@@ -225,7 +225,7 @@ rxi_DeleteCachedConnections(void)
  */
 
 struct rx_connection *
-rx_GetCachedConnection(unsigned int remoteAddr, unsigned short port,
+rx_GetCachedConnection(afs_in_addr remoteAddr, unsigned short port,
 		       unsigned short service,
 		       struct rx_securityClass *securityObject,
 		       int securityIndex)

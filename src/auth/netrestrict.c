@@ -30,23 +30,24 @@
 #define MAX_NETFILE_LINE       2048	/* length of a line in the netrestrict file */
 #define MAXIPADDRS             1024	/* from afsd.c */
 
-static int ParseNetInfoFile_int(afs_uint32 *, afs_uint32 *, afs_uint32 *,
+static int ParseNetInfoFile_int(afs_in_addr *, afs_in_addr *, afs_uint32 *,
                          int, char reason[], const char *,
                          int);
+
 /*
  * The line parameter is a pointer to a buffer containing a string of
  * bytes of the form
 ** w.x.y.z 	# machineName
  * returns the network interface IP Address in NBO
  */
-afs_uint32
+afs_in_addr
 extract_Addr(char *line, int maxSize)
 {
     char bytes[4][32];
     int i = 0, n = 0;
     char *endPtr;
     afs_uint32 val[4];
-    afs_uint32 retval = 0;
+    afs_in_addr retval = 0;
 
     /* skip empty spaces */
     while (isspace(*line) && maxSize) {
@@ -115,7 +116,7 @@ extract_Addr(char *line, int maxSize)
  *     fatal failure.
  */
 static int
-parseNetRestrictFile_int(afs_uint32 outAddrs[], afs_uint32 outMask[],
+parseNetRestrictFile_int(afs_in_addr outAddrs[], afs_in_addr outMask[],
 			 afs_uint32 outMtu[], afs_uint32 maxAddrs,
 			 afs_uint32 *nAddrs, char reason[],
 			 const char *fileName, const char *fileName_ni)
@@ -124,7 +125,11 @@ parseNetRestrictFile_int(afs_uint32 outAddrs[], afs_uint32 outMask[],
     char line[MAX_NETFILE_LINE];
     int lineNo, usedfile = 0;
     afs_uint32 i, neaddrs, nOutaddrs;
-    afs_uint32 addr, eAddrs[MAXIPADDRS], eMask[MAXIPADDRS], eMtu[MAXIPADDRS];
+    afs_in_addr addr;
+    afs_in_addr eAddrs[MAXIPADDRS];
+    afs_in_addr eMask[MAXIPADDRS];
+    afs_uint32 eMtu[MAXIPADDRS];
+
 
     opr_Assert(outAddrs);
     opr_Assert(reason);
@@ -216,7 +221,7 @@ parseNetRestrictFile_int(afs_uint32 outAddrs[], afs_uint32 outMask[],
 }
 
 int
-afsconf_ParseNetRestrictFile(afs_uint32 outAddrs[], afs_uint32 outMask[],
+afsconf_ParseNetRestrictFile(afs_in_addr outAddrs[], afs_in_addr outMask[],
 			     afs_uint32 outMtu[], afs_uint32 maxAddrs,
 			     afs_uint32 * nAddrs, char reason[],
 			     const char *fileName)
@@ -251,17 +256,18 @@ afsconf_ParseNetRestrictFile(afs_uint32 outAddrs[], afs_uint32 outMask[],
  *     The number of valid address on success or < 0 on fatal failure.
  */
 static int
-ParseNetInfoFile_int(afs_uint32 outAddrs[], afs_uint32 outMask[], afs_uint32 outMtu[],
+ParseNetInfoFile_int(afs_in_addr outAddrs[], afs_in_addr outMask[], afs_uint32 outMtu[],
 		     int max, char reason[], const char *fileName,
 		     int fakeonly)
 {
 
-    afs_uint32 existingAddr[MAXIPADDRS], existingMask[MAXIPADDRS],
-	existingMtu[MAXIPADDRS];
+    afs_in_addr existingAddr[MAXIPADDRS];
+    afs_in_addr existingMask[MAXIPADDRS];
+    afs_uint32 existingMtu[MAXIPADDRS];
     char line[MAX_NETFILE_LINE];
     FILE *fp;
     int i, existNu, count = 0;
-    afs_uint32 addr;
+    afs_in_addr addr;
     int lineNo = 0;
     int l;
 
@@ -374,7 +380,7 @@ ParseNetInfoFile_int(afs_uint32 outAddrs[], afs_uint32 outMask[], afs_uint32 out
 }
 
 int
-afsconf_ParseNetInfoFile(afs_uint32 outAddrs[], afs_uint32 outMask[], afs_uint32 outMtu[],
+afsconf_ParseNetInfoFile(afs_in_addr outAddrs[], afs_in_addr outMask[], afs_uint32 outMtu[],
 			 int max, char reason[], const char *fileName)
 {
     return ParseNetInfoFile_int(outAddrs, outMask, outMtu, max, reason, fileName, 0);
@@ -386,12 +392,12 @@ afsconf_ParseNetInfoFile(afs_uint32 outAddrs[], afs_uint32 outMask[], afs_uint32
  * entries.
  */
 static int
-filterAddrs(afs_uint32 addr1[], afs_uint32 addr2[], afs_uint32 mask1[],
-	    afs_uint32 mask2[], afs_uint32 mtu1[], afs_uint32 mtu2[], int n1,
+filterAddrs(afs_in_addr addr1[], afs_in_addr addr2[], afs_in_addr mask1[],
+	    afs_in_addr mask2[], afs_uint32 mtu1[], afs_uint32 mtu2[], int n1,
 	    int n2)
 {
-    afs_uint32 taddr[MAXIPADDRS];
-    afs_uint32 tmask[MAXIPADDRS];
+    afs_in_addr taddr[MAXIPADDRS];
+    afs_in_addr tmask[MAXIPADDRS];
     afs_uint32 tmtu[MAXIPADDRS];
     int count = 0, i = 0, j = 0, found = 0;
 
@@ -447,14 +453,16 @@ filterAddrs(afs_uint32 addr1[], afs_uint32 addr2[], afs_uint32 mask1[],
  */
 /* max - Entries in addrbuf, maskbuf and mtubuf */
 int
-afsconf_ParseNetFiles(afs_uint32 addrbuf[], afs_uint32 maskbuf[],
+afsconf_ParseNetFiles(afs_in_addr addrbuf[], afs_in_addr maskbuf[],
 		      afs_uint32 mtubuf[], afs_uint32 max, char reason[],
 		      const char *niFileName, const char *nrFileName)
 {
-    afs_uint32 addrbuf1[MAXIPADDRS], maskbuf1[MAXIPADDRS],
-	mtubuf1[MAXIPADDRS];
-    afs_uint32 addrbuf2[MAXIPADDRS], maskbuf2[MAXIPADDRS],
-	mtubuf2[MAXIPADDRS];
+    afs_in_addr addrbuf1[MAXIPADDRS];
+    afs_in_addr maskbuf1[MAXIPADDRS];
+    afs_uint32 mtubuf1[MAXIPADDRS];
+    afs_in_addr addrbuf2[MAXIPADDRS];
+    afs_in_addr maskbuf2[MAXIPADDRS];
+    afs_uint32 mtubuf2[MAXIPADDRS];
     int nAddrs1 = 0;
     afs_uint32 nAddrs2 = 0;
     int code, i;

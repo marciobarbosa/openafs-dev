@@ -19,7 +19,7 @@ extern int dbase_fd;
 struct ubik_dbase *dbase;
 
 int
-ubik_ServerInit(afs_uint32 myHost, short myPort, afs_uint32 serverList[],
+ubik_ServerInit(afs_in_addr myHost, short myPort, afs_in_addr serverList[],
                 const char *pathName, struct ubik_dbase **dbase)
 {
     return (0);
@@ -170,7 +170,7 @@ ubik_Read(struct ubik_trans *tt, void *buf, afs_int32 len)
 afs_int32 ubik_quorum = 0;
 struct ubik_dbase *ubik_dbase = 0;
 struct ubik_stats ubik_stats;
-afs_uint32 ubik_host[UBIK_MAX_INTERFACE_ADDR];
+afs_in_addr ubik_host[UBIK_MAX_INTERFACE_ADDR];
 afs_int32 ubik_epochTime = 0;
 afs_int32 urecovery_state = 0;
 

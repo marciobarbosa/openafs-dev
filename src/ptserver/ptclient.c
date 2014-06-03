@@ -465,10 +465,11 @@ main(int argc, char **argv)
 	    else if (!(hostinfo = gethostbyname(name)))
 		code = PRBADARG;
 	    else {
+		afs_in_addr hostid;
 		hostaddr = (struct in_addr *)hostinfo->h_addr_list[0];
-		id = ntohl(hostaddr->s_addr);
+		hostid = ntohl(hostaddr->s_addr);
 		code =
-		    ubik_PR_GetHostCPS(pruclient, 0, id, &alist, &over);
+		    ubik_PR_GetHostCPS(pruclient, 0, hostid, &alist, &over);
 	    }
 	    if (CodeOk(code))
 		printf("%s\n", pr_ErrorMsg(code));

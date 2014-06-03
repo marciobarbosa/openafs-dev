@@ -90,7 +90,7 @@ GetConn(struct cmd_syndesc *as, int aencrypt)
     const char *confdir;
     afs_int32 code;
     struct rx_connection *tconn;
-    afs_int32 addr;
+    afs_in_addr_s addr;
     struct afsconf_dir *tdir = NULL;
     afsconf_secflags secFlags;
     struct rx_securityClass *sc;
@@ -102,7 +102,7 @@ GetConn(struct cmd_syndesc *as, int aencrypt)
 	fprintf(stderr, "bos: can't find address for host '%s'\n", hostname);
 	exit(1);
     }
-    memcpy(&addr, th->h_addr, sizeof(afs_int32));
+    memcpy(&addr, th->h_addr, sizeof(addr));
 
     if (aencrypt)
 	secFlags = AFSCONF_SECOPTS_ALWAYSENCRYPT;

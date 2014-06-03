@@ -33,7 +33,7 @@ int (*rxk_PacketArrivalProc) (struct rx_packet * ahandle, struct sockaddr_in * a
 int (*rxk_GetPacketProc) (struct rx_packet **ahandle, int asize);
 #endif
 
-osi_socket *rxk_NewSocketHost(afs_uint32 ahost, short aport);
+osi_socket *rxk_NewSocketHost(afs_in_addr ahost, short aport);
 extern struct interfaceAddr afs_cb_interface;
 
 rxk_ports_t rxk_ports;
@@ -796,7 +796,7 @@ rxi_FindIfnet(afs_uint32 addr, afs_uint32 * maskp)
  * in network byte order.
  */
 osi_socket *
-rxk_NewSocketHost(afs_uint32 ahost, short aport)
+rxk_NewSocketHost(afs_in_addr ahost, short aport)
 {
     afs_int32 code;
 #ifdef AFS_DARWIN80_ENV
@@ -1084,7 +1084,7 @@ afs_rxevent_daemon(void)
 
 /* rxk_ReadPacket returns 1 if valid packet, 0 on error. */
 int
-rxk_ReadPacket(osi_socket so, struct rx_packet *p, int *host, int *port)
+rxk_ReadPacket(osi_socket so, struct rx_packet *p, afs_in_addr_s *host, int *port)
 {
     int code;
     struct sockaddr_in from;
@@ -1196,7 +1196,8 @@ rxk_Listener(void)
 {
     struct rx_packet *rxp = NULL;
     int code;
-    int host, port;
+    afs_in_addr_s host;
+    int port;
 
 #ifdef AFS_LINUX20_ENV
     rxk_ListenerPid = current->pid;

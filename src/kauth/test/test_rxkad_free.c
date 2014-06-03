@@ -59,7 +59,7 @@ Main(struct cmd_syndesc *as, void *arock)
     char newCell[MAXKTCREALMLEN];
     char *cell;
 
-    long serverList[MAXSERVERS];
+    afs_in_addr_sl serverList[MAXSERVERS];
     extern struct passwd *getpwuid();
 
     struct passwd *pw;
@@ -80,7 +80,7 @@ Main(struct cmd_syndesc *as, void *arock)
     unsigned long highWater;	/* mem usage after reap period */
     unsigned long lastWater;	/* mem usage after last msg */
     int serversUse[MAXSERVERS];	/* usage of each server */
-    long serversHost[MAXSERVERS];	/* host addr */
+    afs_in_addr_sl serversHost[MAXSERVERS];	/* host addr */
     unsigned long startTime;
     unsigned long now;
 
@@ -254,7 +254,7 @@ Main(struct cmd_syndesc *as, void *arock)
 		if (rxConn == 0)
 		    break;
 		if (rxConn->serial > 0) {
-		    long host = rx_HostOf(rx_PeerOf(rxConn));
+		    afs_in_addr_sl host = rx_HostOf(rx_PeerOf(rxConn));
 		    for (d = 0; d < MAXSERVERS; d++) {
 			if (serversHost[d] == 0)
 			    serversHost[d] = host;

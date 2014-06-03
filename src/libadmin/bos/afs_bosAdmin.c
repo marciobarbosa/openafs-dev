@@ -162,7 +162,7 @@ bos_ServerOpen(const void *cellHandle, const char *serverName,
     afs_status_t tst = 0;
     afs_cell_handle_p c_handle = (afs_cell_handle_p) cellHandle;
     bos_server_p bos_server = calloc(1, sizeof(bos_server_t));
-    int serverAddress;
+    afs_in_addr_s serverAddress;
 
     /*
      * Validate parameters

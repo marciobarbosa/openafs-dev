@@ -28,7 +28,7 @@ main(int argc, char *argv[])
     struct ktc_principal client;
     struct ktc_encryptionKey sessionkey;
     Date start, end;
-    afs_int32 host;
+    afs_in_addr_s host;
     char key[8];
     char ticket[MAXKTCTICKETLEN];
     afs_int32 ticketLen;

@@ -60,7 +60,7 @@ typedef enum {
 } vos_volumeType_t, *vos_volumeType_p;
 
 typedef struct vos_fileServerEntry {
-    int serverAddress[VOS_MAX_SERVER_ADDRESS];
+    afs_in_addr_s serverAddress[VOS_MAX_SERVER_ADDRESS];
     int count;
 } vos_fileServerEntry_t, *vos_fileServerEntry_p;
 
@@ -145,7 +145,7 @@ typedef struct vos_vldbEntry {
     unsigned int cloneId;
     vos_vldbEntryStatus_t status;
     struct {
-	int serverAddress;
+	afs_in_addr_s serverAddress;
 	int serverPartition;
 	vos_vldbServerFlag_t serverFlags;
     } volumeSites[VOS_MAX_REPLICA_SITES];
@@ -268,7 +268,7 @@ extern int ADMINAPI vos_FileServerAddressChange(const void *cellHandle,
 
 extern int ADMINAPI vos_FileServerAddressRemove(const void *cellHandle,
 						vos_MessageCallBack_t
-						callBack, unsigned int serverAddress,
+						callBack, afs_in_addr serverAddress,
 						afs_status_p st);
 
 extern int ADMINAPI vos_FileServerGetBegin(const void *cellHandle,

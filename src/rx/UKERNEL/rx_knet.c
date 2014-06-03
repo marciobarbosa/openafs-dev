@@ -64,7 +64,7 @@ void
 rxi_ListenerProc(osi_socket usockp, int *tnop, struct rx_call **newcallp)
 {
     struct rx_packet *tp;
-    afs_uint32 host;
+    afs_in_addr host;
     u_short port;
     int rc;
 
@@ -174,7 +174,7 @@ rx_ServerProc(void *unused)
  * we start the receiver threads.
  */
 osi_socket *
-rxk_NewSocketHost(afs_uint32 ahost, short aport)
+rxk_NewSocketHost(afs_in_addr ahost, short aport)
 {
     struct usr_socket *usockp;
 

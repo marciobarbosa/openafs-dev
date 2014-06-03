@@ -61,12 +61,12 @@ struct addr_data addr_globals;
 /* Values protected by the beacon lock */
 struct beacon_data beacon_globals;
 
-static int ubeacon_InitServerListCommon(afs_uint32 ame,
+static int ubeacon_InitServerListCommon(afs_in_addr ame,
 					struct afsconf_cell *info,
 					char clones[],
-					afs_uint32 aservers[]);
-static int verifyInterfaceAddress(afs_uint32 *ame, struct afsconf_cell *info,
-				  afs_uint32 aservers[]);
+					afs_in_addr aservers[]);
+static int verifyInterfaceAddress(afs_in_addr *ame, struct afsconf_cell *info,
+				  afs_in_addr aservers[]);
 
 /*! \file
  * Module responsible for both deciding if we're currently the sync site,
@@ -162,7 +162,7 @@ ubeacon_AmSyncSite(void)
  * \see ubeacon_InitServerListCommon()
  */
 int
-ubeacon_InitServerListByInfo(afs_uint32 ame, struct afsconf_cell *info,
+ubeacon_InitServerListByInfo(afs_in_addr ame, struct afsconf_cell *info,
 			     char clones[])
 {
     afs_int32 code;
@@ -178,7 +178,7 @@ ubeacon_InitServerListByInfo(afs_uint32 ame, struct afsconf_cell *info,
  * \see ubeacon_InitServerListCommon()
  */
 int
-ubeacon_InitServerList(afs_uint32 ame, afs_uint32 aservers[])
+ubeacon_InitServerList(afs_in_addr ame, afs_in_addr aservers[])
 {
     afs_int32 code;
 
@@ -265,14 +265,14 @@ ubeacon_ReinitServer(struct ubik_server *ts)
  * \see ubeacon_InitServerList(), ubeacon_InitServerListByInfo()
  */
 int
-ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
-			     char clones[], afs_uint32 aservers[])
+ubeacon_InitServerListCommon(afs_in_addr ame, struct afsconf_cell *info,
+			     char clones[], afs_in_addr aservers[])
 {
     struct ubik_server *ts;
     afs_int32 me = -1;
-    afs_int32 servAddr;
+    afs_in_addr_s servAddr;
     afs_int32 i, code;
-    afs_int32 magicHost;
+    afs_in_addr_s magicHost;
     struct ubik_server *magicServer;
 
     /* verify that the addresses passed in are correct */
@@ -286,8 +286,8 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 
     if (info) {
 	for (i = 0; i < info->numServers; i++) {
-	    if (ntohl((afs_uint32) info->hostAddr[i].sin_addr.s_addr) ==
-		ntohl((afs_uint32) ame)) {
+	    if (ntohl(info->hostAddr[i].sin_addr.s_addr) ==
+		ntohl(ame)) {
 		me = i;
 		if (clones[i]) {
 		    amIClone = 1;
@@ -307,8 +307,8 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 		ts->isClone = 1;
 	    } else {
 		if (!magicHost
-		    || ntohl((afs_uint32) ts->addr[0]) <
-		    (afs_uint32) magicHost) {
+		    || ntohl(ts->addr[0]) <
+		    magicHost) {
 		    magicHost = ntohl(ts->addr[0]);
 		    magicServer = ts;
 		}
@@ -341,7 +341,7 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 			addr_globals.ubikSecClass, addr_globals.ubikSecIndex);	/* for disk reqs */
 	    ts->isClone = 0;	/* don't know about clones */
 	    ts->up = 1;
-	    if (ntohl((afs_uint32) servAddr) < (afs_uint32) magicHost) {
+	    if (ntohl(servAddr) < magicHost) {
 		magicHost = ntohl(servAddr);
 		magicServer = ts;
 	    }
@@ -620,10 +620,10 @@ ubeacon_Interact(void *dummy)
  * \return 0 on success, non-zero on failure
  */
 static int
-verifyInterfaceAddress(afs_uint32 *ame, struct afsconf_cell *info,
-		       afs_uint32 aservers[]) {
-    afs_uint32 myAddr[UBIK_MAX_INTERFACE_ADDR], *servList, tmpAddr;
-    afs_uint32 myAddr2[UBIK_MAX_INTERFACE_ADDR];
+verifyInterfaceAddress(afs_in_addr *ame, struct afsconf_cell *info,
+		       afs_in_addr aservers[]) {
+    afs_in_addr myAddr[UBIK_MAX_INTERFACE_ADDR], *servList, tmpAddr;
+    afs_in_addr myAddr2[UBIK_MAX_INTERFACE_ADDR];
     char hoststr[16];
     int tcount, count, found, i, j, totalServers, start, end, usednetfiles =
 	0;
@@ -706,7 +706,7 @@ verifyInterfaceAddress(afs_uint32 *ame, struct afsconf_cell *info,
     for (j = 0, found = 0; j < count; j++) {
 	for (i = 0; i < totalServers; i++) {
 	    if (info)
-		tmpAddr = (afs_uint32) info->hostAddr[i].sin_addr.s_addr;
+		tmpAddr = info->hostAddr[i].sin_addr.s_addr;
 	    else
 		tmpAddr = aservers[i];
 	    if (myAddr[j] == tmpAddr) {
@@ -765,7 +765,7 @@ verifyInterfaceAddress(afs_uint32 *ame, struct afsconf_cell *info,
  * \return 0 on success, non-zero on failure
  */
 int
-ubeacon_updateUbikNetworkAddress(afs_uint32 ubik_host[UBIK_MAX_INTERFACE_ADDR])
+ubeacon_updateUbikNetworkAddress(afs_in_addr ubik_host[UBIK_MAX_INTERFACE_ADDR])
 {
     int j, count, code = 0;
     UbikInterfaceAddr inAddr, outAddr;

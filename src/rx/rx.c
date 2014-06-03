@@ -124,14 +124,14 @@ static struct rx_packet *rxi_SendCallAbort(struct rx_call *call,
 					   int istack, int force);
 static void rxi_AckAll(struct rx_call *call);
 static struct rx_connection
-	*rxi_FindConnection(osi_socket socket, afs_uint32 host, u_short port,
+	*rxi_FindConnection(osi_socket socket, afs_in_addr host, u_short port,
 			    u_short serviceId, afs_uint32 cid,
 			    afs_uint32 epoch, int type, u_int securityIndex,
                             int *unknownService);
 static struct rx_packet
 	*rxi_ReceiveDataPacket(struct rx_call *call, struct rx_packet *np,
 			       int istack, osi_socket socket,
-			       afs_uint32 host, u_short port, int *tnop,
+			       afs_in_addr host, u_short port, int *tnop,
 			       struct rx_call **newcallp);
 static struct rx_packet
 	*rxi_ReceiveAckPacket(struct rx_call *call, struct rx_packet *np,
@@ -453,7 +453,7 @@ static
 rx_atomic_t rxinit_status = RX_ATOMIC_INIT(1);
 
 int
-rx_InitHost(u_int host, u_int port)
+rx_InitHost(afs_in_addr host, u_int port)
 {
 #ifdef KERNEL
     osi_timeval_t tv;
@@ -996,7 +996,7 @@ rx_StartServer(int donateMe)
  * specified security object to implement the security model for this
  * connection. */
 struct rx_connection *
-rx_NewConnection(afs_uint32 shost, u_short sport, u_short sservice,
+rx_NewConnection(afs_in_addr shost, u_short sport, u_short sservice,
 		 struct rx_securityClass *securityObject,
 		 int serviceSecurityIndex)
 {
@@ -1701,7 +1701,7 @@ rxi_SetCallNumberVector(struct rx_connection *aconn,
                          service name might be used for probing for
                          statistics) */
 struct rx_service *
-rx_NewServiceHost(afs_uint32 host, u_short port, u_short serviceId,
+rx_NewServiceHost(afs_in_addr host, u_short port, u_short serviceId,
 		  char *serviceName, struct rx_securityClass **securityObjects,
 		  int nSecurityObjects,
 		  afs_int32(*serviceProc) (struct rx_call * acall))
@@ -2823,7 +2823,7 @@ rxi_Free(void *addr, size_t size)
 }
 
 void
-rxi_SetPeerMtu(struct rx_peer *peer, afs_uint32 host, afs_uint32 port, int mtu)
+rxi_SetPeerMtu(struct rx_peer *peer, afs_in_addr host, afs_uint32 port, int mtu)
 {
     struct rx_peer **peer_ptr = NULL, **peer_end = NULL;
     struct rx_peer *next = NULL;
@@ -2888,7 +2888,7 @@ rxi_SetPeerMtu(struct rx_peer *peer, afs_uint32 host, afs_uint32 port, int mtu)
 
 #ifdef AFS_RXERRQ_ENV
 static void
-rxi_SetPeerDead(struct sock_extended_err *err, afs_uint32 host, afs_uint16 port)
+rxi_SetPeerDead(struct sock_extended_err *err, afs_in_addr host, afs_uint16 port)
 {
     int hashIndex = PEER_HASH(host, port);
     struct rx_peer *peer;
@@ -2919,7 +2919,7 @@ rxi_SetPeerDead(struct sock_extended_err *err, afs_uint32 host, afs_uint16 port)
 }
 
 void
-rxi_ProcessNetError(struct sock_extended_err *err, afs_uint32 addr, afs_uint16 port)
+rxi_ProcessNetError(struct sock_extended_err *err, afs_in_addr addr, afs_uint16 port)
 {
 # ifdef AFS_ADAPT_PMTU
     if (err->ee_errno == EMSGSIZE && err->ee_info >= 68) {
@@ -3020,7 +3020,7 @@ rx_GetNetworkError(struct rx_connection *conn, int *err_origin, int *err_type,
  * new one will be allocated and initialized
  */
 struct rx_peer *
-rxi_FindPeer(afs_uint32 host, u_short port, int create)
+rxi_FindPeer(afs_in_addr host, u_short port, int create)
 {
     struct rx_peer *pp;
     int hashIndex;
@@ -3068,7 +3068,7 @@ rxi_FindPeer(afs_uint32 host, u_short port, int create)
  * server connection is created, it will be created using the supplied
  * index, if the index is valid for this service */
 static struct rx_connection *
-rxi_FindConnection(osi_socket socket, afs_uint32 host,
+rxi_FindConnection(osi_socket socket, afs_in_addr host,
 		   u_short port, u_short serviceId, afs_uint32 cid,
 		   afs_uint32 epoch, int type, u_int securityIndex,
                    int *unknownService)
@@ -3335,7 +3335,7 @@ int (*rx_almostSent) (struct rx_packet *, struct sockaddr_in *) = 0;
 
 struct rx_packet *
 rxi_ReceivePacket(struct rx_packet *np, osi_socket socket,
-		  afs_uint32 host, u_short port, int *tnop,
+		  afs_in_addr host, u_short port, int *tnop,
 		  struct rx_call **newcallp)
 {
     struct rx_call *call;
@@ -3774,7 +3774,7 @@ TryAttach(struct rx_call *acall, osi_socket socket,
 static struct rx_packet *
 rxi_ReceiveDataPacket(struct rx_call *call,
 		      struct rx_packet *np, int istack,
-		      osi_socket socket, afs_uint32 host, u_short port,
+		      osi_socket socket, afs_in_addr host, u_short port,
 		      int *tnop, struct rx_call **newcallp)
 {
     int ackNeeded = 0;		/* 0 means no, otherwise ack_reason */
@@ -7310,7 +7310,7 @@ rx_PrintPeerStats(FILE * file, struct rx_peer *peer)
 
 #if defined(RXDEBUG) || defined(MAKEDEBUGCALL)
 static int
-MakeDebugCall(osi_socket socket, afs_uint32 remoteAddr, afs_uint16 remotePort,
+MakeDebugCall(osi_socket socket, afs_in_addr remoteAddr, afs_uint16 remotePort,
 	      u_char type, void *inputData, size_t inputLength,
 	      void *outputData, size_t outputLength)
 {
@@ -7421,7 +7421,7 @@ MakeDebugCall(osi_socket socket, afs_uint32 remoteAddr, afs_uint16 remotePort,
 #endif /* RXDEBUG */
 
 afs_int32
-rx_GetServerDebug(osi_socket socket, afs_uint32 remoteAddr,
+rx_GetServerDebug(osi_socket socket, afs_in_addr remoteAddr,
 		  afs_uint16 remotePort, struct rx_debugStats * stat,
 		  afs_uint32 * supportedValues)
 {
@@ -7485,7 +7485,7 @@ rx_GetServerDebug(osi_socket socket, afs_uint32 remoteAddr,
 }
 
 afs_int32
-rx_GetServerStats(osi_socket socket, afs_uint32 remoteAddr,
+rx_GetServerStats(osi_socket socket, afs_in_addr remoteAddr,
 		  afs_uint16 remotePort, struct rx_statistics * stat,
 		  afs_uint32 * supportedValues)
 {
@@ -7525,7 +7525,7 @@ rx_GetServerStats(osi_socket socket, afs_uint32 remoteAddr,
 }
 
 afs_int32
-rx_GetServerVersion(osi_socket socket, afs_uint32 remoteAddr,
+rx_GetServerVersion(osi_socket socket, afs_in_addr remoteAddr,
 		    afs_uint16 remotePort, size_t version_length,
 		    char *version)
 {
@@ -7540,7 +7540,7 @@ rx_GetServerVersion(osi_socket socket, afs_uint32 remoteAddr,
 }
 
 afs_int32
-rx_GetServerConnections(osi_socket socket, afs_uint32 remoteAddr,
+rx_GetServerConnections(osi_socket socket, afs_in_addr remoteAddr,
 			afs_uint16 remotePort, afs_int32 * nextConnection,
 			int allConnections, afs_uint32 debugSupportedValues,
 			struct rx_debugConn * conn,
@@ -7627,7 +7627,7 @@ rx_GetServerConnections(osi_socket socket, afs_uint32 remoteAddr,
 }
 
 afs_int32
-rx_GetServerPeers(osi_socket socket, afs_uint32 remoteAddr,
+rx_GetServerPeers(osi_socket socket, afs_in_addr remoteAddr,
 		  afs_uint16 remotePort, afs_int32 * nextPeer,
 		  afs_uint32 debugSupportedValues, struct rx_debugPeer * peer,
 		  afs_uint32 * supportedValues)
@@ -7687,7 +7687,7 @@ rx_GetServerPeers(osi_socket socket, afs_uint32 remoteAddr,
 }
 
 afs_int32
-rx_GetLocalPeers(afs_uint32 peerHost, afs_uint16 peerPort,
+rx_GetLocalPeers(afs_in_addr peerHost, afs_uint16 peerPort,
 		struct rx_debugPeer * peerStats)
 {
 	struct rx_peer *tp;
@@ -8081,7 +8081,7 @@ rxi_ClearRPCOpStat(rx_function_entry_v1_p rpc_stat)
 
 static rx_interface_stat_p
 rxi_FindRpcStat(struct opr_queue *stats, afs_uint32 rxInterface,
-		afs_uint32 totalFunc, int isServer, afs_uint32 remoteHost,
+		afs_uint32 totalFunc, int isServer, afs_in_addr remoteHost,
 		afs_uint32 remotePort, int addToPeerList,
 		unsigned int *counter, int create)
 {
@@ -8171,7 +8171,7 @@ rx_ClearProcessRPCStats(afs_int32 rxInterface)
 }
 
 void
-rx_ClearPeerRPCStats(afs_int32 rxInterface, afs_uint32 peerHost, afs_uint16 peerPort)
+rx_ClearPeerRPCStats(afs_int32 rxInterface, afs_in_addr peerHost, afs_uint16 peerPort)
 {
     rx_interface_stat_p rpc_stat;
     int totalFunc, i;
@@ -8229,7 +8229,7 @@ rx_CopyProcessRPCStats(afs_uint64 op)
 }
 
 void *
-rx_CopyPeerRPCStats(afs_uint64 op, afs_uint32 peerHost, afs_uint16 peerPort)
+rx_CopyPeerRPCStats(afs_uint64 op, afs_in_addr peerHost, afs_uint16 peerPort)
 {
     rx_interface_stat_p rpc_stat;
     rx_function_entry_v1_p rpcop_stat =
@@ -8323,7 +8323,7 @@ rxi_AddRpcStat(struct opr_queue *stats, afs_uint32 rxInterface,
 	       afs_uint32 currentFunc, afs_uint32 totalFunc,
 	       struct clock *queueTime, struct clock *execTime,
 	       afs_uint64 bytesSent, afs_uint64 bytesRcvd, int isServer,
-	       afs_uint32 remoteHost, afs_uint32 remotePort,
+	       afs_in_addr remoteHost, afs_uint32 remotePort,
 	       int addToPeerList, unsigned int *counter)
 {
     int rc = 0;

@@ -44,8 +44,8 @@ int lwps = 9;
 
 struct vldstats dynamic_statistics;
 struct ubik_dbase *VL_dbase;
-afs_uint32 rd_HostAddress[MAXSERVERID + 1];
-afs_uint32 wr_HostAddress[MAXSERVERID + 1];
+afs_in_addr rd_HostAddress[MAXSERVERID + 1];
+afs_in_addr wr_HostAddress[MAXSERVERID + 1];
 
 static void *CheckSignal(void*);
 int LogLevel = 0;
@@ -57,7 +57,7 @@ afs_int32 rxBind = 0;
 int rxkadDisableDotCheck = 0;
 
 #define ADDRSPERSITE 16         /* Same global is in rx/rx_user.c */
-afs_uint32 SHostAddrs[ADDRSPERSITE];
+afs_in_addr SHostAddrs[ADDRSPERSITE];
 
 static void
 CheckSignal_Signal(int unused)
@@ -159,7 +159,7 @@ int
 main(int argc, char **argv)
 {
     afs_int32 code;
-    afs_uint32 myHost;
+    afs_in_addr myHost;
     struct rx_service *tservice;
     struct rx_securityClass **securityClasses;
     afs_int32 numClasses;
@@ -170,7 +170,7 @@ main(int argc, char **argv)
     char hostname[VL_MAXNAMELEN];
     int noAuth = 0;
     char clones[MAXHOSTSPERCELL];
-    afs_uint32 host = ntohl(INADDR_ANY);
+    afs_in_addr host = ntohl(INADDR_ANY);
     struct cmd_syndesc *opts;
 
     char *vl_dbaseName;
@@ -391,7 +391,7 @@ main(int argc, char **argv)
 	       hostname));
 	exit(1);
     }
-    memcpy(&myHost, th->h_addr, sizeof(afs_uint32));
+    memcpy(&myHost, th->h_addr, sizeof(myHost));
 
 #if !defined(AFS_HPUX_ENV) && !defined(AFS_NT40_ENV)
     signal(SIGXCPU, CheckSignal_Signal);

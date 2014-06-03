@@ -81,9 +81,9 @@ static int InvalidVolname(char *volname);
 static int InvalidVoltype(afs_int32 voltype);
 static int InvalidOperation(afs_int32 voloper);
 static int InvalidReleasetype(afs_int32 releasetype);
-static int IpAddrToRelAddr(struct vl_ctx *ctx, afs_uint32 ipaddr, int create);
-static int ChangeIPAddr(struct vl_ctx *ctx, afs_uint32 ipaddr1,
-                        afs_uint32 ipaddr2);
+static int IpAddrToRelAddr(struct vl_ctx *ctx, afs_in_addr ipaddr, int create);
+static int ChangeIPAddr(struct vl_ctx *ctx, afs_in_addr ipaddr1,
+                        afs_in_addr ipaddr2);
 
 static_inline void
 countRequest(int opcode)
@@ -418,7 +418,7 @@ SVL_CreateEntryN(struct rx_call *rxcall, struct nvldbentry *newentry)
 }
 
 static afs_int32
-ChangeAddr(struct rx_call *rxcall, afs_uint32 ip1, afs_uint32 ip2)
+ChangeAddr(struct rx_call *rxcall, afs_in_addr ip1, afs_in_addr ip2)
 {
     int this_op = VLCHANGEADDR;
     struct vl_ctx ctx;
@@ -2302,7 +2302,7 @@ SVL_GetAddrs(struct rx_call *rxcall,
     afs_int32 code;
     struct vl_ctx ctx;
     int nservers, i;
-    afs_uint32 *taddrp;
+    afs_in_addr *taddrp;
 
     countRequest(this_op);
     addrsp->bulkaddrs_len = *nentries = 0;
@@ -2314,7 +2314,7 @@ SVL_GetAddrs(struct rx_call *rxcall,
 
     VLog(5, ("GetAddrs\n"));
     addrsp->bulkaddrs_val = taddrp =
-	malloc(sizeof(afs_uint32) * (MAXSERVERID + 1));
+	malloc(sizeof(afs_in_addr) * (MAXSERVERID + 1));
     nservers = *nentries = addrsp->bulkaddrs_len = 0;
 
     if (!taddrp) {
@@ -2339,7 +2339,7 @@ abort:
 }
 
 static_inline void
-append_addr(char *buffer, afs_uint32 addr, size_t buffer_size)
+append_addr(char *buffer, afs_in_addr addr, size_t buffer_size)
 {
     int n = strlen(buffer);
     if (buffer_size > n) {
@@ -2360,7 +2360,7 @@ SVL_RegisterAddrs(struct rx_call *rxcall, afsUUID *uuidp, afs_int32 spare1,
     struct extentaddr *exp = 0, *tex;
     char addrbuf[256];
     afsUUID tuuid;
-    afs_uint32 addrs[VL_MAXIPADDRS_PERMH];
+    afs_in_addr addrs[VL_MAXIPADDRS_PERMH];
     int base;
     int count, willChangeEntry, foundUuidEntry, willReplaceCnt;
     int WillReplaceEntry, WillChange[MAXSERVERID + 1];
@@ -2723,7 +2723,7 @@ SVL_GetAddrsU(struct rx_call *rxcall,
     int nservers, i, j, base = 0;
     struct extentaddr *exp = 0;
     afsUUID tuuid;
-    afs_uint32 *taddrp, taddr;
+    afs_in_addr *taddrp, taddr;
     char rxstr[AFS_RXINFO_LEN];
 
     countRequest(this_op);
@@ -2797,7 +2797,7 @@ SVL_GetAddrsU(struct rx_call *rxcall,
 	goto abort;
     }
     addrsp->bulkaddrs_val = taddrp =
-	malloc(sizeof(afs_uint32) * (MAXSERVERID + 1));
+	malloc(sizeof(afs_in_addr) * (MAXSERVERID + 1));
     nservers = *nentries = addrsp->bulkaddrs_len = 0;
     if (!taddrp) {
 	code = VL_NOMEM;
@@ -3467,7 +3467,7 @@ InvalidReleasetype(afs_int32 releasetype)
 }
 
 static int
-IpAddrToRelAddr(struct vl_ctx *ctx, afs_uint32 ipaddr, int create)
+IpAddrToRelAddr(struct vl_ctx *ctx, afs_in_addr ipaddr, int create)
 {
     int i, j;
     afs_int32 code;
@@ -3509,7 +3509,7 @@ IpAddrToRelAddr(struct vl_ctx *ctx, afs_uint32 ipaddr, int create)
 }
 
 static int
-ChangeIPAddr(struct vl_ctx *ctx, afs_uint32 ipaddr1, afs_uint32 ipaddr2)
+ChangeIPAddr(struct vl_ctx *ctx, afs_in_addr ipaddr1, afs_in_addr ipaddr2)
 {
     int i, j;
     afs_int32 code;

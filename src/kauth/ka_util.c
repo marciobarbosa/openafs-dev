@@ -58,7 +58,7 @@ struct ubik_dbase *KA_dbase;
 int MinHours = 0;
 int npwSums = KA_NPWSUMS;
 afs_int32 verbose_track = 1;
-afs_uint32 myHost = 0;
+afs_in_addr myHost = 0;
 
 main(argc, argv)
      int argc;

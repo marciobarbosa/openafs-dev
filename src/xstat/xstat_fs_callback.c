@@ -53,7 +53,7 @@ init_afs_cb(void)
 #else
     afs_uuid_create(&afs_cb_interface.uuid);
 #endif
-    count = rx_getAllAddr((afs_uint32 *)afs_cb_interface.addr_in, AFS_MAX_INTERFACE_ADDR);
+    count = rx_getAllAddr((afs_in_addr *)afs_cb_interface.addr_in, AFS_MAX_INTERFACE_ADDR);
     if (count <= 0)
 	afs_cb_interface.numberOfInterfaces = 0;
     else
@@ -102,7 +102,7 @@ SRXAFSCB_CallBack(struct rx_call *rxcall, AFSCBFids * Fids_Array,
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -150,7 +150,7 @@ SRXAFSCB_InitCallBackState(struct rx_call * rxcall)
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -201,7 +201,7 @@ SRXAFSCB_Probe(struct rx_call * rxcall)
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -249,7 +249,7 @@ SRXAFSCB_GetCE64(struct rx_call * rxcall, afs_int32 index,
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -271,7 +271,7 @@ SRXAFSCB_GetCE(struct rx_call * rxcall, afs_int32 index, AFSDBCacheEntry * ce)
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -315,7 +315,7 @@ SRXAFSCB_GetLock(struct rx_call * rxcall, afs_int32 index, AFSDBLock * lock)
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -359,7 +359,7 @@ SRXAFSCB_XStatsVersion(struct rx_call * rxcall, afs_int32 * versionNumberP)
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -405,7 +405,7 @@ SRXAFSCB_GetXStats(struct rx_call * rxcall, afs_int32 clientVersionNumber,
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -448,7 +448,7 @@ SRXAFSCB_InitCallBackState2(struct rx_call * rxcall,
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -491,7 +491,7 @@ SRXAFSCB_WhoAreYou(struct rx_call * rxcall, struct interfaceAddr * addr)
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -541,7 +541,7 @@ SRXAFSCB_InitCallBackState3(struct rx_call * rxcall, afsUUID * uuidp)
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -590,7 +590,7 @@ SRXAFSCB_ProbeUuid(struct rx_call * rxcall, afsUUID * uuidp)
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);
@@ -750,7 +750,7 @@ SRXAFSCB_TellMeAboutYourself(struct rx_call * rxcall,
 
     if (rxcall != (struct rx_call *)0) {
 	hostNameResult =
-	    hostutil_GetNameByINet((afs_int32) (rxcall->conn->peer->host));
+	    hostutil_GetNameByINet(rxcall->conn->peer->host);
 	strcpy(hostName, hostNameResult);
 	fprintf(stderr, "[%s:%s] Called from host %s, port %d\n", mn, rn,
 		hostName, rxcall->conn->peer->port);

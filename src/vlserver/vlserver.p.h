@@ -37,7 +37,7 @@ extern struct vldstats dynamic_statistics;
 /* Header struct holding stats, internal pointers and the hash tables */
 struct vlheader {
     struct vital_vlheader vital_header;	/* all small critical stuff are in here */
-    afs_uint32 IpMappedAddr[MAXSERVERID + 1];	/* Mapping of ip addresses to relative ones */
+    afs_in_addr IpMappedAddr[MAXSERVERID + 1];	/* Mapping of ip addresses to relative ones */
     afs_uint32 VolnameHash[HASHSIZE];	/* hash table for vol names */
     afs_uint32 VolidHash[MAXTYPES][HASHSIZE];	/* hash table for vol ids */
     afs_int32 SIT;		/* spare for poss future use */
@@ -114,7 +114,7 @@ struct extentaddr {
 	struct {
 	    afsUUID hostuuid;
 	    afs_int32 uniquifier;
-	    afs_uint32 addrs[VL_MAXIPADDRS_PERMH];
+	    afs_in_addr addrs[VL_MAXIPADDRS_PERMH];
 	    afs_uint32 flags;
 	    afs_int32 spares[11];
 	} _ex_addrentry;

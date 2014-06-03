@@ -58,7 +58,7 @@ MainCommand(struct cmd_syndesc *as, void *arock)
     osi_socket s;
     int j;
     struct sockaddr_in taddr;
-    afs_int32 host;
+    afs_in_addr_s host;
     struct in_addr hostAddr;
     short port;
     struct hostent *th;
@@ -167,7 +167,7 @@ MainCommand(struct cmd_syndesc *as, void *arock)
 	    printf("rxdebug: host %s not found in host table\n", hostName);
 	    exit(1);
 	}
-	memcpy(&host, th->h_addr, sizeof(afs_int32));
+	memcpy(&host, th->h_addr, sizeof(host));
     } else
 	host = htonl(0x7f000001);	/* IP localhost */
 

@@ -103,7 +103,8 @@ rx_upcall(socket_t so, void *arg, __unused int waitflag)
 	error = 0;
 
     if (!error) {
-	int host, port;
+	afs_in_addr_s host;
+	int port;
 
 	nbytes -= resid;
 

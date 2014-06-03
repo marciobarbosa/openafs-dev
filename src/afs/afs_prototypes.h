@@ -527,7 +527,7 @@ extern struct afs_exporter *afs_nfsexporter;
 extern void afs_nfsclient_init(void);
 extern int afs_nfsclient_reqhandler(struct afs_exporter *exporter,
 				    afs_ucred_t **cred,
-				    afs_uint32 host, afs_int32 *pagparam,
+				    afs_in_addr host, afs_int32 *pagparam,
 				    struct afs_exporter **outexporter);
 extern void shutdown_nfsclnt(void);
 
@@ -856,7 +856,7 @@ extern struct server *afs_servers[NSERVERS];
 extern int afs_totalServers;
 extern struct server *afs_FindServer(afs_int32 aserver, afs_uint16 aport,
 				     afsUUID * uuidp, afs_int32 locktype);
-extern struct server *afs_GetServer(afs_uint32 * aserver, afs_int32 nservers,
+extern struct server *afs_GetServer(afs_in_addr * aserver, afs_int32 nservers,
 				    afs_int32 acell, u_short aport,
 				    afs_int32 locktype, afsUUID * uuidp,
 				    afs_int32 addr_uniquifier,
@@ -881,7 +881,7 @@ extern void afs_SortServers(struct server *aservers[], int count);
 extern void afs_ActivateServer(struct srvAddr *sap);
 #ifdef AFS_USERSPACE_IP_ADDR
 extern void afsi_SetServerIPRank(struct srvAddr *sa, afs_int32 addr,
-				afs_uint32 subnetmask);
+				afs_in_addr subnetmask);
 #else
 #if (!defined(AFS_SUN5_ENV)) && defined(USEIFADDR)
 void afsi_SetServerIPRank(struct srvAddr *sa, struct in_ifaddr *ifa);

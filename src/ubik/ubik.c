@@ -77,7 +77,7 @@
 afs_int32 ubik_quorum = 0;
 struct ubik_dbase *ubik_dbase = 0;
 struct ubik_stats ubik_stats;
-afs_uint32 ubik_host[UBIK_MAX_INTERFACE_ADDR];
+afs_in_addr ubik_host[UBIK_MAX_INTERFACE_ADDR];
 afs_int32 urecovery_state = 0;
 int (*ubik_SyncWriterCacheProc) (void);
 struct ubik_server *ubik_servers;
@@ -384,9 +384,9 @@ ubik_thread_create(pthread_attr_t *tattr, pthread_t *thread, void *proc) {
  * \see ubik_ServerInit(), ubik_ServerInitByInfo()
  */
 static int
-ubik_ServerInitCommon(afs_uint32 myHost, short myPort,
+ubik_ServerInitCommon(afs_in_addr myHost, short myPort,
 		      struct afsconf_cell *info, char clones[],
-		      afs_uint32 serverList[], const char *pathName,
+		      afs_in_addr serverList[], const char *pathName,
 		      struct ubik_dbase **dbase)
 {
     struct ubik_dbase *tdb;
@@ -556,7 +556,7 @@ ubik_ServerInitCommon(afs_uint32 myHost, short myPort,
  * \see ubik_ServerInitCommon()
  */
 int
-ubik_ServerInitByInfo(afs_uint32 myHost, short myPort,
+ubik_ServerInitByInfo(afs_in_addr myHost, short myPort,
 		      struct afsconf_cell *info, char clones[],
 		      const char *pathName, struct ubik_dbase **dbase)
 {
@@ -572,7 +572,7 @@ ubik_ServerInitByInfo(afs_uint32 myHost, short myPort,
  * \see ubik_ServerInitCommon()
  */
 int
-ubik_ServerInit(afs_uint32 myHost, short myPort, afs_uint32 serverList[],
+ubik_ServerInit(afs_in_addr myHost, short myPort, afs_in_addr serverList[],
 		const char *pathName, struct ubik_dbase **dbase)
 {
     afs_int32 code;
@@ -1396,8 +1396,8 @@ panic(char *format, ...)
  * This function takes an IP addresses as its parameter. It returns the
  * the primary IP address that is on the host passed in, or 0 if not found.
  */
-afs_uint32
-ubikGetPrimaryInterfaceAddr(afs_uint32 addr)
+afs_in_addr
+ubikGetPrimaryInterfaceAddr(afs_in_addr addr)
 {
     struct ubik_server *ts;
     int j;

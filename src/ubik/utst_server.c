@@ -268,8 +268,8 @@ int
 main(int argc, char **argv)
 {
     afs_int32 code, i;
-    afs_uint32 serverList[MAXSERVERS];
-    afs_uint32 myHost;
+    afs_in_addr serverList[MAXSERVERS];
+    afs_in_addr myHost;
     struct rx_service *tservice;
     struct rx_securityClass *sc[2];
     char dbfileName[128];

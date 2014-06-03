@@ -479,9 +479,9 @@ PrintCellServDBEntry(struct rx_connection *aconn, afs_int32 cellnum)
 	char hoststr[16];
         for ( n=0; n<sl.serverList_len; n++) {
             struct hostent *host;
-            afs_uint32      addr = ntohl(sl.serverList_val[n]);
+            afs_in_addr     addr = ntohl(sl.serverList_val[n]);
 
-            host = gethostbyaddr((const char *)&addr, sizeof(afs_uint32), AF_INET);
+            host = gethostbyaddr((const char *)&addr, sizeof(host), AF_INET);
             printf("%-28s#%s\n", afs_inet_ntoa_r(addr, hoststr),
                     host ? host->h_name : "");
         }
@@ -514,7 +514,7 @@ CommandProc(struct cmd_syndesc *as, void *arock)
     afs_int32 port;
     struct rx_securityClass *secobj;
     int int32p;
-    afs_int32 addr;
+    afs_in_addr_s addr;
 
     hostName = as->parms[0].items->data;
     if (as->parms[1].items)

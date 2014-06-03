@@ -88,7 +88,7 @@ struct partitionsort {
     struct partitionsort *next;
 };
 struct serversort {
-    afs_uint32 ipaddr;
+    afs_in_addr ipaddr;
     struct partitionsort *partitions;
     struct serversort *next;
 };
@@ -2247,7 +2247,7 @@ bc_dbVerifyCmd(struct cmd_syndesc *as, void *arock)
 {
     afs_int32 status;
     afs_int32 orphans;
-    afs_int32 host;
+    afs_in_addr_s host;
 
     struct hostent *hostPtr;
     int detail;

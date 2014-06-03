@@ -1761,7 +1761,8 @@ ucs_ProcTail_setup(definition * defp, int split_flag)
 {
     proc1_list *plist;
 
-    f_print(fout, "{\tafs_int32 rcode, code, newHost, thisHost, i, _ucount;\n");
+    f_print(fout, "{\tafs_int32 rcode, code, i, _ucount;\n");
+    f_print(fout, "\tafs_in_addr_s newHost, thisHost;\n");
     f_print(fout, "\tint chaseCount, pass, needsync;\n");
 #if 0 /* goes with block below */
     f_print(fout, "\tint j, inlist;\n");

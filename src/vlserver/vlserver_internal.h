@@ -15,7 +15,7 @@
  */
 struct vl_ctx {
     struct ubik_trans *trans;
-    afs_uint32 *hostaddress;
+    afs_in_addr *hostaddress;
     struct extentaddr **ex_addr;
     struct vlheader *cheader;
 };

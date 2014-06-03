@@ -154,7 +154,7 @@ audmakebuf(char *audEvent, va_list vaList)
 #endif
 
 static void
-printbuf(int rec, char *audEvent, char *afsName, afs_int32 hostId,
+printbuf(int rec, char *audEvent, char *afsName, afs_in_addr_s hostId,
 	 afs_int32 errCode, va_list vaList)
 {
     int vaEntry;
@@ -299,7 +299,7 @@ static int
 osi_audit_internal(char *audEvent,	/* Event name (15 chars or less) */
 		   afs_int32 errCode,	/* The error code */
 		   char *afsName,
-		   afs_int32 hostId,
+		   afs_in_addr_s hostId,
 		   va_list vaList)
 {
 #ifdef AFS_AIX32_ENV
@@ -401,7 +401,7 @@ osi_auditU(struct rx_call *call, char *audEvent, int errCode, ...)
     afs_int32 secClass;
     afs_int32 code;
     char afsName[MAXKTCNAMELEN + MAXKTCNAMELEN + MAXKTCREALMLEN + 3];
-    afs_int32 hostId;
+    afs_in_addr_s hostId;
     va_list vaList;
 
     if (osi_audit_all < 0)

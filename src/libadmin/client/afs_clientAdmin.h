@@ -58,7 +58,7 @@ typedef enum {
 typedef struct {
     char serverName[AFS_MAX_SERVER_NAME_LEN];
     afs_server_type_t serverType;
-    int serverAddress[AFS_MAX_SERVER_ADDRESS];
+    afs_in_addr_s serverAddress[AFS_MAX_SERVER_ADDRESS];
 } afs_serverEntry_t, *afs_serverEntry_p;
 
 extern int ADMINAPI afsclient_TokenGetExisting(const char *cellName,

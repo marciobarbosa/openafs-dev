@@ -5673,7 +5673,8 @@ SRXAFS_FlushCPS(struct rx_call * acall, struct ViceIds * vids,
 {
     int i;
     afs_int32 nids, naddrs;
-    afs_int32 *vd, *addr;
+    afs_int32 *vd;
+    afs_in_addr *addr;
     Error errorCode = 0;		/* return code to caller */
 
     ViceLog(1, ("SRXAFS_FlushCPS\n"));
@@ -5700,7 +5701,7 @@ SRXAFS_FlushCPS(struct rx_call * acall, struct ViceIds * vids,
 	h_EnumerateClients(*vd, FlushClientCPS, NULL);
     }
 
-    addr = addrs->IPAddrs_val;
+    addr = (afs_in_addr*)addrs->IPAddrs_val;
     for (i = 0; i < naddrs; i++, addr++) {
 	if (*addr)
 	    h_flushhostcps(*addr, htons(7001));
@@ -5738,7 +5739,8 @@ CopyVolumeEntry(char *aname, struct vldbentry *ave,
 {
     int i, j, vol;
     afs_int32 mask, whichType;
-    afs_uint32 *serverHost, *typePtr;
+    afs_in_addr *serverHost;
+    afs_uint32 *typePtr;
 
     /* figure out what type we want if by name */
     i = strlen(aname);

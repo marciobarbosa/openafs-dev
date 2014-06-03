@@ -45,7 +45,7 @@ char uss_Var[uss_NumVars][uss_MAX_ARG_SIZE];	/*$1, $2, ... command variables */
 int uss_VarMax = 0;		/*Largest index in above */
 char uss_Volume[uss_VolumeLen + 1];	/*Name of user's volume */
 afs_int32 uss_VolumeID;		/*Numerical volume ID */
-afs_int32 uss_ServerID;		/*Numerical server ID */
+afs_in_addr_s uss_ServerID;	/*Numerical server ID */
 afs_int32 uss_PartitionID;	/*Numerical partition ID */
 char uss_DirPool[100][uss_DirPoolLen];	/*List of all acceptable subdirs */
 

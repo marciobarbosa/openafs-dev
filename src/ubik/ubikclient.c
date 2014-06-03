@@ -36,12 +36,12 @@ short ubik_initializationState;	/*!< initial state is zero */
  * \brief Parse list for clients.
  */
 int
-ubik_ParseClientList(int argc, char **argv, afs_uint32 * aothers)
+ubik_ParseClientList(int argc, char **argv, afs_in_addr * aothers)
 {
     afs_int32 i;
     char *tp;
     struct hostent *th;
-    afs_uint32 temp;
+    afs_in_addr temp;
     afs_int32 counter;
     int inServer;
 
@@ -62,7 +62,7 @@ ubik_ParseClientList(int argc, char **argv, afs_uint32 * aothers)
 		return UBADHOST;
 	    }
 	    memmove((void *)&temp, (const void *)th->h_addr,
-		    sizeof(afs_int32));
+		    sizeof(temp));
 	    UNLOCK_GLOBAL_MUTEX;
 	    if (counter++ >= MAXSERVERS)
 		return UNHOSTS;
@@ -294,7 +294,7 @@ ubik_ClientDestroy(struct ubik_client * aclient)
 struct rx_connection *
 ubik_RefreshConn(struct rx_connection *tc)
 {
-    afs_uint32 host;
+    afs_in_addr host;
     u_short port;
     u_short service;
     struct rx_securityClass *sc;
@@ -360,7 +360,7 @@ try_GetSyncSite(struct ubik_client *aclient, afs_int32 apos)
     struct rx_peer *rxp;
     afs_int32 code;
     int i;
-    afs_int32 thisHost, newHost;
+    afs_in_addr_s thisHost, newHost;
     struct rx_connection *tc;
     short origLevel;
 
@@ -556,7 +556,9 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
 	  long p5, long p6, long p7, long p8, long p9, long p10,
 	  long p11, long p12, long p13, long p14, long p15, long p16)
 {
-    afs_int32 rcode, code, newHost, thisHost, i, count;
+    afs_int32 rcode, code, i, count;
+    afs_in_addr newHost;
+    afs_in_addr thisHost;
     int chaseCount, pass, needsync, inlist, j;
     struct rx_connection *tc;
     struct rx_peer *rxp;

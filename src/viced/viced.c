@@ -183,9 +183,11 @@ pthread_key_t viced_uclient_key;
 
 char FS_HostName[128] = "localhost";
 char *FS_configPath = NULL;
-afs_uint32 FS_HostAddr_NBO;
-afs_uint32 FS_HostAddr_HBO;
-afs_uint32 FS_HostAddrs[ADDRSPERSITE], FS_HostAddr_cnt = 0, FS_registered = 0;
+afs_in_addr FS_HostAddr_NBO;
+afs_in_addr FS_HostAddr_HBO;
+afs_in_addr FS_HostAddrs[ADDRSPERSITE];
+afs_uint32 FS_HostAddr_cnt = 0;
+afs_uint32 FS_registered = 0;
 /* All addresses in FS_HostAddrs are in NBO */
 afsUUID FS_HostUUID;
 
@@ -1616,8 +1618,8 @@ ReadSysIdFile(void)
     if (FS_HostAddr_cnt == 0) {
 	FS_HostAddr_cnt = nentries;
 	for (i = 0; i < nentries; i++) {
-	    if (read(fd, (char *)&FS_HostAddrs[i], sizeof(afs_int32)) !=
-		sizeof(afs_int32)) {
+	    if (read(fd, (char *)&FS_HostAddrs[i], sizeof(afs_in_addr)) !=
+		sizeof(afs_in_addr)) {
 		ViceLog(0,
 			("%s: Read of addresses failed (%d)\n",
 			 AFSDIR_SERVER_SYSID_FILEPATH, errno));
@@ -1684,8 +1686,8 @@ WriteSysIdFile(void)
 	return EIO;
     }
     for (i = 0; i < FS_HostAddr_cnt; i++) {
-	if (write(fd, (char *)&FS_HostAddrs[i], sizeof(afs_int32)) !=
-	    sizeof(afs_int32)) {
+	if (write(fd, (char *)&FS_HostAddrs[i], sizeof(afs_in_addr)) !=
+	    sizeof(afs_in_addr)) {
 	    ViceLog(0,
 		    ("%s: write of addresses failed (%d)\n",
 		     AFSDIR_SERVER_SYSID_FILEPATH, errno));
@@ -1741,10 +1743,10 @@ Do_VLRegisterRPC(void)
     return 0;
 }
 
-afs_int32
+afs_in_addr
 SetupVL(void)
 {
-    afs_int32 code;
+    afs_in_addr code;
 
     if (AFSDIR_SERVER_NETRESTRICT_FILEPATH || AFSDIR_SERVER_NETINFO_FILEPATH) {
 	/*
@@ -1830,7 +1832,7 @@ main(int argc, char *argv[])
     int curLimit;
     time_t t;
     struct tm tm;
-    afs_uint32 rx_bindhost;
+    afs_in_addr rx_bindhost;
     VolumePackageOptions opts;
 
 #ifdef	AFS_AIX32_ENV

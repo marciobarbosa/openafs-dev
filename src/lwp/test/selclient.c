@@ -94,7 +94,7 @@ main(int ac, char **av)
     int on = 1;
     char *hostname = 0;
     struct hostent *hostent;
-    int host;			/* net order. */
+    afs_in_addr_s host;		/* net order. */
     short port = -1;		/* host order. */
     int setFD = 0;
     int sockFD;

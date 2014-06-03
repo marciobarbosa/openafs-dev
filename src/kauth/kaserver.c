@@ -42,13 +42,13 @@
 
 struct kadstats dynamic_statistics;
 struct ubik_dbase *KA_dbase;
-afs_uint32 myHost = 0;
+afs_in_addr myHost = 0;
 afs_int32 verbose_track = 1;
 afs_int32 krb4_cross = 0;
 afs_int32 rxBind = 0;
 
 #define ADDRSPERSITE 16         /* Same global is in rx/rx_user.c */
-afs_uint32 SHostAddrs[ADDRSPERSITE];
+afs_in_addr SHostAddrs[ADDRSPERSITE];
 
 struct afsconf_dir *KA_conf;	/* for getting cell info */
 
@@ -110,8 +110,8 @@ initialize_dstats(void)
 }
 
 static int
-convert_cell_to_ubik(struct afsconf_cell *cellinfo, afs_uint32 *myHost,
-		     afs_uint32 *serverList)
+convert_cell_to_ubik(struct afsconf_cell *cellinfo, afs_in_addr *myHost,
+		     afs_in_addr *serverList)
 {
     int i;
     char hostname[64];
@@ -124,7 +124,7 @@ convert_cell_to_ubik(struct afsconf_cell *cellinfo, afs_uint32 *myHost,
 	ViceLog(0, ("kaserver: couldn't get address of this host.\n"));
 	exit(1);
     }
-    memcpy(myHost, th->h_addr, sizeof(afs_uint32));
+    memcpy(myHost, th->h_addr, sizeof(*myHost));
 
     for (i = 0; i < cellinfo->numServers; i++)
 	if (cellinfo->hostAddr[i].sin_addr.s_addr != *myHost) {
@@ -157,7 +157,7 @@ main(int argc, char *argv[])
 {
     afs_int32 code;
     char *whoami = argv[0];
-    afs_uint32 serverList[MAXSERVERS];
+    afs_in_addr serverList[MAXSERVERS];
     struct afsconf_cell cellinfo;
     char *cell;
     const char *cellservdb, *dbpath, *lclpath;
@@ -169,7 +169,7 @@ main(int argc, char *argv[])
     int level;			/* security level for Ubik */
     afs_int32 i;
     char clones[MAXHOSTSPERCELL];
-    afs_uint32 host = ntohl(INADDR_ANY);
+    afs_in_addr host = ntohl(INADDR_ANY);
     char *auditFileName = NULL;
 
     struct rx_service *tservice;

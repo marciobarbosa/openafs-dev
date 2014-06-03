@@ -4017,7 +4017,7 @@ afs_setsprefs(struct spref *sp, unsigned int num, unsigned int vlonly)
 	/* if we didn't find one, start to create one. */
 	/* Note that it doesn't have a cell yet...     */
 	if (!matches) {
-	    afs_uint32 temp = sp->host.s_addr;
+	    afs_in_addr temp = sp->host.s_addr;
 	    srvr =
 		afs_GetServer(&temp, 1, 0, (vlonly ? AFS_VLPORT : AFS_FSPORT),
 			      WRITE_LOCK, (afsUUID *) 0, 0, NULL);
@@ -4510,7 +4510,7 @@ HandleClientContext(struct afs_ioctl *ablob, int *com,
 		    afs_ucred_t **acred, afs_ucred_t *credp)
 {
     char *ain, *inData;
-    afs_uint32 hostaddr;
+    afs_in_addr hostaddr;
     afs_int32 uid, g0, g1, i, code, pag, exporter_type, isroot = 0;
     struct afs_exporter *exporter, *outexporter;
     afs_ucred_t *newcred;
@@ -4538,7 +4538,7 @@ HandleClientContext(struct afs_ioctl *ablob, int *com,
     }
 
     /* Extract information for remote user */
-    hostaddr = *((afs_uint32 *) ain);
+    hostaddr = *((afs_in_addr *) ain);
     ain += sizeof(hostaddr);
     uid = *((afs_uint32 *) ain);
     ain += sizeof(uid);
@@ -5149,7 +5149,8 @@ DECL_PIOCTL(PSetCachingThreshold)
 DECL_PIOCTL(PCallBackAddr)
 {
 #ifndef UKERNEL
-    afs_uint32 addr, code;
+    afs_in_addr addr;
+    afs_uint32 code;
     int srvAddrCount;
     struct server *ts;
     struct srvAddr *sa;
@@ -5516,7 +5517,7 @@ out:
 
 DECL_PIOCTL(PNFSNukeCreds)
 {
-    afs_uint32 addr;
+    afs_in_addr addr;
     afs_int32 i;
     struct unixuser *tu;
 

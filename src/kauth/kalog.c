@@ -46,7 +46,7 @@ kalog_Init(void)
 /* log a ticket usage */
 void
 kalog_log(char *principal, char *instance, char *sprincipal,
-	  char *sinstance, char *realm, int hostaddr, int type)
+	  char *sinstance, char *realm, afs_in_addr_s hostaddr, int type)
 {
     char keybuf[512];		/* not random! 63 . 63 , 63 . 63 max key */
     datum key, data;
@@ -125,7 +125,7 @@ kalog_log(char *principal, char *instance, char *sprincipal,
 /* log a ticket usage to the text log */
 void
 ka_log(char *principal, char *instance, char *sprincipal, char *sinstance,
-       char *realm, int hostaddr, int type)
+       char *realm, afs_in_addr_s hostaddr, int type)
 {
     char logbuf[512];		/* not random! 63 . 63 , 63 . 63 max key */
 

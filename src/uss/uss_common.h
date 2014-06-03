@@ -118,7 +118,7 @@ extern char uss_Var[][uss_MAX_ARG_SIZE];	/*$1, $2, ... command variables */
 extern int uss_VarMax;		/*Largest index in above */
 extern char uss_Volume[];	/*Name of user's volume */
 extern afs_int32 uss_VolumeID;	/*Numerical volume ID */
-extern afs_int32 uss_ServerID;	/*Numerical server ID */
+extern afs_in_addr_s uss_ServerID;	/*Numerical server ID */
 extern afs_int32 uss_PartitionID;	/*Numerical partition ID */
 extern char uss_DirPool[][uss_DirPoolLen];	/*List of all acceptable subdirs */
 

@@ -37,7 +37,7 @@
  * open and bind RX socket
  */
 osi_socket *
-rxk_NewSocketHost(afs_uint32 ahost, short aport)
+rxk_NewSocketHost(afs_in_addr ahost, short aport)
 {
     struct socket *sockp;
     struct sockaddr_in myaddr;

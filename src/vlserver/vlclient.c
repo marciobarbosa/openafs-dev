@@ -134,7 +134,7 @@ GetVolume(int vol, struct vldbentry *entry)
 
 /* Almost identical's to pr_Initialize in vlserver/pruser.c */
 afs_int32
-vl_Initialize(char *confDir, int secFlags, int server, char *cellp)
+vl_Initialize(char *confDir, int secFlags, afs_in_addr_s server, char *cellp)
 {
     return ugen_ClientInitServer(confDir, cellp, secFlags, &cstruct,
 				 MAXSERVERS, AFSCONF_VLDBSERVICE, 90,
@@ -142,11 +142,11 @@ vl_Initialize(char *confDir, int secFlags, int server, char *cellp)
 }
 
 /* return host address in network byte order */
-afs_int32
+afs_in_addr_s
 GetServer(char *aname)
 {
     struct hostent *th;
-    afs_uint32 addr;
+    afs_in_addr addr;
     int b1, b2, b3, b4;
     afs_int32 code;
 
@@ -167,7 +167,8 @@ static int
 handleit(struct cmd_syndesc *as, void *arock)
 {
     struct cmd_item *ti;
-    afs_int32 code, server = 0, sawserver = 0;
+    afs_int32 code, sawserver = 0;
+    afs_in_addr_s server = 0;
     afs_int32 id, voltype;
     struct vldbentry entry;
     char *cellp = 0;
@@ -207,7 +208,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 	int status = 0;
 	int i;
 	char hoststr[16];
-	afs_uint32 addr;
+	afs_in_addr addr;
 
 	for (i = 0; cstruct->conns[i]; i++, nconns++) {
 	    rx_SetConnDeadTime(cstruct->conns[i], 6);
@@ -753,7 +754,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 		printf("return code is %d.\n", code);
 	    } else if (!strcmp(oper, "ga")) {
 		int nentries, i;
-		afs_uint32 *addrp;
+		afs_in_addr *addrp;
 		bulkaddrs addrs;
 		struct VLCallBack vlcb;
 
@@ -778,7 +779,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 		free(addrs.bulkaddrs_val);
 	    } else if (!strcmp(oper, "gau")) {
 		int nentries, i, j;
-		afs_uint32 *addrp;
+		afs_in_addr *addrp;
 		bulkaddrs addrs;
 		struct VLCallBack vlcb;
 
@@ -796,7 +797,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 		    if ((*addrp & 0xff000000) == 0xff000000) {
 			int mhnentries, unique;
 			struct in_addr hostAddr;
-			afs_uint32 *mhaddrp;
+			afs_in_addr *mhaddrp;
 			bulkaddrs mhaddrs;
 			ListAddrByAttributes attrs;
 			afsUUID uuid;
@@ -839,10 +840,10 @@ handleit(struct cmd_syndesc *as, void *arock)
 		}
 		free(addrs.bulkaddrs_val);
 	    } else if (!strcmp(oper, "mhc")) {
-		afs_uint32 serveraddrs[MAXSERVERID + 1][VL_MAXIPADDRS_PERMH];
+		afs_in_addr serveraddrs[MAXSERVERID + 1][VL_MAXIPADDRS_PERMH];
 		afs_int32 serveraddrtype[MAXSERVERID + 1];
 		int nentries1, nentries2, i, j, x, y, unique, found;
-		afs_uint32 *addrp1, *addrp2;
+		afs_in_addr *addrp1, *addrp2;
 		bulkaddrs addrs1, addrs2;
 		struct VLCallBack vlcb;
 		ListAddrByAttributes attrs;
@@ -943,7 +944,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 
 	    } else if (!strcmp(oper, "regaddr")) {
 		int i;
-		afs_uint32 *addrp, tad;
+		afs_in_addr *addrp, tad;
 		bulkaddrs addrs;
 		afsUUID uuid;
 
@@ -973,7 +974,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 		}
 	    } else if (!strcmp(oper, "ca")) {
 		struct hostent *h1, *h2;
-		afs_uint32 a1, a2;
+		afs_in_addr a1, a2;
 
 		printf("changing %s", *argp);
 		h1 = hostutil_GetHostByName(&(*argp)[0]);
@@ -982,7 +983,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 			   *argp);
 		    continue;
 		}
-		memcpy(&a1, (afs_int32 *) h1->h_addr, sizeof(afs_uint32));
+		memcpy(&a1, (afs_int32 *) h1->h_addr, sizeof(a1));
 
 		++argp, --nargs;
 		printf(" to %s\n", *argp);
@@ -992,7 +993,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 			   *argp);
 		    continue;
 		}
-		memcpy(&a2, (afs_int32 *) h2->h_addr, sizeof(afs_uint32));
+		memcpy(&a2, (afs_int32 *) h2->h_addr, sizeof(a2));
 
 		printf("changing 0x%x to 0x%x\n", ntohl(a1), ntohl(a2));
 		code =
@@ -1003,7 +1004,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 		    continue;
 		}
 	    } else if (!strcmp(oper, "caid")) {
-		afs_uint32 a1, a2;
+		afs_in_addr a1, a2;
 
 		sscanf(&(*argp)[0], "%d", &a1);
 		printf("changing %d (0x%x)", a1, a1);

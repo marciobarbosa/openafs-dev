@@ -97,9 +97,9 @@ static afs_int32 removeFromGroup(struct rx_call *call, afs_int32 aid,
 				 afs_int32 gid, afs_int32 *cid);
 static afs_int32 getCPS(struct rx_call *call, afs_int32 aid, prlist *alist,
 			afs_int32 *over, afs_int32 *cid);
-static afs_int32 getCPS2(struct rx_call *call, afs_int32 aid, afs_uint32 ahost,
+static afs_int32 getCPS2(struct rx_call *call, afs_int32 aid, afs_in_addr ahost,
 			 prlist *alist, afs_int32 *over, afs_int32 *cid);
-static afs_int32 getHostCPS(struct rx_call *call, afs_uint32 ahost,
+static afs_int32 getHostCPS(struct rx_call *call, afs_in_addr ahost,
 			    prlist *alist, afs_int32 *over, afs_int32 *cid);
 static afs_int32 listMax(struct rx_call *call, afs_int32 *uid, afs_int32 *gid, afs_int32 *cid);
 static afs_int32 setMax(struct rx_call *call, afs_int32 aid, afs_int32 gflag,
@@ -129,7 +129,7 @@ static afs_int32 listOwned(struct rx_call *call, afs_int32 aid, prlist *alist,
 static afs_int32 isAMemberOf(struct rx_call *call, afs_int32 uid, afs_int32 gid,
 			     afs_int32 *flag, afs_int32 *cid);
 static afs_int32 addWildCards(struct ubik_trans *tt, prlist *alist,
-			      afs_uint32 host);
+			      afs_in_addr host);
 static afs_int32 WhoIsThisWithName(struct rx_call *acall,
 				   struct ubik_trans *at, afs_int32 *aid,
 				   char *aname);
@@ -1153,7 +1153,7 @@ SPR_GetCPS2(struct rx_call *call, afs_int32 aid, afs_int32 ahost,
 }
 
 static afs_int32
-getCPS2(struct rx_call *call, afs_int32 aid, afs_uint32 ahost, prlist *alist,
+getCPS2(struct rx_call *call, afs_int32 aid, afs_in_addr ahost, prlist *alist,
 	afs_int32 *over, afs_int32 *cid)
 {
     afs_int32 code;
@@ -1229,7 +1229,7 @@ SPR_GetHostCPS(struct rx_call *call, afs_int32 ahost, prlist *alist,
 }
 
 afs_int32
-getHostCPS(struct rx_call *call, afs_uint32 ahost, prlist *alist,
+getHostCPS(struct rx_call *call, afs_in_addr ahost, prlist *alist,
 	   afs_int32 *over, afs_int32 *cid)
 {
     afs_int32 code, temp;
@@ -1946,12 +1946,12 @@ isAMemberOf(struct rx_call *call, afs_int32 uid, afs_int32 gid, afs_int32 *flag,
 }
 
 static afs_int32
-addWildCards(struct ubik_trans *tt, prlist *alist, afs_uint32 host)
+addWildCards(struct ubik_trans *tt, prlist *alist, afs_in_addr host)
 {
     afs_int32 temp;
     struct prentry tentry;
     prlist wlist;
-    unsigned wild = htonl(0xffffff00);
+    afs_in_addr wild = htonl(0xffffff00);
     struct in_addr iaddr;
     afs_int32 hostid;
     int size = 0, i, code;

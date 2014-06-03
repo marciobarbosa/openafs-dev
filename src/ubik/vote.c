@@ -120,7 +120,7 @@ uvote_ShouldIRun(void)
 	code = 0;		/* other guy is sync site, leave him alone */
 	goto done;
     }
-    if (ntohl((afs_uint32)vote_globals.lastYesHost) < ntohl((afs_uint32)ubik_host[0])) {
+    if (ntohl(vote_globals.lastYesHost) < ntohl(ubik_host[0])) {
 	code = 0;		/* if someone is valid and better than us, don't run */
 	goto done;
     }
@@ -146,24 +146,24 @@ done:
  * \return 0 or currently valid sync site.  It can return our own
  * address, if we're the sync site.
  */
-afs_int32
+afs_in_addr_s
 uvote_GetSyncSite(void)
 {
     afs_int32 now;
-    afs_int32 code;
+    afs_in_addr_s syncSite;
 
     UBIK_VOTE_LOCK;
     if (!vote_globals.lastYesState)
-	code = 0;
+	syncSite = 0;
     else {
 	now = FT_ApproxTime();
 	if (SMALLTIME + vote_globals.lastYesClaim < now)
-	    code = 0;		/* last guy timed out */
+	    syncSite = 0;		/* last guy timed out */
 	else
-	    code = vote_globals.lastYesHost;
+	    syncSite = vote_globals.lastYesHost;
     }
     UBIK_VOTE_UNLOCK;
-    return code;
+    return syncSite;
 }
 
 /*!
@@ -179,7 +179,7 @@ SVOTE_Beacon(struct rx_call * rxcall, afs_int32 astate,
 	     afs_int32 astart, struct ubik_version * avers,
 	     struct ubik_tid * atid)
 {
-    afs_int32 otherHost;
+    afs_in_addr_s otherHost;
     afs_int32 now;
     afs_int32 vote;
     struct rx_connection *aconn;
@@ -239,7 +239,7 @@ SVOTE_Beacon(struct rx_call * rxcall, afs_int32 astate,
     UBIK_VOTE_LOCK;
     now = FT_ApproxTime();	/* close to current time */
     if (!isClone
-	&& (ntohl((afs_uint32)otherHost) <= ntohl((afs_uint32)vote_globals.lowestHost)
+	&& (ntohl(otherHost) <= ntohl(vote_globals.lowestHost)
 	    || vote_globals.lowestTime + BIGTIME < now)) {
 	vote_globals.lowestTime = now;
 	vote_globals.lowestHost = otherHost;
@@ -252,7 +252,7 @@ SVOTE_Beacon(struct rx_call * rxcall, afs_int32 astate,
      * he's lowest, these loops don't occur.  because if someone knows he's
      * lowest, he will send out beacons telling others to vote for him. */
     if (!amIClone
-	&& (ntohl((afs_uint32) ubik_host[0]) <= ntohl((afs_uint32)vote_globals.lowestHost)
+	&& (ntohl(ubik_host[0]) <= ntohl(vote_globals.lowestHost)
 	    || vote_globals.lowestTime + BIGTIME < now)) {
 	vote_globals.lowestTime = now;
 	vote_globals.lowestHost = ubik_host[0];
@@ -541,7 +541,7 @@ afs_int32
 SVOTE_GetSyncSite(struct rx_call * rxcall,
 		  afs_int32 * ahost)
 {
-    afs_int32 temp;
+    afs_in_addr_s temp;
 
     temp = uvote_GetSyncSite();
     *ahost = ntohl(temp);

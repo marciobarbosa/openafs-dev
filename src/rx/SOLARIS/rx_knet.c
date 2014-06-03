@@ -318,7 +318,7 @@ struct sockaddr_in rx_sockaddr;
 
 /* Allocate a new socket at specified port in network byte order. */
 osi_socket *
-rxk_NewSocketHost(afs_uint32 ahost, short aport)
+rxk_NewSocketHost(afs_in_addr ahost, short aport)
 {
     vnode_t *accessvp;
     struct sonode *so;

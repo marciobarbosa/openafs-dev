@@ -1123,7 +1123,7 @@ vos_FileServerAddressChange(const void *cellHandle,
 int ADMINAPI
 vos_FileServerAddressRemove(const void *cellHandle,
 			    vos_MessageCallBack_t callBack,
-			    unsigned int serverAddress,
+			    afs_in_addr serverAddress,
 			    afs_status_p st)
 {
     int rc = 0;

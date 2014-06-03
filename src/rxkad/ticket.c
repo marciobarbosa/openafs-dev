@@ -46,7 +46,7 @@ union Key_schedule_safe {
 
 static int
 decode_athena_ticket(char *ticket, int ticketLen, char *name, char *inst,
-		     char *realm, afs_int32 * host,
+		     char *realm, afs_in_addr_s * host,
 		     struct ktc_encryptionKey *sessionKey, afs_uint32 * start,
 		     afs_uint32 * end)
 {
@@ -95,7 +95,7 @@ decode_athena_ticket(char *ticket, int ticketLen, char *name, char *inst,
 int
 tkt_DecodeTicket(char *asecret, afs_int32 ticketLen,
 		 struct ktc_encryptionKey *key, char *name, char *inst,
-		 char *cell, struct ktc_encryptionKey *sessionKey, afs_int32 * host,
+		 char *cell, struct ktc_encryptionKey *sessionKey, afs_in_addr_s * host,
 		 afs_uint32 * start, afs_uint32 * end)
 {
     char clear_ticket[MAXKTCTICKETLEN];
@@ -160,7 +160,7 @@ tkt_DecodeTicket(char *asecret, afs_int32 ticketLen,
 
 static int
 assemble_athena_ticket(char *ticket, int *ticketLen, char *name, char *inst,
-		       char *realm, afs_int32 host,
+		       char *realm, afs_in_addr_s host,
 		       struct ktc_encryptionKey *sessionKey, afs_uint32 start,
 		       afs_uint32 end, char *sname, char *sinst)
 {
@@ -194,7 +194,7 @@ int
 tkt_MakeTicket(char *ticket, int *ticketLen, struct ktc_encryptionKey *key,
 	       char *name, char *inst, char *cell, afs_uint32 start,
 	       afs_uint32 end, struct ktc_encryptionKey *sessionKey,
-	       afs_uint32 host, char *sname, char *sinst)
+	       afs_in_addr host, char *sname, char *sinst)
 {
     int code;
     union Key_schedule_safe schedule;

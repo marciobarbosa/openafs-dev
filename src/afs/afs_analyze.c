@@ -352,7 +352,7 @@ afs_PrintServerErrors(struct vrequest *areq, struct VenusFid *afid)
     int i;
     struct volume *tvp;
     struct srvAddr *sa;
-    afs_uint32 address;
+    afs_in_addr address;
     char *sep = " (";
     char *term = "";
 
@@ -417,7 +417,7 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
     afs_int32 shouldRetry = 0;
     afs_int32 serversleft = 1;
     struct afs_stats_RPCErrors *aerrP;
-    afs_uint32 address;
+    afs_in_addr address;
 
     if (AFS_IS_DISCONNECTED && !AFS_IN_SYNC) {
 	/* On reconnection, act as connected. XXX: for now.... */

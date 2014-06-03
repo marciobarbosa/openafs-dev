@@ -55,7 +55,7 @@ struct afsop_cell {
 
 char afs_zeros[AFS_ZEROS];
 char afs_rootVolumeName[64] = "";
-afs_uint32 rx_bindhost;
+afs_in_addr rx_bindhost;
 
 #ifdef AFS_SUN510_ENV
 ddi_taskq_t *afs_taskq;
@@ -1246,7 +1246,7 @@ afs_syscall_call(long parm, long parm2, long parm3,
       } */
 #endif /* AFS_AIX32_ENV */
     } else if (parm == AFSOP_GETMASK) {	/* parm2 == addr in net order */
-	afs_uint32 mask = 0;
+	afs_in_addr mask = 0;
 #if	!defined(AFS_SUN5_ENV)
 # ifdef AFS_USERSPACE_IP_ADDR
 	afs_int32 i;

@@ -83,7 +83,7 @@ int rxBind = 0;
 int rxkadDisableDotCheck = 0;
 
 #define ADDRSPERSITE 16         /* Same global is in rx/rx_user.c */
-afs_uint32 SHostAddrs[ADDRSPERSITE];
+afs_in_addr SHostAddrs[ADDRSPERSITE];
 
 int bozo_isrestricted = 0;
 int bozo_restdisable = 0;
@@ -754,7 +754,7 @@ bozo_DeletePidFile(char *ainst, char *aname)
  * @returns status
  */
 void
-bozo_CreateRxBindFile(afs_uint32 host)
+bozo_CreateRxBindFile(afs_in_addr host)
 {
     char buffer[16];
     FILE *fp;
@@ -789,7 +789,7 @@ main(int argc, char **argv, char **envp)
     int i;
     char *oldlog;
     int rxMaxMTU = -1;
-    afs_uint32 host = htonl(INADDR_ANY);
+    afs_in_addr host = htonl(INADDR_ANY);
     char *auditFileName = NULL;
     struct rx_securityClass **securityClasses;
     afs_int32 numClasses;

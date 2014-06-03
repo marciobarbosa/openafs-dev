@@ -446,11 +446,12 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     struct ubik_dbase *dbase = NULL;
     char tbuffer[1024];
     afs_int32 offset;
+    afs_in_addr syncSite;
     struct ubik_version tversion;
     int tlen;
     struct rx_peer *tpeer;
     struct rx_connection *tconn;
-    afs_uint32 otherHost = 0;
+    afs_in_addr otherHost = 0;
     char hoststr[16];
     char pbuffer[1028];
     int fd = -1;
@@ -477,11 +478,11 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
      * screwup.  Thus, we only object if we're sure we know who the sync site
      * is, and it ain't the guy talking to us.
      */
-    offset = uvote_GetSyncSite();
+    syncSite = uvote_GetSyncSite();
     tconn = rx_ConnectionOf(rxcall);
     tpeer = rx_PeerOf(tconn);
     otherHost = ubikGetPrimaryInterfaceAddr(rx_HostOf(tpeer));
-    if (offset && offset != otherHost) {
+    if (syncSite && syncSite != otherHost) {
 	/* we *know* this is the wrong guy */
 	code = USYNC;
 	DBHOLD(dbase);
@@ -621,7 +622,7 @@ SDISK_UpdateInterfaceAddr(struct rx_call *rxcall,
 			  UbikInterfaceAddr *outAddr)
 {
     struct ubik_server *ts, *tmp;
-    afs_uint32 remoteAddr;	/* in net byte order */
+    afs_in_addr remoteAddr;	/* in net byte order */
     int i, j, found = 0, probableMatch = 0;
     char hoststr[16];
 

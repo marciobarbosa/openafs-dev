@@ -27,7 +27,7 @@
 
 
 #define	NOPAG	    0xffffffff	/* Also defined in afs/afs.h */
-static afs_int32 hostAddr = 0;
+static afs_in_addr_s hostAddr = 0;
 static int hostAddrLookup = 0;
 char *afs_server = 0, server_name[128];
 static afs_int32 SetClientCreds(struct clientcred *creds, afs_uint32 * groups);
@@ -41,7 +41,7 @@ void afs_get_groups_from_pag(afs_uint32 pag, afs_uint32 * g0p, afs_uint32 * g1p)
  * $HOME/.AFSSERVER file is checked, otherwise the "/.AFSSERVER" is
  * used.
  */
-afs_int32
+afs_in_addr_s
 GetAfsServerAddr(char *syscall)
 {
     struct hostent *th;
@@ -109,7 +109,7 @@ rx_connection(afs_int32 * errorcode, char *syscall)
 {
     struct rx_connection *conn;
     struct rx_securityClass *null_securityObject;
-    afs_int32 host;
+    afs_in_addr_s host;
 
     if (!(host = GetAfsServerAddr(syscall))) {
 	*errorcode = -1;

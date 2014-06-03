@@ -103,7 +103,7 @@ extern void rx_RecordCallStatistics(struct rx_call *call,
 				    int isServer);
 
 /* Peer management */
-extern afs_uint32 rx_HostOf(struct rx_peer *peer);
+extern afs_in_addr rx_HostOf(struct rx_peer *peer);
 extern u_short rx_PortOf(struct rx_peer *peer);
 
 /* Packets */
@@ -196,7 +196,7 @@ extern u_short rx_PortOf(struct rx_peer *peer);
 #ifndef KERNEL
 typedef void (*rx_destructor_t) (void *);
 int rx_KeyCreate(rx_destructor_t);
-osi_socket rxi_GetHostUDPSocket(u_int host, u_short port);
+osi_socket rxi_GetHostUDPSocket(afs_in_addr host, u_short port);
 osi_socket rxi_GetUDPSocket(u_short port);
 #endif /* KERNEL */
 
@@ -210,7 +210,7 @@ int ntoh_syserr_conv(int error);
 
 
 static_inline int
-rx_IsLoopbackAddr(afs_uint32 addr)
+rx_IsLoopbackAddr(afs_in_addr addr)
 {
     return ((addr & 0xffff0000) == 0x7f000000);
 }
@@ -322,7 +322,7 @@ returned with an error code of RX_CALL_DEAD ( transient error ) */
 
 struct rx_service {
     u_short serviceId;		/* Service number */
-    afs_uint32 serviceHost;	/* IP address for this service */
+    afs_in_addr serviceHost;	/* IP address for this service */
     u_short servicePort;	/* UDP port for this service */
     char *serviceName;		/* Name of the service */
     osi_socket socket;		/* socket structure or file descriptor */
@@ -719,7 +719,7 @@ struct rx_debugStats {
 };
 
 struct rx_debugConn_vL {
-    afs_uint32 host;
+    afs_in_addr host;
     afs_int32 cid;
     afs_int32 serial;
     afs_int32 callNumber[RX_MAXCALLS];
@@ -738,7 +738,7 @@ struct rx_debugConn_vL {
 };
 
 struct rx_debugConn {
-    afs_uint32 host;
+    afs_in_addr host;
     afs_int32 cid;
     afs_int32 serial;
     afs_int32 callNumber[RX_MAXCALLS];
@@ -760,7 +760,7 @@ struct rx_debugConn {
 };
 
 struct rx_debugPeer {
-    afs_uint32 host;
+    afs_in_addr host;
     u_short port;
     u_short ifMTU;
     afs_uint32 idleWhen;
@@ -817,7 +817,7 @@ struct rx_debugPeer {
 #define AFS_RX_STATS_CLEAR_EXEC_TIME_MAX	0x400
 
 typedef struct rx_function_entry_v1 {
-    afs_uint32 remote_peer;
+    afs_uint32 remote_peer; /* afs_in_addr */
     afs_uint32 remote_port;
     afs_uint32 remote_is_server;
     afs_uint32 interfaceId;

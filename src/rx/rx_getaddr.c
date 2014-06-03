@@ -48,17 +48,17 @@
 #ifdef KERNEL
 /* only used for generating random noise */
 
-afs_uint32 rxi_tempAddr = 0;	/* default attempt */
+afs_in_addr rxi_tempAddr = 0;	/* default attempt */
 
 /* set the advisory noise */
 void
-rxi_setaddr(afs_uint32 x)
+rxi_setaddr(afs_in_addr x)
 {
     rxi_tempAddr = x;
 }
 
 /* get approx to net addr */
-afs_uint32
+afs_in_addr
 rxi_getaddr(void)
 {
     return rxi_tempAddr;
@@ -70,7 +70,7 @@ rxi_getaddr(void)
 
 /* to satisfy those who call setaddr */
 void
-rxi_setaddr(afs_uint32 x)
+rxi_setaddr(afs_in_addr x)
 {
 }
 
@@ -87,10 +87,10 @@ rxi_setaddr(afs_uint32 x)
 /* Return our internet address as a long in network byte order.  Returns zero
  * if it can't find one.
  */
-afs_uint32
+afs_in_addr
 rxi_getaddr(void)
 {
-    afs_uint32 buffer[1024];
+    afs_in_addr buffer[1024];
     int count;
 
     count = rx_getAllAddr(buffer, 1024);
@@ -137,7 +137,7 @@ rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo *rtinfo)
 static_inline int
 rxi_IsLoopbackIface(struct sockaddr_in *a, unsigned long flags)
 {
-    afs_uint32 addr = ntohl(a->sin_addr.s_addr);
+    afs_in_addr addr = ntohl(a->sin_addr.s_addr);
     if (rx_IsLoopbackAddr(addr)) {
 	return 1;
     }
@@ -178,7 +178,7 @@ ifm_fixversion(char *buffer, size_t *size) {
 #endif
 
 int
-rx_getAllAddr_internal(afs_uint32 buffer[], int maxSize, int loopbacks)
+rx_getAllAddr_internal(afs_in_addr buffer[], int maxSize, int loopbacks)
 {
     size_t needed;
     int mib[6];
@@ -262,7 +262,7 @@ rx_getAllAddr_internal(afs_uint32 buffer[], int maxSize, int loopbacks)
 }
 
 int
-rx_getAllAddrMaskMtu(afs_uint32 addrBuffer[], afs_uint32 maskBuffer[],
+rx_getAllAddrMaskMtu(afs_in_addr addrBuffer[], afs_in_addr maskBuffer[],
 		     afs_uint32 mtuBuffer[], int maxSize)
 {
     int s;
@@ -367,7 +367,7 @@ rx_getAllAddrMaskMtu(afs_uint32 addrBuffer[], afs_uint32 maskBuffer[],
 
 
 int
-rx_getAllAddr(afs_uint32 buffer[], int maxSize)
+rx_getAllAddr(afs_in_addr buffer[], int maxSize)
 {
     return rx_getAllAddr_internal(buffer, maxSize, 0);
 }
@@ -376,7 +376,7 @@ rx_getAllAddr(afs_uint32 buffer[], int maxSize)
 */
 #else /* UKERNEL indirectly, on DARWIN or XBSD */
 static int
-rx_getAllAddr_internal(afs_uint32 buffer[], int maxSize, int loopbacks)
+rx_getAllAddr_internal(afs_in_addr buffer[], int maxSize, int loopbacks)
 {
     int s;
     int i, len, count = 0;
@@ -453,7 +453,7 @@ rx_getAllAddr_internal(afs_uint32 buffer[], int maxSize, int loopbacks)
 }
 
 int
-rx_getAllAddr(afs_uint32 buffer[], int maxSize)
+rx_getAllAddr(afs_in_addr buffer[], int maxSize)
 {
     return rx_getAllAddr_internal(buffer, maxSize, 0);
 }
@@ -465,7 +465,7 @@ rx_getAllAddr(afs_uint32 buffer[], int maxSize)
  * by afsi_SetServerIPRank().
  */
 int
-rx_getAllAddrMaskMtu(afs_uint32 addrBuffer[], afs_uint32 maskBuffer[],
+rx_getAllAddrMaskMtu(afs_in_addr addrBuffer[], afs_in_addr maskBuffer[],
                      afs_uint32 mtuBuffer[], int maxSize)
 {
     int i, count = 0;

@@ -68,7 +68,7 @@ static int
 CommandProc(struct cmd_syndesc *as, void *arock)
 {
     char *hostName, *portName, *times;
-    afs_int32 hostAddr;
+    afs_in_addr_s hostAddr;
     afs_int32 i, j, code;
     short port;
     int int32p;
@@ -101,7 +101,7 @@ CommandProc(struct cmd_syndesc *as, void *arock)
 	    printf("udebug: host %s not found in host table\n", hostName);
 	    exit(1);
 	}
-	memcpy(&hostAddr, th->h_addr, sizeof(afs_int32));
+	memcpy(&hostAddr, th->h_addr, sizeof(hostAddr));
     } else
 	hostAddr = htonl(0x7f000001);	/* IP localhost */
 

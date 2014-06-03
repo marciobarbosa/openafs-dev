@@ -45,7 +45,7 @@ struct ClearToken {
 
 
 static int
-SetSysname(afs_int32 ahost, afs_int32 auid, char *sysname)
+SetSysname(afs_in_addr_s ahost, afs_int32 auid, char *sysname)
 {
     afs_int32 code;
     afs_int32 pheader[6];
@@ -85,7 +85,7 @@ SetSysname(afs_int32 ahost, afs_int32 auid, char *sysname)
 
 
 static int
-GetTokens(afs_int32 ahost, afs_int32 auid)
+GetTokens(afs_in_addr_s ahost, afs_int32 auid)
 {
     struct ViceIoctl iob;
     afs_int32 pheader[6];
@@ -219,7 +219,7 @@ GetTokens(afs_int32 ahost, afs_int32 auid)
 
 
 static int
-NFSUnlog(afs_int32 ahost, afs_int32 auid)
+NFSUnlog(afs_in_addr_s ahost, afs_int32 auid)
 {
     afs_int32 code;
     afs_int32 pheader[6];
@@ -251,7 +251,7 @@ NFSUnlog(afs_int32 ahost, afs_int32 auid)
 
 /* Copy the AFS service token into the kernel for a particular host and user */
 static int
-NFSCopyToken(afs_int32 ahost, afs_int32 auid)
+NFSCopyToken(afs_in_addr_s ahost, afs_int32 auid)
 {
     struct ktc_principal client, server;
     struct ktc_token theTicket;
@@ -337,7 +337,8 @@ cmdproc(struct cmd_syndesc *as, void *arock)
 {
     struct hostent *the;
     char *tp, *sysname = 0;
-    afs_int32 uid, addr;
+    afs_int32 uid;
+    afs_in_addr_s addr;
     afs_int32 code;
 
     the = (struct hostent *)
@@ -346,7 +347,7 @@ cmdproc(struct cmd_syndesc *as, void *arock)
 	printf("knfs: unknown host '%s'.\n", tp);
 	return -1;
     }
-    memcpy(&addr, the->h_addr, sizeof(afs_int32));
+    memcpy(&addr, the->h_addr, sizeof(addr));
     uid = -1;
     if (as->parms[1].items) {
 	code = util_GetInt32(tp = as->parms[1].items->data, &uid);

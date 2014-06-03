@@ -625,7 +625,7 @@ h_gethostcps_r(struct host *host, afs_int32 now)
 
 /* args in net byte order */
 void
-h_flushhostcps(afs_uint32 hostaddr, afs_uint16 hport)
+h_flushhostcps(afs_in_addr hostaddr, afs_uint16 hport)
 {
     struct host *host;
 
@@ -728,7 +728,7 @@ h_SetupCallbackConn_r(struct host * host)
  * On return, refCount is incremented.
  */
 int
-h_Lookup_r(afs_uint32 haddr, afs_uint16 hport, struct host **hostp)
+h_Lookup_r(afs_in_addr haddr, afs_uint16 hport, struct host **hostp)
 {
     afs_int32 now;
     struct host *host = NULL;
@@ -1196,7 +1196,7 @@ h_DeleteHostFromUuidHashTable_r(struct host *host)
  * All addresses are in network byte order.
  */
 static int
-invalidateInterfaceAddr_r(struct host *host, afs_uint32 addr, afs_uint16 port)
+invalidateInterfaceAddr_r(struct host *host, afs_in_addr addr, afs_uint16 port)
 {
     int i;
     int number;
@@ -1242,7 +1242,7 @@ invalidateInterfaceAddr_r(struct host *host, afs_uint32 addr, afs_uint16 port)
  * All addresses are in network byte order.
  */
 static int
-removeAddress_r(struct host *host, afs_uint32 addr, afs_uint16 port)
+removeAddress_r(struct host *host, afs_in_addr addr, afs_uint16 port)
 {
     int i;
     char hoststr[16], hoststr2[16];
@@ -1313,7 +1313,7 @@ removeAddress_r(struct host *host, afs_uint32 addr, afs_uint16 port)
 }
 
 static void
-createHostAddrHashChain_r(int index, afs_uint32 addr, afs_uint16 port, struct host *host)
+createHostAddrHashChain_r(int index, afs_in_addr addr, afs_uint16 port, struct host *host)
 {
     struct h_AddrHashChain *chain;
     char hoststr[16];
@@ -1341,7 +1341,7 @@ createHostAddrHashChain_r(int index, afs_uint32 addr, afs_uint16 port, struct ho
  * @param[in]	oldHost	the host previously added with this address
  */
 static void
-reconcileHosts_r(afs_uint32 addr, afs_uint16 port, struct host *newHost,
+reconcileHosts_r(afs_in_addr addr, afs_uint16 port, struct host *newHost,
 		 struct host *oldHost)
 {
     struct rx_connection *cb = NULL;
@@ -1463,7 +1463,7 @@ reconcileHosts_r(afs_uint32 addr, afs_uint16 port, struct host *newHost,
 
 /* inserts a new HashChain structure corresponding to this address */
 void
-h_AddHostToAddrHashTable_r(afs_uint32 addr, afs_uint16 port, struct host *host)
+h_AddHostToAddrHashTable_r(afs_in_addr addr, afs_uint16 port, struct host *host)
 {
     int index;
     struct h_AddrHashChain *chain;
@@ -1500,7 +1500,7 @@ h_AddHostToAddrHashTable_r(afs_uint32 addr, afs_uint16 port, struct host *host)
  * All addresses are in network byte order.
  */
 int
-addInterfaceAddr_r(struct host *host, afs_uint32 addr, afs_uint16 port)
+addInterfaceAddr_r(struct host *host, afs_in_addr addr, afs_uint16 port)
 {
     int i;
     int number;
@@ -1566,7 +1566,7 @@ addInterfaceAddr_r(struct host *host, afs_uint32 addr, afs_uint16 port)
  * All addresses are in network byte order.
  */
 int
-removeInterfaceAddr_r(struct host *host, afs_uint32 addr, afs_uint16 port)
+removeInterfaceAddr_r(struct host *host, afs_in_addr addr, afs_uint16 port)
 {
     int i;
     int number;
@@ -1828,7 +1828,7 @@ h_GetHost_r(struct rx_connection *tcon)
     struct interfaceAddr interf;
     int interfValid = 0;
     struct Identity *identP = NULL;
-    afs_uint32 haddr;
+    afs_in_addr haddr;
     afs_uint16 hport;
     char hoststr[16], hoststr2[16];
     Capabilities caps;
@@ -3142,7 +3142,7 @@ static int h_stateRestoreHost(struct fs_dump_state * state);
 static int h_stateRestoreIndex(struct host * h, void *rock);
 static int h_stateVerifyHost(struct host * h, void *rock);
 static int h_stateVerifyAddrHash(struct fs_dump_state * state, struct host * h,
-                                 afs_uint32 addr, afs_uint16 port, int valid);
+                                 afs_in_addr addr, afs_uint16 port, int valid);
 static int h_stateVerifyUuidHash(struct fs_dump_state * state, struct host * h);
 static void h_hostToDiskEntry_r(struct host * in, struct hostDiskEntry * out);
 static void h_diskEntryToHost_r(struct hostDiskEntry * in, struct host * out);
@@ -3331,7 +3331,7 @@ h_stateVerifyHost(struct host * h, void* rock)
  */
 static int
 h_stateVerifyAddrHash(struct fs_dump_state * state, struct host * h,
-                      afs_uint32 addr, afs_uint16 port, int valid)
+                      afs_in_addr addr, afs_uint16 port, int valid)
 {
     int ret = 0, found = 0;
     struct host *host = NULL;
@@ -4272,7 +4272,7 @@ initInterfaceAddr_r(struct host *host, struct interfaceAddr *interf)
 /* deleted a HashChain structure for this address and host */
 /* returns 1 on success */
 int
-h_DeleteHostFromAddrHashTable_r(afs_uint32 addr, afs_uint16 port,
+h_DeleteHostFromAddrHashTable_r(afs_in_addr addr, afs_uint16 port,
 				struct host *host)
 {
     char hoststr[16];
