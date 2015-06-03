@@ -34,6 +34,11 @@
 static struct host *hash_table[HASH_ENTRIES_SIZE] = { NULL };
 static afs_uint32 hash_table_size = 0;
 
+#ifdef AFS_PTHREAD_ENV
+static pthread_once_t host_thread = PTHREAD_ONCE_INIT;
+static pthread_mutex_t host_mutex;
+#endif
+
 typedef struct host {
     afs_uint32 address;
     time_t expires;
@@ -77,7 +82,7 @@ remove_host(afs_uint32 addrp)
     int i = HOST_ADDR_HASH(addrp);
     host_t *hasht, *prior = hash_table[i];
 
-    for(hasht = hash_table[i]; hasht; hasht = hasht->next) {
+    for (hasht = hash_table[i]; hasht; hasht = hasht->next) {
     	if (hasht->address == addrp)
     	    break;
     	prior = hasht;
@@ -102,7 +107,7 @@ find_host(afs_uint32 addrp)
     time_t now = time(NULL);
     int i = HOST_ADDR_HASH(addrp);
 
-    for(hasht = hash_table[i]; hasht; hasht = hasht->next) {
+    for (hasht = hash_table[i]; hasht; hasht = hasht->next) {
         if (hasht->address == addrp)
             break;
     }
@@ -112,6 +117,39 @@ find_host(afs_uint32 addrp)
     }
     return hasht;
 }
+
+#ifdef AFS_PTHREAD_ENV
+static void
+check_host_ttl(void)
+{
+    host_t *entry, *next;
+    int i;
+    time_t now = time(NULL);
+
+    for (i = 0; i < HASH_ENTRIES_SIZE; i++) {
+        entry = hash_table[i];
+        if (!entry)
+            continue;
+        while (entry) {
+            next = entry->next;
+            if (entry->expires < now)
+                remove_host(entry->address);
+            entry = next;
+        }
+    }
+}
+
+static void
+check_host_ttl_thread(void)
+{
+    while (1) {
+        pthread_mutex_lock(&host_mutex);
+        check_host_ttl();
+        pthread_mutex_unlock(&host_mutex);
+        sleep(300);
+    }
+}
+#endif
 
 /* also parse a.b.c.d addresses */
 struct hostent *
@@ -189,12 +227,22 @@ hostutil_GetNameByINet(afs_uint32 addr)
     static char tbuffer[256];
     host_t *h;
 
+#ifdef AFS_PTHREAD_ENV
+    pthread_once(&host_thread, check_host_ttl_thread);
+#endif
+
 #ifdef AFS_NT40_ENV
     if (afs_winsockInit() < 0)
 	return NULL;
 #endif
-    if ((h = find_host(addr)) != NULL)
-        return h->name;
+
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_lock(&host_mutex);
+#endif
+    if ((h = find_host(addr)) != NULL) {
+        strlcpy(tbuffer, h->name, sizeof(tbuffer));
+        goto done;
+    }
 
     th = gethostbyaddr((void *)&addr, sizeof(addr), AF_INET);
     if (th && strlen(th->h_name) < sizeof(tbuffer)) {
@@ -207,6 +255,10 @@ hostutil_GetNameByINet(afs_uint32 addr)
     }
     add_host(addr, tbuffer);
 
+done:
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_unlock(&host_mutex);
+#endif
     return tbuffer;
 }
 
