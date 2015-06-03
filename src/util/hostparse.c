@@ -22,7 +22,96 @@
 #include <ctype.h>
 #endif
 
+#include <opr/jhash.h>
 #include "afsutil.h"
+
+#define HASH_ENTRIES_SIZE 32 /* must be a power of 2 */
+#define MAX_HASH_SIZE 256
+#define HOST_TTL 20
+#define HOST_ADDR_HASH(addr) \
+    (opr_jhash_int((addr), 0) & (HASH_ENTRIES_SIZE - 1))
+
+static struct host *hash_table[HASH_ENTRIES_SIZE] = { NULL };
+static afs_uint32 hash_table_size = 0;
+
+typedef struct host {
+    afs_uint32 address;
+    time_t expires;
+    char *name;
+    struct host *next;
+} host_t;
+
+static host_t*
+add_host(afs_uint32 addrp, char *namep)
+{
+    int i;
+    time_t now = time(NULL);
+    host_t *hostt = NULL;
+
+    if (hash_table_size > MAX_HASH_SIZE)
+    	goto done;
+
+    if ((hostt = calloc(1, sizeof(host_t))) == NULL)
+    	goto done;
+    hostt->address = addrp;
+    hostt->expires = now + HOST_TTL;
+    if ((hostt->name = calloc(strlen(namep), sizeof(char))) == NULL) {
+    	free(hostt);
+    	hostt = NULL;
+    	goto done;
+    }
+    strcpy(hostt->name, namep);
+
+    i = HOST_ADDR_HASH(addrp);
+    hostt->next = hash_table[i];
+    hash_table[i] = hostt;
+    hash_table_size++;
+
+done:
+    return hostt;
+}
+
+static void
+remove_host(afs_uint32 addrp)
+{
+    int i = HOST_ADDR_HASH(addrp);
+    host_t *hasht, *prior = hash_table[i];
+
+    for(hasht = hash_table[i]; hasht; hasht = hasht->next) {
+    	if (hasht->address == addrp)
+    	    break;
+    	prior = hasht;
+    }
+    if (hasht && hasht->address == hash_table[i]->address) { /* first element */
+    	hash_table[i] = hasht->next;
+    	free(hasht->name);
+    	free(hasht);
+        hash_table_size--;
+    } else if (hasht) {
+    	prior->next = hasht->next;
+    	free(hasht->name);
+    	free(hasht);
+        hash_table_size--;
+    }
+}
+
+static host_t*
+find_host(afs_uint32 addrp)
+{
+    host_t *hasht;
+    time_t now = time(NULL);
+    int i = HOST_ADDR_HASH(addrp);
+
+    for(hasht = hash_table[i]; hasht; hasht = hasht->next) {
+        if (hasht->address == addrp)
+            break;
+    }
+    if (hasht && (hasht->expires < now)) {
+        remove_host(hasht->address);
+        hasht = NULL;
+    }
+    return hasht;
+}
 
 /* also parse a.b.c.d addresses */
 struct hostent *
@@ -98,11 +187,15 @@ hostutil_GetNameByINet(afs_uint32 addr)
 {
     struct hostent *th;
     static char tbuffer[256];
+    host_t *h;
 
 #ifdef AFS_NT40_ENV
     if (afs_winsockInit() < 0)
 	return NULL;
 #endif
+    if ((h = find_host(addr)) != NULL)
+        return h->name;
+
     th = gethostbyaddr((void *)&addr, sizeof(addr), AF_INET);
     if (th && strlen(th->h_name) < sizeof(tbuffer)) {
 	strlcpy(tbuffer, th->h_name, sizeof(tbuffer));
@@ -112,6 +205,7 @@ hostutil_GetNameByINet(afs_uint32 addr)
 		(int)((addr >> 16) & 0xff), (int)((addr >> 8) & 0xff),
 		(int)(addr & 0xff));
     }
+    add_host(addr, tbuffer);
 
     return tbuffer;
 }
