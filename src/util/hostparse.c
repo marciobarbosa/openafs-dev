@@ -31,13 +31,15 @@
 #define HOST_ADDR_HASH(addr) \
     (opr_jhash_int((addr), 0) & (HASH_ENTRIES_SIZE - 1))
 
-static struct host *hash_table[HASH_ENTRIES_SIZE] = { NULL };
-static afs_uint32 hash_table_size = 0;
-
 #ifdef AFS_PTHREAD_ENV
-static pthread_once_t host_thread = PTHREAD_ONCE_INIT;
+#define THREAD_SLEEP_TIME 300
+static pthread_t host_thread;
+static pthread_once_t host_thread_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t host_mutex;
 #endif
+
+static struct host *hash_table[HASH_ENTRIES_SIZE] = { NULL };
+static afs_uint32 hash_table_size = 0;
 
 typedef struct host {
     afs_uint32 address;
@@ -46,7 +48,7 @@ typedef struct host {
     struct host *next;
 } host_t;
 
-static host_t*
+static host_t *
 add_host(afs_uint32 addrp, char *namep)
 {
     int i;
@@ -139,15 +141,22 @@ check_host_ttl(void)
     }
 }
 
-static void
-check_host_ttl_thread(void)
+static void *
+check_host_ttl_thread(void *p)
 {
     while (1) {
         pthread_mutex_lock(&host_mutex);
         check_host_ttl();
         pthread_mutex_unlock(&host_mutex);
-        sleep(300);
+        sleep(THREAD_SLEEP_TIME);
     }
+    return NULL;
+}
+
+static void
+init_host_ttl_thread(void)
+{
+    pthread_create(&host_thread, NULL, check_host_ttl_thread, NULL);
 }
 #endif
 
@@ -228,7 +237,7 @@ hostutil_GetNameByINet(afs_uint32 addr)
     host_t *h;
 
 #ifdef AFS_PTHREAD_ENV
-    pthread_once(&host_thread, check_host_ttl_thread);
+    pthread_once(&host_thread_once, init_host_ttl_thread);
 #endif
 
 #ifdef AFS_NT40_ENV
