@@ -61,6 +61,7 @@ extern afs_int64 flipbase64_to_int64(char *s);
 /* hostparse.c */
 extern struct hostent *hostutil_GetHostByName(char *ahost);
 extern char *hostutil_GetNameByINet(afs_uint32 addr);
+extern void clean_out_hash(void);
 extern afs_uint32 extractAddr(char *line, int maxSize);
 extern char *afs_inet_ntoa_r(afs_uint32 addr, char *buf);
 extern char *gettmpdir(void);

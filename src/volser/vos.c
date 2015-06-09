@@ -6346,6 +6346,7 @@ main(int argc, char **argv)
 	}
 	rx_Finalize();
     }
+    clean_out_hash();
 
     exit((code ? -1 : 0));
 }
