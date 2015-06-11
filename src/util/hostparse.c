@@ -22,7 +22,97 @@
 #include <ctype.h>
 #endif
 
+#include <opr/jhash.h>
 #include "afsutil.h"
+
+#define HASH_ENTRIES_SIZE 32 /* must be a power of 2 */
+#define MAX_HASH_SIZE 256
+#define HOST_ADDR_HASH(addr) \
+    (opr_jhash_int((addr), 0) & (HASH_ENTRIES_SIZE - 1))
+
+typedef struct host {
+    afs_uint32 address;
+    char *name;
+    struct host *next;
+} host_t;
+
+typedef struct context {
+    afs_uint32 hash_table_size;
+    host_t *hash_table[HASH_ENTRIES_SIZE];
+} context_t;
+
+static host_t *
+add_host(afs_uint32 addrp, char *namep, context_t *ctxp)
+{
+    int i;
+    host_t *hostt = NULL;
+
+    if (ctxp->hash_table_size > MAX_HASH_SIZE)
+        goto done;
+
+    if ((hostt = calloc(1, sizeof(host_t))) == NULL)
+        goto done;
+    hostt->address = addrp;
+    if ((hostt->name = calloc(strlen(namep), sizeof(char))) == NULL) {
+        free(hostt);
+        hostt = NULL;
+        goto done;
+    }
+    strcpy(hostt->name, namep);
+
+    i = HOST_ADDR_HASH(addrp);
+    hostt->next = ctxp->hash_table[i];
+    ctxp->hash_table[i] = hostt;
+    ctxp->hash_table_size++;
+
+done:
+    return hostt;
+}
+
+static host_t *
+find_host(afs_uint32 addrp, context_t *ctxp)
+{
+    host_t *hasht;
+    int i = HOST_ADDR_HASH(addrp);
+
+    for (hasht = ctxp->hash_table[i]; hasht; hasht = hasht->next) {
+        if (hasht->address == addrp)
+            break;
+    }
+    return hasht;
+}
+
+static void
+remove_entry(host_t *entryp)
+{
+    if (entryp->next)
+        remove_entry(entryp->next);
+    free(entryp->name);
+    free(entryp);
+}
+
+void
+hostutil_RemoveContext(void *ctxp)
+{
+    context_t *ctx = (context_t *)ctxp;
+    host_t *entry;
+    int i;
+
+    for (i = 0; i < HASH_ENTRIES_SIZE; i++) {
+        entry = ctx->hash_table[i];
+        if (!entry)
+            continue;
+        remove_entry(entry);
+        ctx->hash_table[i] = NULL;
+    }
+    ctx->hash_table_size = 0;
+}
+
+void *
+hostutil_CreateContext(void)
+{
+    return calloc(1, sizeof(context_t));
+}
 
 /* also parse a.b.c.d addresses */
 struct hostent *
@@ -114,6 +204,25 @@ hostutil_GetNameByINet(afs_uint32 addr)
     }
 
     return tbuffer;
+}
+
+char *
+hostutil_GetNameByINetCtx(afs_uint32 addrp, void *ctxp)
+{
+    context_t *ctx = (context_t *)ctxp;
+    host_t *h;
+    char *name;
+
+    if (!ctxp)
+        return hostutil_GetNameByINet(addrp);
+
+    if ((h = find_host(addrp, ctx)) != NULL) {
+        return h->name;
+    }
+    name = hostutil_GetNameByINet(addrp);
+    add_host(addrp, name, ctx);
+
+    return name;
 }
 
 /* the parameter is a pointer to a buffer containing a string of

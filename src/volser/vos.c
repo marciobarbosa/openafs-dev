@@ -1465,7 +1465,7 @@ PrintLocked(afs_int32 aflags)
 static void
 PostVolumeStats(struct nvldbentry *entry)
 {
-    SubEnumerateEntry(entry);
+    SubEnumerateEntry(entry, NULL);
     /* Check for VLOP_ALLOPERS */
     PrintLocked(entry->flags);
     return;
@@ -4542,6 +4542,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
     char pname[10];
     int quiet, sort, lock;
     afs_int32 thisindex, nextindex;
+    void *ctx = hostutil_CreateContext();
 
     apart = 0;
 
@@ -4635,7 +4636,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 	    for (j = 0; j < centries; j++) {	/* process each entry */
 		vllist = &arrayEntries.nbulkentries_val[j];
 		MapHostToNetwork(vllist);
-		EnumerateEntry(vllist);
+		EnumerateEntryCtx(vllist, ctx);
 
 		PrintLocked(vllist->flags);
 	    }
@@ -4683,7 +4684,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 	      CompareVldbEntryByName);
 	for (vllist = tarray, j = 0; j < nentries; j++, vllist++) {
 	    MapHostToNetwork(vllist);
-	    EnumerateEntry(vllist);
+	    EnumerateEntryCtx(vllist, ctx);
 
 	    PrintLocked(vllist->flags);
 	}
@@ -4694,6 +4695,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 	fprintf(STDOUT, "\nTotal entries: %lu\n", (unsigned long)nentries);
     if (tarray)
 	free(tarray);
+    hostutil_RemoveContext(ctx);
     return 0;
 }
 

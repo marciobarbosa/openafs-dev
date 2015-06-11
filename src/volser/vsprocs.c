@@ -540,7 +540,7 @@ CheckAndDeleteVolume(struct rx_connection *aconn, afs_int32 apart,
 
 /* called by EmuerateEntry, show vldb entry in a reasonable format */
 void
-SubEnumerateEntry(struct nvldbentry *entry)
+SubEnumerateEntry(struct nvldbentry *entry, void *ctxp)
 {
     int i;
     char pname[10];
@@ -586,7 +586,7 @@ SubEnumerateEntry(struct nvldbentry *entry)
 	MapPartIdIntoName(entry->serverPartition[i], pname);
 	fprintf(STDOUT, "       server %s partition %s ",
 		noresolve ? afs_inet_ntoa_r(entry->serverNumber[i], hoststr) :
-                hostutil_GetNameByINet(entry->serverNumber[i]), pname);
+                hostutil_GetNameByINetCtx(entry->serverNumber[i], ctxp), pname);
 	if (entry->serverFlags[i] & VLSF_RWVOL)
 	    fprintf(STDOUT, "RW Site ");
 	else
@@ -615,7 +615,17 @@ EnumerateEntry(struct nvldbentry *entry)
 
     fprintf(STDOUT, "\n");
     fprintf(STDOUT, "%s \n", entry->name);
-    SubEnumerateEntry(entry);
+    SubEnumerateEntry(entry, NULL);
+    return;
+}
+
+void
+EnumerateEntryCtx(struct nvldbentry *entry, void *ctxp)
+{
+
+    fprintf(STDOUT, "\n");
+    fprintf(STDOUT, "%s \n", entry->name);
+    SubEnumerateEntry(entry, ctxp);
     return;
 }
 
