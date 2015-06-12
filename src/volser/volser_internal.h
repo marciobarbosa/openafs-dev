@@ -36,8 +36,8 @@ extern afs_int32 GCTrans(void);
 struct nvldbentry;
 extern int PrintError(char *msg, afs_int32 errcode);
 extern void init_volintInfo(struct volintInfo *vinfo);
-extern void SubEnumerateEntry(struct nvldbentry *entry);
-extern void EnumerateEntry(struct nvldbentry *entry);
+extern void SubEnumerateEntry(void *ctxp, struct nvldbentry *entry);
+extern void EnumerateEntry(void *ctxp, struct nvldbentry *entry);
 extern int UV_NukeVolume(afs_uint32 server, afs_int32 partid, afs_uint32 volid);
 extern int UV_PartitionInfo64(afs_uint32 server, char *pname,
 			    struct diskPartition64 *partition);

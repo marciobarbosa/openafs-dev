@@ -1465,7 +1465,7 @@ PrintLocked(afs_int32 aflags)
 static void
 PostVolumeStats(struct nvldbentry *entry)
 {
-    SubEnumerateEntry(entry);
+    SubEnumerateEntry(NULL, entry);
     /* Check for VLOP_ALLOPERS */
     PrintLocked(entry->flags);
     return;
@@ -1697,7 +1697,7 @@ ExamineVolume(struct cmd_syndesc *as, void *arock)
 		XVolumeStats(xInfoP, &entry, aserver, apart, voltype);
 	    else if (as->parms[2].items) {
 		DisplayFormat2(aserver, apart, pntr);
-		EnumerateEntry(&entry);
+		EnumerateEntry(NULL, &entry);
 		isSubEnum = 1;
 	    } else
 		VolumeStats_int(pntr, &entry, aserver, apart, voltype);
@@ -3988,7 +3988,7 @@ VolumeInfoCmd(char *name)
 	exit(1);
     }
     MapHostToNetwork(&entry);
-    EnumerateEntry(&entry);
+    EnumerateEntry(NULL, &entry);
 
     /* Defect #3027: grubby check to handle locked volume.
      * If VLOP_ALLOPERS is set, the entry is locked.
@@ -4542,6 +4542,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
     char pname[10];
     int quiet, sort, lock;
     afs_int32 thisindex, nextindex;
+    void *ctx = hostutil_CreateHostCacheCtx();
 
     apart = 0;
 
@@ -4635,7 +4636,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 	    for (j = 0; j < centries; j++) {	/* process each entry */
 		vllist = &arrayEntries.nbulkentries_val[j];
 		MapHostToNetwork(vllist);
-		EnumerateEntry(vllist);
+		EnumerateEntry(ctx, vllist);
 
 		PrintLocked(vllist->flags);
 	    }
@@ -4683,7 +4684,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 	      CompareVldbEntryByName);
 	for (vllist = tarray, j = 0; j < nentries; j++, vllist++) {
 	    MapHostToNetwork(vllist);
-	    EnumerateEntry(vllist);
+	    EnumerateEntry(ctx, vllist);
 
 	    PrintLocked(vllist->flags);
 	}
@@ -4694,6 +4695,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 	fprintf(STDOUT, "\nTotal entries: %lu\n", (unsigned long)nentries);
     if (tarray)
 	free(tarray);
+    hostutil_RemoveHostCacheCtx(ctx);
     return 0;
 }
 

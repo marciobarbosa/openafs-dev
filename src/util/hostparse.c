@@ -22,7 +22,85 @@
 #include <ctype.h>
 #endif
 
+#include <opr/jhash.h>
 #include "afsutil.h"
+
+#define HASH_ENTRIES_SIZE 32 /* must be a power of 2 */
+#define ADDR_HASH(addr) \
+    (opr_jhash_int((addr), 0) & (HASH_ENTRIES_SIZE - 1))
+
+struct host_cache {
+    afs_uint32 address;
+    char *name;
+    struct host_cache *next;
+};
+
+struct host_cache_ctx {
+    afs_uint32 hash_table_size;
+    struct host_cache *hash_table[HASH_ENTRIES_SIZE];
+};
+
+static struct host_cache *
+find_host_cache(struct host_cache_ctx *ctxp, afs_uint32 addrp)
+{
+    struct host_cache *hc;
+    int i = ADDR_HASH(addrp);
+    char *name;
+
+    for (hc = ctxp->hash_table[i]; hc; hc = hc->next) {
+        if (hc->address == addrp)
+            break;
+    }
+    if (hc)
+        return hc;
+    if ((hc = calloc(1, sizeof(struct host_cache))) == NULL)
+        goto done;
+    hc->address = addrp;
+    name = hostutil_GetNameByINet(addrp);
+    if ((hc->name = calloc(strlen(name), sizeof(char))) == NULL) {
+        free(hc);
+        hc = NULL;
+        goto done;
+    }
+    strcpy(hc->name, name);
+    hc->next = ctxp->hash_table[i];
+    ctxp->hash_table[i] = hc;
+    ctxp->hash_table_size++;
+done:
+    return hc;
+}
+
+static void
+remove_entry(struct host_cache *entryp)
+{
+    if (entryp->next)
+        remove_entry(entryp->next);
+    free(entryp->name);
+    free(entryp);
+}
+
+void *
+hostutil_CreateHostCacheCtx(void)
+{
+    return calloc(1, sizeof(struct host_cache_ctx));
+}
+
+void
+hostutil_RemoveHostCacheCtx(void *ctxp)
+{
+    struct host_cache_ctx *ctx = (struct host_cache_ctx *)ctxp;
+    struct host_cache *entry;
+    int i;
+
+    for (i = 0; i < HASH_ENTRIES_SIZE; i++) {
+        entry = ctx->hash_table[i];
+        if (!entry)
+            continue;
+        remove_entry(entry);
+        ctx->hash_table[i] = NULL;
+    }
+    ctx->hash_table_size = 0;
+}
 
 /* also parse a.b.c.d addresses */
 struct hostent *
@@ -114,6 +192,21 @@ hostutil_GetNameByINet(afs_uint32 addr)
     }
 
     return tbuffer;
+}
+
+char *
+hostutil_GetNameByINetCache(void *ctxp, afs_uint32 addrp, host_name_t namep)
+{
+    struct host_cache_ctx *ctx = (struct host_cache_ctx *)ctxp;
+    struct host_cache *hc;
+
+    if (!ctxp)
+        return hostutil_GetNameByINet(addrp);
+    if ((hc = find_host_cache(ctx, addrp)) == NULL)
+        return hostutil_GetNameByINet(addrp);
+    strcpy(namep, hc->name);
+
+    return namep;
 }
 
 /* the parameter is a pointer to a buffer containing a string of

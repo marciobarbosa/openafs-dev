@@ -540,12 +540,13 @@ CheckAndDeleteVolume(struct rx_connection *aconn, afs_int32 apart,
 
 /* called by EmuerateEntry, show vldb entry in a reasonable format */
 void
-SubEnumerateEntry(struct nvldbentry *entry)
+SubEnumerateEntry(void *ctxp, struct nvldbentry *entry)
 {
     int i;
     char pname[10];
     int isMixed = 0;
     char hoststr[16];
+    char sname[256];
 
 #ifdef notdef
     fprintf(STDOUT, "	readWriteID %-10u ", entry->volumeId[RWVOL]);
@@ -586,7 +587,7 @@ SubEnumerateEntry(struct nvldbentry *entry)
 	MapPartIdIntoName(entry->serverPartition[i], pname);
 	fprintf(STDOUT, "       server %s partition %s ",
 		noresolve ? afs_inet_ntoa_r(entry->serverNumber[i], hoststr) :
-                hostutil_GetNameByINet(entry->serverNumber[i]), pname);
+                hostutil_GetNameByINetCache(ctxp, entry->serverNumber[i], sname), pname);
 	if (entry->serverFlags[i] & VLSF_RWVOL)
 	    fprintf(STDOUT, "RW Site ");
 	else
@@ -610,12 +611,12 @@ SubEnumerateEntry(struct nvldbentry *entry)
 
 /*enumerate the vldb entry corresponding to <entry> */
 void
-EnumerateEntry(struct nvldbentry *entry)
+EnumerateEntry(void *ctxp, struct nvldbentry *entry)
 {
 
     fprintf(STDOUT, "\n");
     fprintf(STDOUT, "%s \n", entry->name);
-    SubEnumerateEntry(entry);
+    SubEnumerateEntry(ctxp, entry);
     return;
 }
 
@@ -928,7 +929,7 @@ UV_DeleteVolume(afs_uint32 aserver, afs_int32 apart, afs_uint32 avolid)
 	MapHostToNetwork(&entry);
 
 	if (verbose)
-	    EnumerateEntry(&entry);
+	    EnumerateEntry(NULL, &entry);
     }
 
     /* Whether volume is in the VLDB or not. Delete the volume on disk */
@@ -3553,7 +3554,7 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
     MapHostToNetwork(&entry);
 
     if (verbose)
-	EnumerateEntry(&entry);
+	EnumerateEntry(NULL, &entry);
 
     if (!ISNAMEVALID(entry.name))
 	ONERROR(VOLSERBADOP, entry.name,
@@ -5077,12 +5078,12 @@ UV_RestoreVolume2(afs_uint32 toserver, afs_int32 topart, afs_uint32 tovolid,
 	    }
 	    islocked = 0;
 	    if (verbose)
-		EnumerateEntry(&entry);
+		EnumerateEntry(NULL, &entry);
 	} else {		/*update the existing entry */
 	    if (verbose) {
 		fprintf(STDOUT, "Updating the existing VLDB entry\n");
 		fprintf(STDOUT, "------- Old entry -------\n");
-		EnumerateEntry(&entry);
+		EnumerateEntry(NULL, &entry);
 		fprintf(STDOUT, "------- New entry -------\n");
 	    }
 	    vcode =
@@ -5172,7 +5173,7 @@ UV_RestoreVolume2(afs_uint32 toserver, afs_int32 topart, afs_uint32 tovolid,
 	    }
 	    islocked = 0;
 	    if (verbose)
-		EnumerateEntry(&entry);
+		EnumerateEntry(NULL, &entry);
 	}
 
 
@@ -6023,7 +6024,7 @@ CheckVolume(volintInfo * volumeinfo, afs_uint32 aserver, afs_int32 apart,
 	} else {
 	    if ((entry.flags & VLF_RWEXISTS) || (entry.flags & VLF_ROEXISTS)
 		|| (entry.flags & VLF_BACKEXISTS))
-		EnumerateEntry(&entry);
+		EnumerateEntry(NULL, &entry);
 	}
 	fprintf(STDOUT, "\n");
     }
@@ -6393,7 +6394,7 @@ CheckVolume(volintInfo * volumeinfo, afs_uint32 aserver, afs_int32 apart,
     if (verbose) {
 	fprintf(STDOUT, "-- status after --\n");
 	if (modified)
-	    EnumerateEntry(&entry);
+	    EnumerateEntry(NULL, &entry);
 	else
 	    fprintf(STDOUT, "\n**no change**\n");
     }
@@ -6490,7 +6491,7 @@ UV_SyncVolume(afs_uint32 aserver, afs_int32 apart, char *avolname, int flags)
 	} else {
 	    if ((vldbentry.flags & VLF_RWEXISTS) || (vldbentry.flags & VLF_ROEXISTS)
 		|| (vldbentry.flags & VLF_BACKEXISTS))
-		EnumerateEntry(&vldbentry);
+		EnumerateEntry(NULL, &vldbentry);
 	}
 	fprintf(STDOUT, "\n");
     }
@@ -6613,7 +6614,7 @@ UV_SyncVolume(afs_uint32 aserver, afs_int32 apart, char *avolname, int flags)
 	if (deleted) {
 	    fprintf(STDOUT, "\n**entry deleted**\n");
 	} else if (modified) {
-	    EnumerateEntry(&vldbentry);
+	    EnumerateEntry(NULL, &vldbentry);
 	} else {
 	    fprintf(STDOUT, "\n**no change**\n");
 	}
@@ -7031,7 +7032,7 @@ CheckVldb(struct nvldbentry * entry, afs_int32 * modified, afs_int32 * deleted)
 	fprintf(STDOUT, "\n-- status before -- \n");
 	if ((entry->flags & VLF_RWEXISTS) || (entry->flags & VLF_ROEXISTS)
 	    || (entry->flags & VLF_BACKEXISTS))
-	    EnumerateEntry(entry);
+	    EnumerateEntry(NULL, entry);
 	fprintf(STDOUT, "\n");
     }
 
@@ -7134,7 +7135,7 @@ CheckVldb(struct nvldbentry * entry, afs_int32 * modified, afs_int32 * deleted)
 	if (delentry)
 	    fprintf(STDOUT, "\n**entry deleted**\n");
 	else if (modentry)
-	    EnumerateEntry(entry);
+	    EnumerateEntry(NULL, entry);
 	else
 	    fprintf(STDOUT, "\n**no change**\n");
     }
