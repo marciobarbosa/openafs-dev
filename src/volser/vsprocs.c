@@ -538,75 +538,46 @@ CheckAndDeleteVolume(struct rx_connection *aconn, afs_int32 apart,
 
 #endif
 
+static int
+create_addr_1(int index)
+{
+    char ip[15] = "192.168.20.";
+    int ip_nbo;
+    char end[4];
+
+    sprintf(end, "%d", index);
+    strncat(ip, end, 4);
+    inet_pton(AF_INET, ip, &ip_nbo);
+
+    return ip_nbo;
+}
+
+static int
+create_addr_2(int index)
+{
+    char ip[15] = "192.168.21.";
+    int ip_nbo;
+    char end[4];
+
+    sprintf(end, "%d", index);
+    strncat(ip, end, 4);
+    inet_pton(AF_INET, ip, &ip_nbo);
+
+    return ip_nbo;
+}
+
 /* called by EmuerateEntry, show vldb entry in a reasonable format */
 void
 SubEnumerateEntry(struct nvldbentry *entry)
 {
     int i;
-    char pname[10];
-    int isMixed = 0;
-    char hoststr[16];
-    char sname[256];
+    char buffer[256];
 
-#ifdef notdef
-    fprintf(STDOUT, "	readWriteID %-10u ", entry->volumeId[RWVOL]);
-    if (entry->flags & VLF_RWEXISTS)
-	fprintf(STDOUT, " valid \n");
-    else
-	fprintf(STDOUT, " invalid \n");
-    fprintf(STDOUT, "	readOnlyID  %-10u ", entry->volumeId[ROVOL]);
-    if (entry->flags & VLF_ROEXISTS)
-	fprintf(STDOUT, " valid \n");
-    else
-	fprintf(STDOUT, " invalid \n");
-    fprintf(STDOUT, "	backUpID    %-10u ", entry->volumeId[BACKVOL]);
-    if (entry->flags & VLF_BACKEXISTS)
-	fprintf(STDOUT, " valid \n");
-    else
-	fprintf(STDOUT, " invalid \n");
-    if ((entry->cloneId != 0) && (entry->flags & VLF_ROEXISTS))
-	fprintf(STDOUT, "    releaseClone %-10u \n", entry->cloneId);
-#else
-    if (entry->flags & VLF_RWEXISTS)
-	fprintf(STDOUT, "    RWrite: %-10u", entry->volumeId[RWVOL]);
-    if (entry->flags & VLF_ROEXISTS)
-	fprintf(STDOUT, "    ROnly: %-10u", entry->volumeId[ROVOL]);
-    if (entry->flags & VLF_BACKEXISTS)
-	fprintf(STDOUT, "    Backup: %-10u", entry->volumeId[BACKVOL]);
-    if ((entry->cloneId != 0) && (entry->flags & VLF_ROEXISTS))
-	fprintf(STDOUT, "    RClone: %-10lu", (unsigned long)entry->cloneId);
-    fprintf(STDOUT, "\n");
-#endif
-    fprintf(STDOUT, "    number of sites -> %lu\n",
-	    (unsigned long)entry->nServers);
-    for (i = 0; i < entry->nServers; i++) {
-	if (entry->serverFlags[i] & VLSF_NEWREPSITE)
-	    isMixed = 1;
+    for (i = 0; i < 200; i++) {
+    	hostutil_GetNameByINetCache(create_addr_1(i + 2), buffer, 256);
+    	hostutil_GetNameByINetCache(create_addr_2(i + 2), buffer, 256);
     }
-    for (i = 0; i < entry->nServers; i++) {
-	MapPartIdIntoName(entry->serverPartition[i], pname);
-	fprintf(STDOUT, "       server %s partition %s ",
-		noresolve ? afs_inet_ntoa_r(entry->serverNumber[i], hoststr) :
-                hostutil_GetNameByINetCache(entry->serverNumber[i], sname, 256), pname);
-	if (entry->serverFlags[i] & VLSF_RWVOL)
-	    fprintf(STDOUT, "RW Site ");
-	else
-	    fprintf(STDOUT, "RO Site ");
-	if (isMixed) {
-	    if (entry->serverFlags[i] & VLSF_NEWREPSITE)
-		fprintf(STDOUT," -- New release");
-	    else
-		if (!(entry->serverFlags[i] & VLSF_RWVOL))
-		    fprintf(STDOUT," -- Old release");
-	} else {
-	    if (entry->serverFlags[i] & VLSF_DONTUSE)
-		fprintf(STDOUT, " -- Not released");
-	}
-	fprintf(STDOUT, "\n");
-    }
-
     return;
-
 }
 
 /*enumerate the vldb entry corresponding to <entry> */
