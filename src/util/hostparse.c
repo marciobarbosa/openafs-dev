@@ -24,11 +24,13 @@
 
 #include <opr/jhash.h>
 #include "afsutil.h"
+#include <stdio.h>
 
 #define HASH_BUCKETS_SIZE 512 /* must be a power of 2 */
 #define ADDR_HASH(addr) \
     (opr_jhash_int((addr), 0) & (HASH_BUCKETS_SIZE - 1))
 
+FILE *fd;
 static struct host_cache *hash_table[HASH_BUCKETS_SIZE];
 #ifdef AFS_PTHREAD_ENV
 static pthread_mutex_t hash_mutex;
@@ -51,12 +53,15 @@ find_host_cache(afs_uint32 aaddr)
         if (hc->address == aaddr)
             break;
     }
-    if (hc)
+    if (hc) {
+        fprintf(fd, "%s%s\n", "[FOUND] ", hc->name);
         return hc;
+    }
     if ((hc = calloc(1, sizeof(struct host_cache))) == NULL)
         goto done;
     hc->address = aaddr;
     name = hostutil_GetNameByINet(aaddr);
+    fprintf(fd, "%s%s\n", "[NOT FOUND] ", name);
     if ((hc->name = strdup(name)) == NULL) {
         free(hc);
         hc = NULL;
@@ -74,6 +79,7 @@ remove_bucket(struct host_cache *aentry)
     struct host_cache *next;
 
     while (aentry) {
+        fprintf(fd, "%s%s\n", "[REMOVE] ", aentry->name);
         next = aentry->next;
         free(aentry->name);
         free(aentry);
@@ -86,6 +92,7 @@ hostutil_DestroyHostCache(void)
 {
     struct host_cache *bucket;
     afs_uint32 i;
+    fd = fopen("/home/marcio/output", "a+");
 
 #ifdef AFS_PTHREAD_ENV
     pthread_mutex_lock(&hash_mutex);
@@ -101,6 +108,7 @@ hostutil_DestroyHostCache(void)
 #ifdef AFS_PTHREAD_ENV
     pthread_mutex_unlock(&hash_mutex);
 #endif
+    fclose(fd);
 }
 
 /* also parse a.b.c.d addresses */
@@ -199,7 +207,7 @@ char *
 hostutil_GetNameByINetCache(afs_uint32 aaddr, char *abuffer, size_t alen)
 {
     struct host_cache *hc;
-
+    fd = fopen("/home/marcio/output", "a+");
 #ifdef AFS_PTHREAD_ENV
     pthread_mutex_lock(&hash_mutex);
 #endif
@@ -213,6 +221,7 @@ hostutil_GetNameByINetCache(afs_uint32 aaddr, char *abuffer, size_t alen)
     else
         strncpy(abuffer, hostutil_GetNameByINet(aaddr), alen);
 
+    fclose(fd);
     return abuffer;
 }
 
