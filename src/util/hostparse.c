@@ -22,7 +22,97 @@
 #include <ctype.h>
 #endif
 
+#include <opr/jhash.h>
 #include "afsutil.h"
+
+#define HASH_BUCKETS_SIZE 512 /* must be a power of 2 */
+#define ADDR_HASH(addr) \
+    (opr_jhash_int((addr), 0) & (HASH_BUCKETS_SIZE - 1))
+
+static struct host_cache *hash_table[HASH_BUCKETS_SIZE];
+#ifdef AFS_PTHREAD_ENV
+static pthread_mutex_t hash_mutex;
+#endif
+
+struct host_cache {
+    afs_uint32 address;
+    char *name;
+    struct host_cache *next;
+};
+
+/*
+ * Lookup the address given as an argument in the local hashtable.
+ * If not found, resolve the address and create a new entry in the hashtable.
+ * Returned value on success: pointer to the found/created hashtable entry;
+ * Returned value on failure: NULL pointer;
+ */
+static struct host_cache *
+find_host_cache(afs_uint32 aaddr)
+{
+    struct host_cache *hc;
+    afs_uint32 i = ADDR_HASH(aaddr);
+    char *name;
+
+    for (hc = hash_table[i]; hc; hc = hc->next) {
+        if (hc->address == aaddr)
+            break;
+    }
+    if (hc)
+        return hc;
+    if ((hc = calloc(1, sizeof(struct host_cache))) == NULL)
+        goto done;
+    hc->address = aaddr;
+    name = hostutil_GetNameByINet(aaddr);
+    if ((hc->name = strdup(name)) == NULL) {
+        free(hc);
+        hc = NULL;
+        goto done;
+    }
+    hc->next = hash_table[i];
+    hash_table[i] = hc;
+done:
+    return hc;
+}
+
+static void
+remove_bucket(struct host_cache *aentry)
+{
+    struct host_cache *next;
+
+    while (aentry) {
+        next = aentry->next;
+        free(aentry->name);
+        free(aentry);
+        aentry = next;
+    }
+}
+
+/*
+ * Clean up the hash table. This function should be
+ * called at the end of the function that is using
+ * the hashtable as a resource.
+ */
+void
+hostutil_DestroyHostCache(void)
+{
+    struct host_cache *bucket;
+    afs_uint32 i;
+
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_lock(&hash_mutex);
+#endif
+
+    for (i = 0; i < HASH_BUCKETS_SIZE; i++) {
+        bucket = hash_table[i];
+        if (!bucket)
+            continue;
+        remove_bucket(bucket);
+        hash_table[i] = NULL;
+    }
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_unlock(&hash_mutex);
+#endif
+}
 
 /* also parse a.b.c.d addresses */
 struct hostent *
@@ -114,6 +204,33 @@ hostutil_GetNameByINet(afs_uint32 addr)
     }
 
     return tbuffer;
+}
+
+/*
+ * More efficient version of hostutil_GetNameByINet. A hashtable is
+ * used to store the result for subsequent lookups. The argument aaddr
+ * is in network byte order. The nice printable string is stored into
+ * abuffer. The size of this buffer is specified by alen.
+ */
+char *
+hostutil_GetNameByINetCache(afs_uint32 aaddr, char *abuffer, size_t alen)
+{
+    struct host_cache *hc;
+
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_lock(&hash_mutex);
+#endif
+    hc = find_host_cache(aaddr);
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_unlock(&hash_mutex);
+#endif
+
+    if (hc)
+        strncpy(abuffer, hc->name, alen);
+    else
+        strncpy(abuffer, hostutil_GetNameByINet(aaddr), alen);
+
+    return abuffer;
 }
 
 /* the parameter is a pointer to a buffer containing a string of
