@@ -4694,6 +4694,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 	fprintf(STDOUT, "\nTotal entries: %lu\n", (unsigned long)nentries);
     if (tarray)
 	free(tarray);
+    hostutil_DestroyHostCache();
     return 0;
 }
 
