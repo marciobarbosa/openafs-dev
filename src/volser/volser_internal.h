@@ -38,6 +38,8 @@ extern int PrintError(char *msg, afs_int32 errcode);
 extern void init_volintInfo(struct volintInfo *vinfo);
 extern void SubEnumerateEntry(struct nvldbentry *entry);
 extern void EnumerateEntry(struct nvldbentry *entry);
+extern void InitHostCache(void);
+extern void DestroyHostCache(void);
 extern int UV_NukeVolume(afs_uint32 server, afs_int32 partid, afs_uint32 volid);
 extern int UV_PartitionInfo64(afs_uint32 server, char *pname,
 			    struct diskPartition64 *partition);

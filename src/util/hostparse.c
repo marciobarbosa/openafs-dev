@@ -22,7 +22,116 @@
 #include <ctype.h>
 #endif
 
+#include <opr/jhash.h>
 #include "afsutil.h"
+
+#define HASH_BUCKETS_SIZE 512 /* must be a power of 2 */
+#define ADDR_HASH(addr) \
+    (opr_jhash_int((addr), 0) & (HASH_BUCKETS_SIZE - 1))
+
+static struct host_cache *cache = NULL; /* singleton */
+#ifdef AFS_PTHREAD_ENV
+static pthread_mutex_t hash_mutex;
+#endif
+
+struct host_cache_entry {
+    afs_uint32 address;
+    char *name;
+    struct host_cache_entry *next;
+};
+
+struct host_cache {
+    struct host_cache_entry *hash_table[HASH_BUCKETS_SIZE];
+};
+
+/*
+ * Lookup the address given as an argument in the local hashtable.
+ * If not found, resolve the address and create a new entry in the hashtable.
+ * Returned value on success: pointer to the found/created hashtable entry;
+ * Returned value on failure: NULL pointer;
+ */
+static struct host_cache_entry *
+find_host_cache(afs_uint32 aaddr)
+{
+    struct host_cache_entry *hce = NULL;
+    afs_uint32 i = ADDR_HASH(aaddr);
+    char name[256];
+    struct sockaddr_in sa;
+    int res;
+
+    if (!cache)
+    	goto done;
+
+    for (hce = cache->hash_table[i]; hce; hce = hce->next) {
+	if (hce->address == aaddr)
+	    break;
+    }
+    if (hce)
+	return hce;
+    if ((hce = calloc(1, sizeof(struct host_cache_entry))) == NULL)
+	goto done;
+    sa.sin_family = AF_INET;
+    sa.sin_addr.s_addr = hce->address = aaddr;
+    res = getnameinfo((struct sockaddr *)&sa, sizeof(sa), name, sizeof(name), NULL, 0, 0);
+    if (res || (hce->name = strdup(name)) == NULL) {
+	free(hce);
+	hce = NULL;
+	goto done;
+    }
+    hce->next = cache->hash_table[i];
+    cache->hash_table[i] = hce;
+  done:
+    return hce;
+}
+
+void
+hostutil_InitHostCache(void)
+{
+    if (!cache)
+    	cache = (struct host_cache *)calloc(1, sizeof(struct host_cache));
+}
+
+static void
+remove_bucket(struct host_cache_entry *aentry)
+{
+    struct host_cache_entry *next;
+
+    while (aentry) {
+	next = aentry->next;
+	free(aentry->name);
+	free(aentry);
+	aentry = next;
+    }
+}
+
+/*
+ * Clean up the hash table. This function should be
+ * called at the end of the function that is using
+ * the hashtable as a resource.
+ */
+void
+hostutil_DestroyHostCache(void)
+{
+    struct host_cache_entry *bucket;
+    afs_uint32 i;
+
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_lock(&hash_mutex);
+#endif
+    if (!cache)
+    	return;
+    for (i = 0; i < HASH_BUCKETS_SIZE; i++) {
+	bucket = cache->hash_table[i];
+	if (!bucket)
+	    continue;
+	remove_bucket(bucket);
+	cache->hash_table[i] = NULL;
+    }
+    cache = NULL;
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_unlock(&hash_mutex);
+#endif
+}
 
 /* also parse a.b.c.d addresses */
 struct hostent *
@@ -114,6 +223,33 @@ hostutil_GetNameByINet(afs_uint32 addr)
     }
 
     return tbuffer;
+}
+
+/*
+ * More efficient version of hostutil_GetNameByINet. A hashtable is
+ * used to store the result for subsequent lookups. The argument aaddr
+ * is in network byte order. The nice printable string is stored into
+ * abuffer. The size of this buffer is specified by alen.
+ */
+char *
+hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
+{
+    struct host_cache_entry *hce;
+
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_lock(&hash_mutex);
+#endif
+    hce = find_host_cache(aaddr);
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_unlock(&hash_mutex);
+#endif
+
+    if (hce)
+	strncpy(abuffer, hce->name, alen);
+    else
+	strncpy(abuffer, hostutil_GetNameByINet(aaddr), alen);
+
+    return abuffer;
 }
 
 /* the parameter is a pointer to a buffer containing a string of
