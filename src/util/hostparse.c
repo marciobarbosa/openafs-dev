@@ -22,7 +22,163 @@
 #include <ctype.h>
 #endif
 
+#include <opr/jhash.h>
 #include "afsutil.h"
+
+#define HASH_BUCKETS_SIZE 512	/* must be a power of 2 */
+#define ADDR_HASH(addr) \
+    (opr_jhash_int((addr), 0) & (HASH_BUCKETS_SIZE - 1))
+
+static struct host_cache *cache = NULL;
+#ifdef AFS_PTHREAD_ENV
+static pthread_mutex_t hash_mutex;
+#endif
+
+struct host_cache_entry {
+    afs_uint32 address;
+    char *name;
+    struct host_cache_entry *next;
+};
+
+struct host_cache {
+    struct host_cache_entry *hash_table[HASH_BUCKETS_SIZE];
+};
+
+/**
+ * Lookup the IP address in the hashtable. If not found, create an entry.
+ *
+ * @param[in] aaddr ipv4 address in network byte order
+ *
+ * @return host cache entry object
+ *   @retval pointer to the found/created hashtable entry success
+ *   @retval NULL failure
+ */
+static struct host_cache_entry *
+find_host_cache(afs_uint32 aaddr)
+{
+    struct host_cache_entry *hce = NULL;
+    afs_uint32 i = ADDR_HASH(aaddr);
+    char name[256];
+    struct sockaddr_in sa;
+    int res;
+
+#ifdef AFS_NT40_ENV
+    if (afs_winsockInit() < 0)
+	goto done;
+#endif
+    if (cache == NULL)
+	goto done;
+
+    for (hce = cache->hash_table[i]; hce != NULL; hce = hce->next) {
+	if (hce->address == aaddr)
+	    break;
+    }
+    if (hce != NULL)
+	return hce;
+    hce = calloc(1, sizeof(struct host_cache_entry));
+    if (hce == NULL)
+	goto done;
+    sa.sin_family = AF_INET;
+    sa.sin_addr.s_addr = aaddr;
+    hce->address = aaddr;
+    res =
+	getnameinfo((struct sockaddr *)&sa, sizeof(sa), name, sizeof(name),
+		    NULL, 0, 0);
+    hce->name = res ? NULL : strdup(name);
+    if (res || (hce->name == NULL)) {
+	free(hce);
+	hce = NULL;
+	goto done;
+    }
+    hce->next = cache->hash_table[i];
+    cache->hash_table[i] = hce;
+  done:
+    return hce;
+}
+
+/**
+ * Allocate the hash table. If already allocated, no action is needed.
+ *
+ * The hash table allocated by this function will be used by the function
+ * hostutil_GetNameByINetCached in order to speed up subsequent lookups.
+ * This function may be called multiple times, but only one global hash
+ * table will be allocated.
+ *
+ * @param none
+ *
+ * @return none
+ */
+void
+hostutil_InitHostCache(void)
+{
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_lock(&hash_mutex);
+#endif
+    if (cache == NULL) {
+	cache = (struct host_cache *)calloc(1, sizeof(struct host_cache));
+    }
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_unlock(&hash_mutex);
+#endif
+}
+
+/**
+ * Remove the linked list addressed by a specific bucket.
+ *
+ * This function is called by hostutil_DestroyHostCache. It is
+ * responsible to clean up the content addressed by the bucket
+ * given as a parameter.
+ *
+ * @param[in] aentry bucket
+ *
+ * @return none
+ */
+static inline void
+remove_bucket(struct host_cache_entry *aentry)
+{
+    struct host_cache_entry *next;
+
+    while (aentry != NULL) {
+	next = aentry->next;
+	free(aentry->name);
+	free(aentry);
+	aentry = next;
+    }
+}
+
+/**
+ * Clean up the hash table used by hostutil_GetNameByINetCached.
+ *
+ * This function should be called when the hash table used by the
+ * function hostutil_GetNameByINetCached is no longer needed.
+ *
+ * @param none
+ *
+ * @return none
+ */
+void
+hostutil_DestroyHostCache(void)
+{
+    struct host_cache_entry *bucket;
+    afs_uint32 i;
+
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_lock(&hash_mutex);
+#endif
+    if (cache == NULL)
+	return;
+    for (i = 0; i < HASH_BUCKETS_SIZE; i++) {
+	bucket = cache->hash_table[i];
+	if (bucket == NULL)
+	    continue;
+	remove_bucket(bucket);
+	cache->hash_table[i] = NULL;
+    }
+    cache = NULL;
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_unlock(&hash_mutex);
+#endif
+}
 
 /* also parse a.b.c.d addresses */
 struct hostent *
@@ -114,6 +270,39 @@ hostutil_GetNameByINet(afs_uint32 addr)
     }
 
     return tbuffer;
+}
+
+/**
+ * More efficient version of hostutil_GetNameByINet.
+ *
+ * A hashtable is used to store the result for subsequent lookups.
+ *
+ * @param[in]  aaddr    ipv4 address in network byte order
+ * @param[out] abuffer  host name
+ * @param[in]  alen     size of abuffer
+ *
+ * @return abuffer
+ *   @retval host name success
+ *   @retval printable ipv4 address failure
+ */
+char *
+hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
+{
+    struct host_cache_entry *hce;
+
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_lock(&hash_mutex);
+#endif
+    hce = find_host_cache(aaddr);
+#ifdef AFS_PTHREAD_ENV
+    pthread_mutex_unlock(&hash_mutex);
+#endif
+    if (hce != NULL) {
+	strlcpy(abuffer, hce->name, alen);
+    } else {
+	strlcpy(abuffer, hostutil_GetNameByINet(aaddr), alen);
+    }
+    return abuffer;
 }
 
 /* the parameter is a pointer to a buffer containing a string of
