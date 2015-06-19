@@ -544,6 +544,7 @@ SubEnumerateEntry(struct nvldbentry *entry)
     char pname[10];
     int isMixed = 0;
     char hoststr[16];
+    char sname[256];
 
 #ifdef notdef
     fprintf(STDOUT, "	readWriteID %-10u ", entry->volumeId[RWVOL]);
@@ -584,7 +585,8 @@ SubEnumerateEntry(struct nvldbentry *entry)
 	MapPartIdIntoName(entry->serverPartition[i], pname);
 	fprintf(STDOUT, "       server %s partition %s ",
 		noresolve ? afs_inet_ntoa_r(entry->serverNumber[i], hoststr) :
-                hostutil_GetNameByINet(entry->serverNumber[i]), pname);
+		hostutil_GetNameByINetCached(entry->serverNumber[i], sname,
+					     sizeof(sname)), pname);
 	if (entry->serverFlags[i] & VLSF_RWVOL)
 	    fprintf(STDOUT, "RW Site ");
 	else
@@ -604,6 +606,41 @@ SubEnumerateEntry(struct nvldbentry *entry)
 
     return;
 
+}
+
+/**
+ * Initialize the cache memory used by hostutil_GetNameByINetCached.
+ *
+ * If a better performance is desired, this function should be called
+ * before EnumerateEntry. As a result, hostutil_GetNameByINetCached
+ * will store in the local memory the resolved addresses that might be
+ * used by subsequent lookups.
+ *
+ * @param none
+ *
+ * @return none
+ */
+void
+InitHostNameCache(void)
+{
+    hostutil_InitHostCache();
+}
+
+/**
+ * Destroy the cache memory used by hostutil_GetNameByINetCached.
+ *
+ * If the function InitHostNameCache was called, this function should
+ * be called when the cache is no longer needed. Usually, at the end of
+ * the function that calls EnumerateEntry.
+ *
+ * @param none
+ *
+ * @return none
+ */
+void
+DestroyHostNameCache(void)
+{
+    hostutil_DestroyHostCache();
 }
 
 /*enumerate the vldb entry corresponding to <entry> */
