@@ -85,13 +85,17 @@ find_host_cache(afs_uint32 aaddr)
 	getnameinfo((struct sockaddr *)&sa, sizeof(sa), name, sizeof(name),
 		    NULL, 0, 0);
     hce->name = res ? NULL : strdup(name);
-    if (res || (hce->name == NULL)) {
+    if (hce->name == NULL) {
 	free(hce);
 	hce = NULL;
 	goto done;
     }
     hce->next = cache->hash_table[i];
     cache->hash_table[i] = hce;
+
+#ifdef AFS_NT40_ENV
+    afs_winsockCleanup();
+#endif
   done:
     return hce;
 }
