@@ -186,6 +186,7 @@ hostutil_DestroyHostCache(void)
 #ifdef AFS_PTHREAD_ENV
     pthread_mutex_unlock(&cache_mutex);
 #endif
+    return;
 }
 
 /* also parse a.b.c.d addresses */
