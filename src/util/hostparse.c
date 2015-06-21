@@ -30,8 +30,9 @@
     (opr_jhash_int((addr), 0) & (HASH_BUCKETS_SIZE - 1))
 
 static struct host_cache *cache = NULL;
+static afs_uint32 cache_count = 0;
 #ifdef AFS_PTHREAD_ENV
-static pthread_mutex_t hash_mutex;
+static pthread_mutex_t cache_mutex;
 #endif
 
 struct host_cache_entry {
@@ -92,10 +93,6 @@ find_host_cache(afs_uint32 aaddr)
     }
     hce->next = cache->hash_table[i];
     cache->hash_table[i] = hce;
-
-#ifdef AFS_NT40_ENV
-    afs_winsockCleanup();
-#endif
   done:
     return hce;
 }
@@ -116,13 +113,14 @@ void
 hostutil_InitHostCache(void)
 {
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_lock(&hash_mutex);
+    pthread_mutex_lock(&cache_mutex);
 #endif
     if (cache == NULL) {
 	cache = (struct host_cache *)calloc(1, sizeof(struct host_cache));
     }
+    cache_count++;
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_unlock(&hash_mutex);
+    pthread_mutex_unlock(&cache_mutex);
 #endif
 }
 
@@ -155,6 +153,8 @@ remove_bucket(struct host_cache_entry *aentry)
  *
  * This function should be called when the hash table used by the
  * function hostutil_GetNameByINetCached is no longer needed.
+ * The hash table will be destroyed only if it is not being used
+ * anywhere.
  *
  * @param none
  *
@@ -167,10 +167,13 @@ hostutil_DestroyHostCache(void)
     afs_uint32 i;
 
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_lock(&hash_mutex);
+    pthread_mutex_lock(&cache_mutex);
 #endif
     if (cache == NULL)
-	return;
+	goto done;
+    cache_count--;
+    if (cache_count > 0)
+	goto done;
     for (i = 0; i < HASH_BUCKETS_SIZE; i++) {
 	bucket = cache->hash_table[i];
 	if (bucket == NULL)
@@ -179,8 +182,9 @@ hostutil_DestroyHostCache(void)
 	cache->hash_table[i] = NULL;
     }
     cache = NULL;
+  done:
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_unlock(&hash_mutex);
+    pthread_mutex_unlock(&cache_mutex);
 #endif
 }
 
@@ -295,11 +299,11 @@ hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
     struct host_cache_entry *hce;
 
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_lock(&hash_mutex);
+    pthread_mutex_lock(&cache_mutex);
 #endif
     hce = find_host_cache(aaddr);
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_unlock(&hash_mutex);
+    pthread_mutex_unlock(&cache_mutex);
 #endif
     if (hce != NULL) {
 	strlcpy(abuffer, hce->name, alen);
