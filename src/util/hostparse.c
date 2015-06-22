@@ -171,6 +171,7 @@ hostutil_DestroyHostCache(void)
 	remove_bucket(bucket);
 	cache->hash_table[i] = NULL;
     }
+    free(cache);
     cache = NULL;
   done:
 #ifdef AFS_PTHREAD_ENV
