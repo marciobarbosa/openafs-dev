@@ -280,7 +280,8 @@ hostutil_GetNameByINet(afs_uint32 addr)
  *
  * @return abuffer
  *   @retval host name success
- *   @retval printable ipv4 address failure
+ *   @retval printable ipv4 address not found
+ *   @retval abuffer failure
  */
 char *
 hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
