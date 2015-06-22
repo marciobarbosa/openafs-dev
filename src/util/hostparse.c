@@ -59,14 +59,8 @@ find_host_cache(afs_uint32 aaddr)
 {
     struct host_cache_entry *hce = NULL;
     afs_uint32 i = ADDR_HASH(aaddr);
-    char name[256];
-    struct sockaddr_in sa;
-    int res;
+    char *name;
 
-#ifdef AFS_NT40_ENV
-    if (afs_winsockInit() < 0)
-	goto done;
-#endif
     if (cache == NULL)
 	goto done;
 
@@ -79,13 +73,9 @@ find_host_cache(afs_uint32 aaddr)
     hce = calloc(1, sizeof(struct host_cache_entry));
     if (hce == NULL)
 	goto done;
-    sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = aaddr;
     hce->address = aaddr;
-    res =
-	getnameinfo((struct sockaddr *)&sa, sizeof(sa), name, sizeof(name),
-		    NULL, 0, 0);
-    hce->name = res ? NULL : strdup(name);
+    name = hostutil_GetNameByINet(aaddr);
+    hce->name = (name != NULL) ? strdup(name) : NULL;
     if (hce->name == NULL) {
 	free(hce);
 	hce = NULL;
@@ -261,23 +251,21 @@ hostutil_GetHostByName(char *ahost)
 char *
 hostutil_GetNameByINet(afs_uint32 addr)
 {
-    struct hostent *th;
+    struct sockaddr_in sa;
     static char tbuffer[256];
+    int res;
 
 #ifdef AFS_NT40_ENV
     if (afs_winsockInit() < 0)
 	return NULL;
 #endif
-    th = gethostbyaddr((void *)&addr, sizeof(addr), AF_INET);
-    if (th && strlen(th->h_name) < sizeof(tbuffer)) {
-	strlcpy(tbuffer, th->h_name, sizeof(tbuffer));
-    } else {
-	addr = ntohl(addr);
-	sprintf(tbuffer, "%d.%d.%d.%d", (int)((addr >> 24) & 0xff),
-		(int)((addr >> 16) & 0xff), (int)((addr >> 8) & 0xff),
-		(int)(addr & 0xff));
-    }
-
+    sa.sin_family = AF_INET;
+    sa.sin_addr.s_addr = addr;
+    res =
+	getnameinfo((struct sockaddr *)&sa, sizeof(sa), tbuffer,
+		    sizeof(tbuffer), NULL, 0, 0);
+    if (res)
+	return NULL;
     return tbuffer;
 }
 
@@ -306,10 +294,8 @@ hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
 #ifdef AFS_PTHREAD_ENV
     pthread_mutex_unlock(&cache_mutex);
 #endif
-    if (hce != NULL) {
+    if (hce != NULL && strlen(hce->name) < alen) {
 	strlcpy(abuffer, hce->name, alen);
-    } else {
-	strlcpy(abuffer, hostutil_GetNameByINet(aaddr), alen);
     }
     return abuffer;
 }
