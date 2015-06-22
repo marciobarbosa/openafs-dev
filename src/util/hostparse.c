@@ -287,6 +287,7 @@ char *
 hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
 {
     struct host_cache_entry *hce;
+    char *name;
 
 #ifdef AFS_PTHREAD_ENV
     pthread_mutex_lock(&cache_mutex);
@@ -297,6 +298,10 @@ hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
 #endif
     if (hce != NULL && strlen(hce->name) < alen) {
 	strlcpy(abuffer, hce->name, alen);
+    } else if (hce == NULL) {
+	name = hostutil_GetNameByINet(aaddr);
+	if (name != NULL && strlen(name) < alen)
+	    strlcpy(abuffer, name, alen);
     }
     return abuffer;
 }
