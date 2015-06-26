@@ -4552,7 +4552,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
     quiet = (as->parms[4].items ? 1 : 0);	/* -quit   flag */
     sort = (as->parms[5].items ? 0 : 1);	/* -nosort flag */
 
-    InitHostNameCache(); /* improves the performance of EnumerateEntry */
+    InitHostNameCache();	/* improves the performance of EnumerateEntry */
 
     /* If the volume name is given, Use VolumeInfoCmd to look it up
      * and not ListAttributes.
@@ -4692,13 +4692,13 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 	    PrintLocked(vllist->flags);
 	}
     }
-    DestroyHostNameCache(); /* used by EnumerateEntry */
 
   bypass:
     if (!quiet)
 	fprintf(STDOUT, "\nTotal entries: %lu\n", (unsigned long)nentries);
     if (tarray)
 	free(tarray);
+    DestroyHostNameCache();	/* used by EnumerateEntry */
     return 0;
 }
 

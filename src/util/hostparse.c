@@ -29,10 +29,10 @@
 #define ADDR_HASH(addr) \
     (opr_jhash_int((addr), 0) & (HASH_BUCKETS_SIZE - 1))
 
-static struct host_cache *cache = NULL;
-static afs_uint32 cache_count = 0;
+static struct host_cache *hostname_cache = NULL;
+static afs_uint32 hostname_cache_count = 0;
 #ifdef AFS_PTHREAD_ENV
-static pthread_mutex_t cache_mutex;
+static pthread_mutex_t hostname_cache_mutex;
 #endif
 
 struct host_cache_entry {
@@ -61,16 +61,17 @@ find_host_cache(afs_uint32 aaddr)
     afs_uint32 i = ADDR_HASH(aaddr);
     char *name;
 
-    if (cache == NULL)
+    if (hostname_cache == NULL)
 	goto done;
 
-    for (hce = cache->hash_table[i]; hce != NULL; hce = hce->next) {
+    for (hce = hostname_cache->hash_table[i]; hce != NULL; hce = hce->next) {
 	if (hce->address == aaddr)
 	    break;
     }
     if (hce != NULL)
 	return hce;
-    hce = calloc(1, sizeof(struct host_cache_entry));
+    hce =
+	(struct host_cache_entry *)calloc(1, sizeof(struct host_cache_entry));
     if (hce == NULL)
 	goto done;
     hce->address = aaddr;
@@ -81,8 +82,8 @@ find_host_cache(afs_uint32 aaddr)
 	hce = NULL;
 	goto done;
     }
-    hce->next = cache->hash_table[i];
-    cache->hash_table[i] = hce;
+    hce->next = hostname_cache->hash_table[i];
+    hostname_cache->hash_table[i] = hce;
   done:
     return hce;
 }
@@ -103,14 +104,17 @@ void
 hostutil_InitHostCache(void)
 {
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_lock(&cache_mutex);
+    pthread_mutex_lock(&hostname_cache_mutex);
 #endif
-    if (cache == NULL) {
-	cache = (struct host_cache *)calloc(1, sizeof(struct host_cache));
+    if (hostname_cache == NULL) {
+	hostname_cache =
+	    (struct host_cache *)calloc(1, sizeof(struct host_cache));
     }
-    cache_count++;
+    if (hostname_cache != NULL) {
+	hostname_cache_count++;
+    }
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_unlock(&cache_mutex);
+    pthread_mutex_unlock(&hostname_cache_mutex);
 #endif
 }
 
@@ -157,25 +161,25 @@ hostutil_DestroyHostCache(void)
     afs_uint32 i;
 
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_lock(&cache_mutex);
+    pthread_mutex_lock(&hostname_cache_mutex);
 #endif
-    if (cache == NULL)
+    if (hostname_cache == NULL)
 	goto done;
-    cache_count--;
-    if (cache_count > 0)
+    hostname_cache_count--;
+    if (hostname_cache_count > 0)
 	goto done;
     for (i = 0; i < HASH_BUCKETS_SIZE; i++) {
-	bucket = cache->hash_table[i];
+	bucket = hostname_cache->hash_table[i];
 	if (bucket == NULL)
 	    continue;
 	remove_bucket(bucket);
-	cache->hash_table[i] = NULL;
+	hostname_cache->hash_table[i] = NULL;
     }
-    free(cache);
-    cache = NULL;
+    free(hostname_cache);
+    hostname_cache = NULL;
   done:
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_unlock(&cache_mutex);
+    pthread_mutex_unlock(&hostname_cache_mutex);
 #endif
     return;
 }
@@ -291,11 +295,11 @@ hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
     char *name;
 
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_lock(&cache_mutex);
+    pthread_mutex_lock(&hostname_cache_mutex);
 #endif
     hce = find_host_cache(aaddr);
 #ifdef AFS_PTHREAD_ENV
-    pthread_mutex_unlock(&cache_mutex);
+    pthread_mutex_unlock(&hostname_cache_mutex);
 #endif
     if (hce != NULL && strlen(hce->name) < alen) {
 	strlcpy(abuffer, hce->name, alen);
