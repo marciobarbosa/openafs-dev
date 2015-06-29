@@ -269,13 +269,8 @@ hostutil_GetNameByINet(afs_uint32 addr)
     res =
 	getnameinfo((struct sockaddr *)&sa, sizeof(sa), tbuffer,
 		    sizeof(tbuffer), NULL, 0, 0);
-    if (res == EAI_OVERFLOW) {
-	res =
-	    getnameinfo((struct sockaddr *)&sa, sizeof(sa), tbuffer,
-			sizeof(tbuffer), NULL, 0, NI_NUMERICHOST);
-    }
     if (res) {
-	return NULL;
+	afs_inet_ntoa_r(addr, tbuffer);
     }
     return tbuffer;
 }
@@ -289,12 +284,11 @@ hostutil_GetNameByINet(afs_uint32 addr)
  * @param[out] abuffer  host name
  * @param[in]  alen     size of abuffer
  *
- * @return abuffer
- *   @retval host name success
- *   @retval printable ipv4 address not found
- *   @retval abuffer failure
+ * @return status
+ *   @retval 1 success
+ *   @retval 0 failure
  */
-char *
+int
 hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
 {
     struct host_cache_entry *hce;
@@ -309,12 +303,15 @@ hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
 #endif
     if (hce != NULL && strlen(hce->name) < alen) {
 	strlcpy(abuffer, hce->name, alen);
+	return 1;
     } else if (hce == NULL) {
 	name = hostutil_GetNameByINet(aaddr);
-	if (name != NULL && strlen(name) < alen)
+	if (name != NULL && strlen(name) < alen) {
 	    strlcpy(abuffer, name, alen);
+	    return 1;
+	}
     }
-    return abuffer;
+    return 0;
 }
 
 /* the parameter is a pointer to a buffer containing a string of

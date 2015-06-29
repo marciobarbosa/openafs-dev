@@ -543,8 +543,7 @@ SubEnumerateEntry(struct nvldbentry *entry)
     int i;
     char pname[10];
     int isMixed = 0;
-    char hoststr[16];
-    char sname[256];
+    char hoststr[256];
 
 #ifdef notdef
     fprintf(STDOUT, "	readWriteID %-10u ", entry->volumeId[RWVOL]);
@@ -584,9 +583,11 @@ SubEnumerateEntry(struct nvldbentry *entry)
     for (i = 0; i < entry->nServers; i++) {
 	MapPartIdIntoName(entry->serverPartition[i], pname);
 	fprintf(STDOUT, "       server %s partition %s ",
-		noresolve ? afs_inet_ntoa_r(entry->serverNumber[i], hoststr) :
-		hostutil_GetNameByINetCached(entry->serverNumber[i], sname,
-					     sizeof(sname)), pname);
+		!noresolve
+		&& hostutil_GetNameByINetCached(entry->serverNumber[i],
+						hoststr, sizeof(hoststr))
+		? hoststr : afs_inet_ntoa_r(entry->serverNumber[i], hoststr),
+		pname);
 	if (entry->serverFlags[i] & VLSF_RWVOL)
 	    fprintf(STDOUT, "RW Site ");
 	else
