@@ -269,8 +269,14 @@ hostutil_GetNameByINet(afs_uint32 addr)
     res =
 	getnameinfo((struct sockaddr *)&sa, sizeof(sa), tbuffer,
 		    sizeof(tbuffer), NULL, 0, 0);
-    if (res)
+    if (res == EAI_OVERFLOW) {
+	res =
+	    getnameinfo((struct sockaddr *)&sa, sizeof(sa), tbuffer,
+			sizeof(tbuffer), NULL, 0, NI_NUMERICHOST);
+    }
+    if (res) {
 	return NULL;
+    }
     return tbuffer;
 }
 
