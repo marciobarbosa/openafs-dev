@@ -69,7 +69,7 @@ find_host_cache(afs_uint32 aaddr)
 	    break;
     }
     if (hce != NULL)
-	return hce;
+	goto done;
     hce =
 	(struct host_cache_entry *)calloc(1, sizeof(struct host_cache_entry));
     if (hce == NULL)
