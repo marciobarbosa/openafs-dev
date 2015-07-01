@@ -362,13 +362,22 @@ hpr_GetHostCPS(afs_int32 host, prlist *CPS)
     afs_int32 code;
     afs_int32 over;
     struct ubik_client *uclient;
+    time_t before, after;
+    int total;
+    char buffer[16];
 
     code = getThreadClient(&uclient);
     if (code)
 	return code;
 
     over = 0;
+    before = time(0);
+    afs_inet_ntoa_r(host, buffer);
+    ViceLog(0, ("%s%s%s%s\n", __FUNCTION__, ": Calling the RPC ubik_PR_GetHostCPS()", "Host: ", buffer));
     code = ubik_PR_GetHostCPS(uclient, 0, host, CPS, &over);
+    after = time(0);
+    total = after - before;
+    ViceLog(0, ("%s%s%d\n", __FUNCTION__, ": Time: ", total));
     if (code != PRSUCCESS)
         return code;
     if (over) {
@@ -418,13 +427,20 @@ hpr_GetCPS(afs_int32 id, prlist *CPS)
     afs_int32 code;
     afs_int32 over;
     struct ubik_client *uclient;
+    time_t before, after;
+    int total;
 
     code = getThreadClient(&uclient);
     if (code)
 	return code;
 
     over = 0;
+    before = time(0);
+    ViceLog(0, ("%s%s\n", __FUNCTION__, ": Calling the RPC ubik_PR_GetCPS"));
     code = ubik_PR_GetCPS(uclient, 0, id, CPS, &over);
+    after = time(0);
+    total = after - before;
+    ViceLog(0, ("%s%s%d\n", __FUNCTION__, ": Time: ", total));
     if (code != PRSUCCESS)
         return code;
     if (over) {
