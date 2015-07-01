@@ -63,8 +63,8 @@ extern void hostutil_InitHostCache(void);
 extern void hostutil_DestroyHostCache(void);
 extern struct hostent *hostutil_GetHostByName(char *ahost);
 extern char *hostutil_GetNameByINet(afs_uint32 addr);
-extern int hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer,
-					size_t alen);
+extern char *hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer,
+					  size_t alen);
 extern afs_uint32 extractAddr(char *line, int maxSize);
 extern char *afs_inet_ntoa_r(afs_uint32 addr, char *buf);
 extern char *gettmpdir(void);

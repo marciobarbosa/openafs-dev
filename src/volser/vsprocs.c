@@ -585,9 +585,10 @@ SubEnumerateEntry(struct nvldbentry *entry)
 	fprintf(STDOUT, "       server %s partition %s ",
 		!noresolve
 		&& hostutil_GetNameByINetCached(entry->serverNumber[i],
-						hoststr, sizeof(hoststr))
-		? hoststr : afs_inet_ntoa_r(entry->serverNumber[i], hoststr),
-		pname);
+						hoststr,
+						sizeof(hoststr)) !=
+		NULL ? hoststr : afs_inet_ntoa_r(entry->serverNumber[i],
+						 hoststr), pname);
 	if (entry->serverFlags[i] & VLSF_RWVOL)
 	    fprintf(STDOUT, "RW Site ");
 	else
