@@ -38,7 +38,7 @@
  * Zero is a valid partition field.
  */
 static int
-FindIndex(struct nvldbentry *entry, afs_uint32 server, afs_int32 part, afs_int32 type)
+FindIndex(struct nvldbentry *entry, afs_in_addr server, afs_int32 part, afs_int32 type)
 {
     int e;
     afs_int32 error = 0;
@@ -70,8 +70,8 @@ FindIndex(struct nvldbentry *entry, afs_uint32 server, afs_int32 part, afs_int32
 
 /* Changes the rw site only */
 static void
-SetAValue(struct nvldbentry *entry, afs_uint32 oserver, afs_int32 opart,
-          afs_uint32 nserver, afs_int32 npart, afs_int32 type)
+SetAValue(struct nvldbentry *entry, afs_in_addr oserver, afs_int32 opart,
+          afs_in_addr nserver, afs_int32 npart, afs_int32 type)
 {
     int e;
 
@@ -94,23 +94,23 @@ SetAValue(struct nvldbentry *entry, afs_uint32 oserver, afs_int32 opart,
 
 /* Changes the RW site only */
 void
-Lp_SetRWValue(struct nvldbentry *entry, afs_uint32 oserver, afs_int32 opart,
-              afs_uint32 nserver, afs_int32 npart)
+Lp_SetRWValue(struct nvldbentry *entry, afs_in_addr oserver, afs_int32 opart,
+              afs_in_addr nserver, afs_int32 npart)
 {
     SetAValue(entry, oserver, opart, nserver, npart, VLSF_RWVOL);
 }
 
 /* Changes the RO site only */
 void
-Lp_SetROValue(struct nvldbentry *entry, afs_uint32 oserver,
-              afs_int32 opart, afs_uint32 nserver, afs_int32 npart)
+Lp_SetROValue(struct nvldbentry *entry, afs_in_addr oserver,
+              afs_int32 opart, afs_in_addr nserver, afs_int32 npart)
 {
     SetAValue(entry, oserver, opart, nserver, npart, VLSF_ROVOL);
 }
 
 /* Returns success if this server and partition matches the RW entry */
 int
-Lp_Match(afs_uint32 server, afs_int32 part,
+Lp_Match(afs_in_addr server, afs_int32 part,
          struct nvldbentry *entry)
 {
     if (FindIndex(entry, server, part, VLSF_RWVOL) == -1)
@@ -120,7 +120,7 @@ Lp_Match(afs_uint32 server, afs_int32 part,
 
 /* Return the index of the RO entry (plus 1) if it exists, else return 0 */
 int
-Lp_ROMatch(afs_uint32 server, afs_int32 part, struct nvldbentry *entry)
+Lp_ROMatch(afs_in_addr server, afs_int32 part, struct nvldbentry *entry)
 {
     return (FindIndex(entry, server, part, VLSF_ROVOL) + 1);
 }

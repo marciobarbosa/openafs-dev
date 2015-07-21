@@ -9,7 +9,7 @@ extern int VLDB_ReplaceEntry(afs_uint32 volid, afs_int32 voltype, struct nvldben
 extern int VLDB_ListAttributes(VldbListByAttributes *attrp, afs_int32 *entriesp, nbulkentries *blkentriesp);
 extern int VLDB_ListAttributesN2(VldbListByAttributes *attrp, char *name, afs_int32 thisindex,
            afs_int32 *nentriesp, nbulkentries *blkentriesp, afs_int32 *nextindexp);
-extern int VLDB_IsSameAddrs(afs_uint32 serv1, afs_uint32 serv2, afs_int32 *errorp);
+extern int VLDB_IsSameAddrs(afs_in_addr serv1, afs_in_addr serv2, afs_int32 *errorp);
 extern int vsu_ExtractName(char rname[], char name[]);
 extern afs_uint32 vsu_GetVolumeID(char *astring, struct ubik_client *acstruct, afs_int32 *errp);
 #endif

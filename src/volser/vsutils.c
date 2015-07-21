@@ -296,9 +296,9 @@ VLDB_ListAttributesN2(VldbListByAttributes *attrp,
 }
 
 struct cacheips {
-    afs_uint32 server;
+    afs_in_addr server;
     afs_uint32 count;
-    afs_uint32 addrs[16];
+    afs_in_addr addrs[16];
 };
 /*
  * Increase cache size.  This avoids high CPU usage by the vlserver
@@ -310,12 +310,13 @@ struct cacheips cacheips[GETADDRUCACHESIZE];
 int cacheip_index = 0;
 
 int
-VLDB_IsSameAddrs(afs_uint32 serv1, afs_uint32 serv2, afs_int32 *errorp)
+VLDB_IsSameAddrs(afs_in_addr serv1, afs_in_addr serv2, afs_int32 *errorp)
 {
     int code;
     ListAddrByAttributes attrs;
     bulkaddrs addrs;
-    afs_uint32 *addrp, j, f1, f2;
+    afs_in_addr *addrp;
+    afs_uint32 j, f1, f2;
     afs_int32 unique, nentries, i;
     afsUUID uuid;
     static int initcache = 0;
@@ -381,7 +382,7 @@ VLDB_IsSameAddrs(afs_uint32 serv1, afs_uint32 serv2, afs_int32 *errorp)
 	cacheip_index = 0;
     cacheips[cacheip_index].server = serv1;
     cacheips[cacheip_index].count = nentries;
-    addrp = addrs.bulkaddrs_val;
+    addrp = (afs_in_addr*)addrs.bulkaddrs_val;
     for (i = 0; i < nentries; i++, addrp++) {
 	cacheips[cacheip_index].addrs[i] = *addrp;
 	if (serv2 == *addrp) {

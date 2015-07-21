@@ -2152,8 +2152,8 @@ afsd_run(void)
 	afsd_syscall(AFSOP_SEED_ENTROPY, seedbuf, sizeof(seedbuf));
 	memset(seedbuf, 0, sizeof(seedbuf));
 	/* parse multihomed address files */
-	afs_in_addr addrbuf[MAXIPADDRS], maskbuf[MAXIPADDRS],
-	    mtubuf[MAXIPADDRS];
+	afs_in_addr addrbuf[MAXIPADDRS], maskbuf[MAXIPADDRS];
+	afs_uint32 mtubuf[MAXIPADDRS];
 	char reason[1024];
 	code = afsconf_ParseNetFiles(addrbuf, maskbuf, mtubuf, MAXIPADDRS, reason,
 				     AFSDIR_CLIENT_NETINFO_FILEPATH,

@@ -63,7 +63,7 @@ int lwps   = 3;
 #define MAXLWP 16
 
 #define ADDRSPERSITE 16         /* Same global is in rx/rx_user.c */
-afs_uint32 SHostAddrs[ADDRSPERSITE];
+afs_in_addr SHostAddrs[ADDRSPERSITE];
 
 /* check whether caller is authorized to manage RX statistics */
 int
@@ -91,8 +91,8 @@ BU_IsLocalRealmMatch(void *rock, char *name, char *inst, char *cell)
 }
 
 int
-convert_cell_to_ubik(struct afsconf_cell *cellinfo, afs_uint32 *myHost,
-		     afs_uint32 *serverList)
+convert_cell_to_ubik(struct afsconf_cell *cellinfo, afs_in_addr *myHost,
+		     afs_in_addr *serverList)
 {
     int i;
     char hostname[64];
@@ -105,7 +105,7 @@ convert_cell_to_ubik(struct afsconf_cell *cellinfo, afs_uint32 *myHost,
 	printf("prserver: couldn't get address of this host.\n");
 	BUDB_EXIT(1);
     }
-    memcpy(myHost, th->h_addr, sizeof(afs_uint32));
+    memcpy(myHost, th->h_addr, sizeof(myHost));
 
     for (i = 0; i < cellinfo->numServers; i++)
 	/* omit my host from serverList */
@@ -361,7 +361,7 @@ main(int argc, char **argv)
     struct afsconf_cell *cellinfo = NULL;
     time_t currentTime;
     afs_int32 code = 0;
-    afs_uint32 host = ntohl(INADDR_ANY);
+    afs_in_addr host = ntohl(INADDR_ANY);
     int r;
 
     char  clones[MAXHOSTSPERCELL];

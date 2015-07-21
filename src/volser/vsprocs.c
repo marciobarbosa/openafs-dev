@@ -433,7 +433,7 @@ UV_SetSecurity(struct rx_securityClass *as, afs_int32 aindex)
 /* bind to volser on <port> <aserver> */
 /* takes server address in network order, port in host order.  dumb */
 struct rx_connection *
-UV_Bind(afs_uint32 aserver, afs_int32 port)
+UV_Bind(afs_in_addr aserver, afs_int32 port)
 {
     struct rx_connection *tc;
 

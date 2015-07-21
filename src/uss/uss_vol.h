@@ -18,7 +18,7 @@
 /*
  * ------------------------ Exported functions  -----------------------
  */
-extern afs_int32 uss_vol_GetServer(char *a_name);
+extern afs_in_addr_s uss_vol_GetServer(char *a_name);
     /*
      * Summary:
      *    Given the string name of a desired host, find its address.
@@ -67,7 +67,7 @@ extern afs_int32 uss_vol_CreateVol(char *a_volname, char *a_server,
      */
 
 extern afs_int32 uss_vol_DeleteVol(char *a_volName, afs_int32 a_volID,
-				   char *a_servName, afs_int32 a_servID,
+				   char *a_servName, afs_in_addr_s a_servID,
 				   char *a_partName, afs_int32 a_partID);
     /*
      * Summary:
@@ -77,7 +77,7 @@ extern afs_int32 uss_vol_DeleteVol(char *a_volName, afs_int32 a_volID,
      *    char *a_volName  : Name of the volume to delete.
      *    afs_int32 a_volID     : Numerical volume ID.
      *    char *a_servName : Name of the server hosting the volume.
-     *    afs_int32 a_servID    : Numerical server ID.
+     *    afs_in_addr_s a_servID    : Numerical server ID.
      *    char *a_partName : Name of the home server partition.
      *    afs_int32 a_volID     : Numerical partition ID.
      *

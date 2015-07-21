@@ -1498,7 +1498,7 @@ PostVolumeStats(struct nvldbentry *entry)
 
 static void
 XVolumeStats(volintXInfo *a_xInfoP, struct nvldbentry *a_entryP,
-	     afs_int32 a_srvID, afs_int32 a_partID, int a_volType)
+	     afs_in_addr_s a_srvID, afs_int32 a_partID, int a_volType)
 {				/*XVolumeStats */
 
     int totalOK, totalNotOK, totalBusy;	/*Dummies - we don't really count here */
@@ -4008,7 +4008,8 @@ VolumeZap(struct cmd_syndesc *as, void *arock)
 {
     struct nvldbentry entry;
     afs_uint32 volid, zapbackupid = 0, backupid = 0;
-    afs_int32 code, server, part, err;
+    afs_int32 code, part, err;
+    afs_in_addr_s server;
 
     if (as->parms[3].items) {
 	/* force flag is on, use the other version */
@@ -5250,7 +5251,8 @@ PartitionInfo(struct cmd_syndesc *as, void *arock)
 static int
 ChangeAddr(struct cmd_syndesc *as, void *arock)
 {
-    afs_int32 ip1, ip2, vcode;
+    afs_int32 vcode;
+    afs_in_addr_s ip1, ip2;
     int remove = 0;
 
     if (noresolve)
@@ -5619,7 +5621,7 @@ ConvertRO(struct cmd_syndesc *as, void *arock)
     afs_int32 code, i, same;
     struct nvldbentry entry;
     afs_int32 vcode;
-    afs_uint32 rwserver = 0;
+    afs_in_addr rwserver = 0;
     afs_int32 rwpartition = 0;
     afs_in_addr roserver = 0;
     afs_int32 ropartition = 0;

@@ -328,7 +328,7 @@ PartIDToPartName(afs_int32 a_partID, char *a_partName)
  *	As advertised.
  *------------------------------------------------------------------------*/
 
-afs_int32
+afs_in_addr_s
 uss_vol_GetServer(char *a_name)
 {				/*uss_vol_GetServer */
 
@@ -580,7 +580,7 @@ uss_vol_CreateVol(char *a_volname, char *a_server, char *a_partition,
     afs_int32 pname;		/*Partition name */
     afs_uint32 volid;		/*Volume ID */
     afs_int32 code;		/*return code */
-    afs_int32 saddr;		/*Socket info for server */
+    afs_in_addr_s saddr;	/*Socket info for server */
     int VolExistFlag = 0;	/*Does the volume exist? */
     int mpExistFlag = 0;	/*Does the mountpoint exist? */
     char *Oldmpoint = NULL;	/*Old mountpoint name, if any */
@@ -864,7 +864,7 @@ uss_vol_CreateVol(char *a_volname, char *a_server, char *a_partition,
 
 afs_int32
 uss_vol_DeleteVol(char *a_volName, afs_int32 a_volID, char *a_servName,
-		  afs_int32 a_servID, char *a_partName, afs_int32  a_partID)
+		  afs_in_addr_s a_servID, char *a_partName, afs_int32  a_partID)
 {				/*uss_vol_DeleteVol */
 
 #ifdef USS_VOL_DB

@@ -130,7 +130,7 @@ static afs_int32 VolSetDate(struct rx_call *, afs_int32, afs_int32);
 static_inline char *
 callerAddress(struct rx_call *acid, char *buffer)
 {
-    afs_uint32 ip = rx_HostOf(rx_PeerOf(rx_ConnectionOf(acid)));
+    afs_in_addr ip = rx_HostOf(rx_PeerOf(rx_ConnectionOf(acid)));
     return afs_inet_ntoa_r(ip, buffer);
 }
 

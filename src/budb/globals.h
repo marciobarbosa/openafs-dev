@@ -30,8 +30,8 @@ struct buServerConfS {
     char *databaseExtension;	/* extension (depends on ubik) */
 
     /* ubik and comm. related */
-    afs_uint32 myHost;
-    afs_uint32 serverList[MAXSERVERS];	/* list of ubik servers */
+    afs_in_addr myHost;
+    afs_in_addr serverList[MAXSERVERS];	/* list of ubik servers */
     char *cellConfigdir;	/* afs cell config. directory */
     struct ubik_dbase *database;	/* handle for the database */
 
