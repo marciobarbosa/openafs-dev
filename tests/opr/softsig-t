@@ -32,8 +32,13 @@ use File::Basename;
 
 # Start up our test process, and send it various signals. Check that these
 # signals make it to it correctly, and are reported on the command line.
-my $builddir = dirname($0);
-my $softsig_helper_path = $builddir."/softsig-helper";
+my $builddir = $ENV{BUILD};
+if (!$builddir) {
+    $builddir = dirname($0);
+} else {
+    $builddir .= "/opr";
+}
+my $softsig_helper_path = $builddir . "/softsig-helper";
 my $pid=open(HELPER, "$softsig_helper_path |")
     or die "Couldn't start test helper.";
 
