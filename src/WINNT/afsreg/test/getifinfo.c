@@ -28,7 +28,7 @@
 #define MAXIPADDRS 16
 int rxi_numNetAddrs;
 afs_in_addr_s addrs[MAXIPADDRS];
-int masks[MAXIPADDRS];
+afs_in_addr_s masks[MAXIPADDRS];
 int mtus[MAXIPADDRS];
 int flags[MAXIPADDRS];
 

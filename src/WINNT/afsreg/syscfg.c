@@ -29,7 +29,7 @@
 #endif
 
 static int IsLoopback(char * guid);
-int syscfg_GetIFInfo_2000(int *count, int *addrs, int *masks, int *mtus, int *flags);
+int syscfg_GetIFInfo_2000(int *count, afs_in_addr_s *addrs, afs_in_addr_s *masks, int *mtus, int *flags);
 
 DWORD GetMTUForAddress(PIP_ADAPTER_ADDRESSES cAddress)
 {
@@ -136,7 +136,7 @@ DWORD GetMTUForAddress(PIP_ADAPTER_ADDRESSES cAddress)
  *	Total number of configured interfaces (>= count) or -1 on error.
  */
 
-int syscfg_GetIFInfo(int *count, afs_in_addr_s *addrs, int *masks, int *mtus, int *flags)
+int syscfg_GetIFInfo(int *count, afs_in_addr_s *addrs, afs_in_addr_s *masks, int *mtus, int *flags)
 {
     PMIB_IPADDRTABLE pIpAddrTable = NULL;
     DWORD            validAddrs = 0;
@@ -349,9 +349,9 @@ static int IsLoopback(char * guid)
 
 static int GetInterfaceList(HKEY skey, char **list);
 static char *GetNextInterface(char *iflist);
-static int GetIP(HKEY skey, char *ifname, int *addr, int *mask);
+static int GetIP(HKEY skey, char *ifname, afs_in_addr_s *addr, afs_in_addr_s *mask);
 
-int syscfg_GetIFInfo_2000(int *count, int *addrs, int *masks, int *mtus, int *flags)
+int syscfg_GetIFInfo_2000(int *count, afs_in_addr_s *addrs, afs_in_addr_s *masks, int *mtus, int *flags)
 {
     int maxCount = *count;
     char *IFListBase = NULL;
@@ -480,7 +480,7 @@ static char *GetNextInterface(char *iflist)
  * Returns 0 on success and -1 on error.
  */
 
-static int GetIP(HKEY skey, char *ifname, int *addr, int *mask)
+static int GetIP(HKEY skey, char *ifname, afs_in_addr_s *addr, afs_in_addr_s *mask)
 {
     HKEY key;
     char *s;

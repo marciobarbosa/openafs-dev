@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 extern int
-syscfg_GetIFInfo(int *count, afs_in_addr_s *addrs, int *masks, int *mtus, int *flags);
+syscfg_GetIFInfo(int *count, afs_in_addr_s *addrs, afs_in_addr_s *masks, int *mtus, int *flags);
 
 #ifdef __cplusplus
 };
