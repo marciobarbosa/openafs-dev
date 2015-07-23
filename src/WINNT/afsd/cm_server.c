@@ -799,8 +799,8 @@ void cm_InitServer(void)
 
 /* Protected by cm_syscfgLock (rw) */
 int cm_noIPAddr;         /* number of client network interfaces */
-int cm_IPAddr[CM_MAXINTERFACE_ADDR];    /* client's IP address in host order */
-int cm_SubnetMask[CM_MAXINTERFACE_ADDR];/* client's subnet mask in host order*/
+afs_in_addr_s cm_IPAddr[CM_MAXINTERFACE_ADDR];    /* client's IP address in host order */
+afs_in_addr_s cm_SubnetMask[CM_MAXINTERFACE_ADDR];/* client's subnet mask in host order*/
 int cm_NetMtu[CM_MAXINTERFACE_ADDR];    /* client's MTU sizes */
 int cm_NetFlags[CM_MAXINTERFACE_ADDR];  /* network flags */
 int cm_LanAdapterChangeDetected = 1;
@@ -873,9 +873,9 @@ afs_int32 cm_UpdateIFInfo(void)
 
 void cm_SetServerIPRank(cm_server_t * serverp)
 {
-    unsigned long	serverAddr; 	/* in host byte order */
-    unsigned long	myAddr, myNet, mySubnet;/* in host byte order */
-    unsigned long	netMask;
+    afs_in_addr_l	serverAddr; 	/* in host byte order */
+    afs_in_addr_l	myAddr, myNet, mySubnet;/* in host byte order */
+    afs_in_addr_l	netMask;
     int 		i;
     afs_int32		code;
 
@@ -1030,7 +1030,7 @@ cm_server_t *cm_NewServer(struct sockaddr_in *socketp, int type, cm_cell_t *cell
 }
 
 cm_server_t *
-cm_FindServerByIP(afs_uint32 ipaddr, unsigned short port, int type, int locked)
+cm_FindServerByIP(afs_in_addr ipaddr, unsigned short port, int type, int locked)
 {
     cm_server_t *tsp;
 

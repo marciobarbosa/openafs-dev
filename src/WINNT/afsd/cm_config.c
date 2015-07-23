@@ -893,7 +893,7 @@ long cm_SearchCellByDNS(char *cellNamep, char *newCellNamep, int *ttl,
                         cm_configProc_t *procp, void *rockp)
 {
     int rc;
-    int  cellHostAddrs[AFSMAXCELLHOSTS];
+    afs_in_addr_s cellHostAddrs[AFSMAXCELLHOSTS];
     char cellHostNames[AFSMAXCELLHOSTS][MAXHOSTCHARS];
     unsigned short adminRanks[AFSMAXCELLHOSTS];
     unsigned short ports[AFSMAXCELLHOSTS];      /* network byte order */

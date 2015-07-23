@@ -280,7 +280,7 @@ long cm_UpdateVolumeLocation(struct cm_cell *cellp, cm_user_t *userp, cm_req_t *
     cm_server_t *tsp;
     struct sockaddr_in tsockAddr;
     long tflags;
-    u_long tempAddr;
+    afs_in_addr_l tempAddr;
     struct vldbentry vldbEntry;
     struct nvldbentry nvldbEntry;
     struct uvldbentry uvldbEntry;

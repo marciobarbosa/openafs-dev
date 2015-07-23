@@ -136,7 +136,7 @@ DWORD GetMTUForAddress(PIP_ADAPTER_ADDRESSES cAddress)
  *	Total number of configured interfaces (>= count) or -1 on error.
  */
 
-int syscfg_GetIFInfo(int *count, int *addrs, int *masks, int *mtus, int *flags)
+int syscfg_GetIFInfo(int *count, afs_in_addr_s *addrs, int *masks, int *mtus, int *flags)
 {
     PMIB_IPADDRTABLE pIpAddrTable = NULL;
     DWORD            validAddrs = 0;

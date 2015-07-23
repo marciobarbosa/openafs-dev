@@ -1338,7 +1338,7 @@ WhereIsCmd(struct cmd_syndesc *as, void *arock)
     struct ViceIoctl blob;
     struct cmd_item *ti;
     int j;
-    afs_int32 *hosts;
+    afs_in_addr_s *hosts;
     char *tp;
     int error = 0;
     int literal = 0;
@@ -2227,7 +2227,8 @@ ListCellsCmd(struct cmd_syndesc *as, void *arock)
     afs_int32 code;
     afs_int32 i, j, *lp, magic, size;
     char *tp;
-    afs_int32 addr, maxa = AFS_OMAXHOSTS;
+    afs_in_addr_s addr;
+    afs_int32 maxa = AFS_OMAXHOSTS;
     struct ViceIoctl blob;
     int resolve;
     errno_t err;
@@ -2736,7 +2737,7 @@ MonitorCmd(struct cmd_syndesc *as, void *arock)
     afs_int32 code;
     struct ViceIoctl blob;
     struct cmd_item *ti;
-    afs_int32 hostAddr;
+    afs_in_addr_s hostAddr;
     struct hostent *thp;
     char *tp;
     int setp;

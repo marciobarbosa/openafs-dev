@@ -120,7 +120,7 @@ typedef struct dns_a_rr_hdr
   unsigned short rr_class;       /* RR class code (IN for Internet) */
   unsigned long  rr_ttl;         /* Time-to-live for resource */
   unsigned short rr_rdlength;    /* length of RDATA field (in octets) */
-  unsigned long  rr_addr;        /* Resolved host address */
+  afs_in_addr_l  rr_addr;        /* Resolved host address */
 } DNS_A_RR_HDR, *PDNS_A_RR_HDR;
 
 #define DNS_A_RR_LEN      14 //sizeof(DNS_A_RR_HDR)

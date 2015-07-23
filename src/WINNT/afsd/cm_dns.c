@@ -598,7 +598,7 @@ int DNSgetAddr(SOCKET commSock, char *hostName, struct in_addr *iNet)
   SOCKADDR_IN sockAddr;
   char buffer[BUFSIZE];
   u_char *addr;
-  u_long *aPtr;
+  afs_in_addr_l *aPtr;
   int rc;
 
   /**********************
@@ -627,7 +627,7 @@ int DNSgetAddr(SOCKET commSock, char *hostName, struct in_addr *iNet)
 
 int getAFSServer(const char *service, const char *protocol, const char *cellName,
                  unsigned short afsdbPort,  /* network byte order */
-                 int *cellHostAddrs, char cellHostNames[][MAXHOSTCHARS],
+                 afs_in_addr_s *cellHostAddrs, char cellHostNames[][MAXHOSTCHARS],
                  unsigned short ports[],    /* network byte order */
                  unsigned short adminRanks[],
                  int *numServers, int *ttl)
@@ -857,7 +857,7 @@ int getAFSServer(const char *service, const char *protocol, const char *cellName
 
 int getAFSServerW(const cm_unichar_t *service, const cm_unichar_t *protocol, const cm_unichar_t *cellName,
                   unsigned short afsdbPort, /* network byte order */
-                  int *cellHostAddrs,
+                  afs_in_addr_s *cellHostAddrs,
                   cm_unichar_t cellHostNames[][MAXHOSTCHARS],
                   unsigned short ports[],   /* network byte order */
                   unsigned short adminRanks[],

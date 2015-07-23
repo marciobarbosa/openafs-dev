@@ -26,7 +26,7 @@
 #include <afs/errmap_nt.h>
 
 #ifndef hostutil_GetNameByINet
-extern char *hostutil_GetNameByINet(afs_uint32 addr);
+extern char *hostutil_GetNameByINet(afs_in_addr addr);
 #endif
 
 #ifndef hostutil_GetHostByName

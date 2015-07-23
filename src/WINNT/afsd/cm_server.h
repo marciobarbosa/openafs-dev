@@ -147,7 +147,7 @@ extern void cm_SetServerNo64Bit(cm_server_t * serverp, int no64bit);
 
 extern void cm_SetServerNoInlineBulk(cm_server_t * serverp, int no);
 
-extern cm_server_t * cm_FindServerByIP(afs_uint32 addr, unsigned short port, int type, int locked);
+extern cm_server_t * cm_FindServerByIP(afs_in_addr addr, unsigned short port, int type, int locked);
 
 extern cm_server_t * cm_FindServerByUuid(afsUUID* uuid, int type, int locked);
 
@@ -165,8 +165,8 @@ extern void cm_ServerClearRPCStats(void);
 
 /* Protected by cm_syscfgLock (rw) */
 extern int cm_noIPAddr;         /* number of client network interfaces */
-extern int cm_IPAddr[CM_MAXINTERFACE_ADDR];    /* client's IP address in host order */
-extern int cm_SubnetMask[CM_MAXINTERFACE_ADDR];/* client's subnet mask in host order*/
+extern afs_in_addr_s cm_IPAddr[CM_MAXINTERFACE_ADDR];    /* client's IP address in host order */
+extern afs_in_addr_s cm_SubnetMask[CM_MAXINTERFACE_ADDR];/* client's subnet mask in host order*/
 extern int cm_NetMtu[CM_MAXINTERFACE_ADDR];    /* client's MTU sizes */
 extern int cm_NetFlags[CM_MAXINTERFACE_ADDR];  /* network flags */
 extern int cm_LanAdapterChangeDetected;
