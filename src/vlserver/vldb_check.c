@@ -19,6 +19,7 @@
 #include <ubik.h>
 #include <afs/afsutil.h>
 #include <afs/cmd.h>
+#include <opr/uuid.h>
 
 #include "vlserver.h"
 #include "vldbint.h"
@@ -866,6 +867,9 @@ CheckIpAddrs(struct vlheader *header)
     struct extentaddr *e;
     int ipindex, ipaddrs;
     afsUUID nulluuid;
+    char *buffer = NULL;
+    int code;
+    opr_uuid_t uuid;
 
     memset(&nulluuid, 0, sizeof(nulluuid));
 
@@ -978,17 +982,25 @@ CheckIpAddrs(struct vlheader *header)
 		}
 
 		if (listservers && ipaddrs) {
-		    quiet_println("MH block %d, index %d:", i, j);
+		    quiet_println("server: %d\n", ipindex);
+		    quiet_println("   mh: block %d, index %d\n", i, j);
+
+		    memcpy(uuid.data, &e->ex_hostuuid, 16);
+		    code = opr_uuid_toString(&uuid, &buffer);
+
+		    if (!code)
+			quiet_println("   uuid: %s\n", buffer);
+		    opr_uuid_freeString(buffer);
+
 		    for (m = 0; m < VL_MAXIPADDRS_PERMH; m++) {
 			if (!e->ex_addrs[m])
 			    continue;
-			quiet_println(" %d.%d.%d.%d",
+			quiet_println("   addr: %d.%d.%d.%d\n",
 			       (e->ex_addrs[m] & 0xff000000) >> 24,
 			       (e->ex_addrs[m] & 0x00ff0000) >> 16,
 			       (e->ex_addrs[m] & 0x0000ff00) >> 8,
 			       (e->ex_addrs[m] & 0x000000ff));
 		    }
-		    quiet_println("\n");
 		}
 	    }
 /*
@@ -1040,16 +1052,12 @@ CheckIpAddrs(struct vlheader *header)
 		     * using the first index to the mh we found above. */
 		    serveraddrs[i] = serveraddrs[serverxref[i]];
 		}
-		if (listservers) {
-		    quiet_println("   Server ip addr %d = MH block %d, index %d\n",
-			   i, (header->IpMappedAddr[i] & 0x00ff0000) >> 16,
-			   (header->IpMappedAddr[i] & 0x0000ffff));
-		}
 	    } else {
 		regentries++;
 		serveraddrs[i] = 1;	/* It is good */
 		if (listservers) {
-		    quiet_println("   Server ip addr %d = %d.%d.%d.%d\n", i,
+		    quiet_println("server: %d\n", i);
+		    quiet_println("   addr: %d.%d.%d.%d\n",
 			   (header->IpMappedAddr[i] & 0xff000000) >> 24,
 			   (header->IpMappedAddr[i] & 0x00ff0000) >> 16,
 			   (header->IpMappedAddr[i] & 0x0000ff00) >> 8,
