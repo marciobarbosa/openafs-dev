@@ -281,6 +281,9 @@ hpr_Initialize(struct ubik_client **uclient)
     struct afsconf_cell info;
     afs_int32 i;
     char cellstr[64];
+#ifdef AFS_PTHREAD_ENV
+    afs_int32 *mtime;
+#endif
 
     tdir = afsconf_Open(AFSDIR_SERVER_ETC_DIRPATH);
     if (!tdir) {
@@ -336,6 +339,14 @@ hpr_Initialize(struct ubik_client **uclient)
     if (code) {
 	ViceLog(0, ("hpr_Initialize: ubik client init failed. [%d]", code));
     }
+#ifdef AFS_PTHREAD_ENV
+    mtime = (afs_int32 *)pthread_getspecific(confdir_mtime_key);
+    if (mtime == NULL) {
+	mtime = (afs_int32 *)calloc(1, sizeof(afs_int32));
+    }
+    *mtime = tdir->timeRead;
+    osi_Assert(pthread_setspecific(confdir_mtime_key, (void *)mtime) == 0);
+#endif
     afsconf_Close(tdir);
     code = rxs_Release(sc);
     return code;
@@ -352,6 +363,50 @@ hpr_End(struct ubik_client *uclient)
     return code;
 }
 
+#ifdef AFS_PTHREAD_ENV
+static int
+CheckPtConnections(void)
+{
+    struct afsconf_dir *tdir;
+    struct ubik_client *uclient;
+    int code = 0;
+    afs_int32 confdir_mtime;
+    afs_int32 *mtime = (afs_int32 *) pthread_getspecific(confdir_mtime_key);
+
+    if (mtime == NULL) {
+	ViceLog(0,
+		("CheckPtConnections: Could not get the content from confdir_mtime_key\n"));
+	return -1;
+    }
+    tdir = afsconf_Open(AFSDIR_SERVER_ETC_DIRPATH);
+
+    if (!tdir) {
+	ViceLog(0,
+		("CheckPtConnections: Could not open configuration directory: %s\n",
+		 AFSDIR_SERVER_ETC_DIRPATH));
+	return -1;
+    }
+    confdir_mtime = tdir->timeRead;
+    afsconf_Close(tdir);
+
+    if (confdir_mtime != *mtime) {
+	ViceLog(0, ("CheckPtConnections: PT connections out of date\n"));
+	uclient =
+	    (struct ubik_client *)pthread_getspecific(viced_uclient_key);
+	code = hpr_Initialize(&uclient);
+	if (!code) {
+	    *mtime = confdir_mtime;
+	    osi_Assert(pthread_setspecific
+		       (confdir_mtime_key, (void *)mtime) == 0);
+	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient)
+		       == 0);
+	    ViceLog(0, ("CheckPtConnections: PT connections updated\n"));
+	}
+    }
+    return code;
+}
+#endif
+
 int
 hpr_GetHostCPS(afs_int32 host, prlist *CPS)
 {
@@ -366,6 +421,10 @@ hpr_GetHostCPS(afs_int32 host, prlist *CPS)
 	if (!code)
 	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient) == 0);
 	else
+	    return code;
+    } else {
+	code = CheckPtConnections();
+	if (code)
 	    return code;
     }
 
@@ -401,6 +460,10 @@ hpr_NameToId(namelist *names, idlist *ids)
 	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient) == 0);
 	else
 	    return code;
+    } else {
+	code = CheckPtConnections();
+	if (code)
+	    return code;
     }
 
     for (i = 0; i < names->namelist_len; i++)
@@ -426,6 +489,10 @@ hpr_IdToName(idlist *ids, namelist *names)
 	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient) == 0);
 	else
 	    return code;
+    } else {
+	code = CheckPtConnections();
+	if (code)
+	    return code;
     }
 
     code = ubik_PR_IDToName(uclient, 0, ids, names);
@@ -449,6 +516,10 @@ hpr_GetCPS(afs_int32 id, prlist *CPS)
 	if (!code)
 	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient) == 0);
 	else
+	    return code;
+    } else {
+	code = CheckPtConnections();
+	if (code)
 	    return code;
     }
 
