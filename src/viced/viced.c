@@ -206,6 +206,7 @@ struct timeval tp;
 
 #ifdef AFS_PTHREAD_ENV
 pthread_key_t viced_uclient_key;
+pthread_key_t confdir_mtime_key;
 #endif
 
 /*
@@ -1655,6 +1656,7 @@ InitPR(void)
 
 #ifdef AFS_PTHREAD_ENV
     osi_Assert(pthread_key_create(&viced_uclient_key, NULL) == 0);
+    osi_Assert(pthread_key_create(&confdir_mtime_key, NULL) == 0);
 #endif
 
     SystemId = SYSADMINID;
