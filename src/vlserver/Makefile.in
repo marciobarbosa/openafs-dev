@@ -76,7 +76,7 @@ vldb_check: vldb_check.o ${LIBS}
 vldb_check.o: vldb_check.c AFS_component_version_number.o
 
 vl_util: vl_util.o ${LIBS}
-	$(CC) ${CFLAGS} -lyaml -o vl_util vl_util.o ${LIBS} ${XLIBS} ${KRB5_LIBS}
+	$(CC) ${CFLAGS} -o vl_util vl_util.o ${LIBS} ${XLIBS} ${KRB5_LIBS} -lyaml
 
 vl_util.o: vl_util.c AFS_component_version_number.o
 
