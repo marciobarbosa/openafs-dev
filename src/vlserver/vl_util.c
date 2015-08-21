@@ -21,6 +21,7 @@
 #define IP_T			5
 
 #define writeYAML(msg, ...)	fprintf(fd_yaml, msg, __VA_ARGS__)
+#define isKeyYAML(key)		!strcmp(token.data.scalar.value, key)
 
 int fd_vldb;
 FILE *fd_yaml;
@@ -171,11 +172,7 @@ exportVolume(struct nvlentry *a_vlentry)
 void
 exportVldbEntries(struct vlheader *a_vlheader)
 {
-    int i, j;
-    char buffer[16];
-    char tmp[40];
     struct nvlentry vlentry;
-    struct extentaddr mhentry;
     afs_uint32 entrysize = 0;
     afs_uint32 addr;
     afs_uint32 addr_begin = ntohl(a_vlheader->vital_header.headersize);
@@ -239,7 +236,6 @@ readBlockYAML(void *a_buffer, size_t a_size, short a_type)
 {
     yaml_token_t token;
     afs_uint32 index;
-    int state;
 
     /* skipping [Block mapping] */
     yaml_parser_scan(&parser, &token);
@@ -247,27 +243,18 @@ readBlockYAML(void *a_buffer, size_t a_size, short a_type)
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	        if (!state) {
-    	            sscanf(token.data.scalar.value, "%u", &index);
-    	            if (index < a_size) {
-    	            	if (a_type == UCHAR_T)
-    	            	    readValueYAML((void *)&((u_char *)a_buffer)[index], a_type);
-    	            	else
-    	            	    readValueYAML((void *)&((afs_uint32 *)a_buffer)[index], a_type);
-    	            } else {
-    	    	    	fprintf(stderr, "vl_util: index out of range (readBlockYAML)\n");
-    	    	    	exit(1);
-    	    	    }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    sscanf(token.data.scalar.value, "%u", &index);
+    	    if (index >= a_size) {
+    	        fprintf(stderr, "vl_util: index out of range (readBlockYAML)\n");
+    	    	exit(1);
+    	    }
+    	    if (a_type == UCHAR_T)
+    	        readValueYAML((void *)&((u_char *)a_buffer)[index], a_type);
+    	    else
+    	        readValueYAML((void *)&((afs_uint32 *)a_buffer)[index], a_type);
     	}
     	if (token.type != YAML_BLOCK_END_TOKEN)
     	    yaml_token_delete(&token);
@@ -279,7 +266,6 @@ readDoubleBlockYAML(afs_uint32 (*a_buffer)[HASHSIZE], size_t a_line, size_t a_co
 {
     yaml_token_t token;
     afs_uint32 index;
-    int state;
 
     /* skipping [Block mapping] */
     yaml_parser_scan(&parser, &token);
@@ -287,24 +273,15 @@ readDoubleBlockYAML(afs_uint32 (*a_buffer)[HASHSIZE], size_t a_line, size_t a_co
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	        if (!state) {
-    	            sscanf(token.data.scalar.value, "%u", &index);
-    	            if (index < a_line) {
-    	            	readBlockYAML(a_buffer[index], a_col, UINT_T);
-    	            } else {
-    	            	fprintf(stderr, "vl_util: index out of range (readDoubleBlockYAML)\n");
-    	    	    	exit(1);
-    	            }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    sscanf(token.data.scalar.value, "%u", &index);
+    	    if (index >= a_line) {
+    	    	fprintf(stderr, "vl_util: index out of range (readDoubleBlockYAML)\n");
+    	    	exit(1);
+    	    }
+    	    readBlockYAML(a_buffer[index], a_col, UINT_T);
     	}
     	if (token.type != YAML_BLOCK_END_TOKEN)
     	    yaml_token_delete(&token);
@@ -315,7 +292,6 @@ void
 importUbikHeader(void)
 {
     yaml_token_t token;
-    int state;
     struct ubik_hdr uheader;
 
     /* skipping [Block mapping] */
@@ -325,26 +301,18 @@ importUbikHeader(void)
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	    	if (!state) {
-    	    	    if (!strcmp(token.data.scalar.value, "magic")) {
-    	    	    	readValueYAML((void *)&uheader.magic, HEX_T);
-    	    	    } else if (!strcmp(token.data.scalar.value, "size")) {
-    	    	    	readValueYAML(&uheader.size, SHORT_T);
-    	    	    } else if (!strcmp(token.data.scalar.value, "epoch")) {
-    	    	    	readValueYAML((void *)&uheader.version.epoch, UINT_T);
-    	    	    } else if (!strcmp(token.data.scalar.value, "counter")) {
-    	    	    	readValueYAML((void *)&uheader.version.counter, UINT_T);
-    	    	    }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    if (isKeyYAML("magic")) {
+    	   	readValueYAML((void *)&uheader.magic, HEX_T);
+    	    } else if (isKeyYAML("size")) {
+    	   	readValueYAML(&uheader.size, SHORT_T);
+    	    } else if (isKeyYAML("epoch")) {
+    	    	readValueYAML((void *)&uheader.version.epoch, UINT_T);
+    	    } else if (isKeyYAML("counter")) {
+    	    	readValueYAML((void *)&uheader.version.counter, UINT_T);
+    	    }
     	}
     	if (token.type != YAML_BLOCK_END_TOKEN)
     	    yaml_token_delete(&token);
@@ -359,7 +327,6 @@ importVldbHeader(void)
     yaml_token_t token;
     struct vlheader vlhdr;
     char *vlhdr_p = (char *)&vlhdr;
-    int state;
 
     /* skipping [Block mapping] */
     yaml_parser_scan(&parser, &token);
@@ -368,33 +335,25 @@ importVldbHeader(void)
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	    	if (!state) {
-    	    	    if (!strcmp(token.data.scalar.value, "free_ptr") || !strcmp(token.data.scalar.value, "sit")) {
-    	    	    	readValueYAML((void *)vlhdr_p, HEX_T);
-    	    	    	vlhdr_p += sizeof(afs_uint32);
-    	    	    } else if (!strcmp(token.data.scalar.value, "ip_mapped_addr")) {
-    	    	    	readBlockYAML((void *)vlhdr.IpMappedAddr, MAXSERVERID + 1, HEX_T);
-    	    	    	vlhdr_p += sizeof(afs_uint32) * (MAXSERVERID + 1);
-    	    	    } else if (!strcmp(token.data.scalar.value, "vol_name_hash")) {
-    	    	    	readBlockYAML((void *)vlhdr.VolnameHash, HASHSIZE, UINT_T);
-    	    	    	vlhdr_p += sizeof(afs_uint32) * HASHSIZE;
-    	    	    } else if (!strcmp(token.data.scalar.value, "vol_id_hash")) {
-    	    	    	readDoubleBlockYAML(vlhdr.VolidHash, MAXTYPES, HASHSIZE);
-    	    	    	vlhdr_p += sizeof(afs_uint32) * MAXTYPES * HASHSIZE;
-    	    	    } else {
-    	    	    	readValueYAML((void *)vlhdr_p, UINT_T);
-    	    	    	vlhdr_p += sizeof(afs_uint32);
-    	    	    }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    if (isKeyYAML("free_ptr") || isKeyYAML("sit")) {
+    	    	readValueYAML((void *)vlhdr_p, HEX_T);
+    	    	vlhdr_p += sizeof(afs_uint32);
+    	    } else if (isKeyYAML("ip_mapped_addr")) {
+    	    	readBlockYAML((void *)vlhdr.IpMappedAddr, MAXSERVERID + 1, HEX_T);
+    	    	vlhdr_p += sizeof(afs_uint32) * (MAXSERVERID + 1);
+    	    } else if (isKeyYAML("vol_name_hash")) {
+    	    	readBlockYAML((void *)vlhdr.VolnameHash, HASHSIZE, UINT_T);
+    	    	vlhdr_p += sizeof(afs_uint32) * HASHSIZE;
+    	    } else if (isKeyYAML("vol_id_hash")) {
+    	    	readDoubleBlockYAML(vlhdr.VolidHash, MAXTYPES, HASHSIZE);
+    	    	vlhdr_p += sizeof(afs_uint32) * MAXTYPES * HASHSIZE;
+    	    } else {
+    	    	readValueYAML((void *)vlhdr_p, UINT_T);
+    	    	vlhdr_p += sizeof(afs_uint32);
+    	    }
     	}
     	if (token.type != YAML_BLOCK_END_TOKEN)
     	    yaml_token_delete(&token);
@@ -409,7 +368,6 @@ importVolEntry(void)
     yaml_token_t token;
     struct nvlentry vlentry;
     char *vlentry_p = (char *)&vlentry;
-    int state;
 
     /* skipping [Block mapping] */
     yaml_parser_scan(&parser, &token);
@@ -418,36 +376,28 @@ importVolEntry(void)
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	    	if (!state) {
-    	    	    if (!strcmp(token.data.scalar.value, "name")) {
-    	    	    	readValueYAML((void *)vlentry_p, STR_T);
-    	    	    	vlentry_p += sizeof(vlentry.name);
-    	    	    } else if (!strcmp(token.data.scalar.value, "server_number")) {
-    	    	    	memset(vlentry.serverNumber, 255, sizeof(vlentry.serverNumber));
-    	    	    	readBlockYAML((void *)vlentry.serverNumber, NMAXNSERVERS, UCHAR_T);
-    	    	    	vlentry_p += sizeof(vlentry.serverNumber);
-    	    	    } else if (!strcmp(token.data.scalar.value, "server_partition")) {
-    	    	    	memset(vlentry.serverPartition, 255, sizeof(vlentry.serverPartition));
-    	    	    	readBlockYAML((void *)vlentry.serverPartition, NMAXNSERVERS, UCHAR_T);
-    	    	    	vlentry_p += sizeof(vlentry.serverPartition);
-    	    	    } else if (!strcmp(token.data.scalar.value, "server_flags")) {
-    	    	    	memset(vlentry.serverFlags, 255, sizeof(vlentry.serverFlags));
-    	    	    	readBlockYAML((void *)vlentry.serverFlags, NMAXNSERVERS, UCHAR_T);
-    	    	    	vlentry_p += sizeof(vlentry.serverFlags);
-    	    	    } else {
-    	    	    	readValueYAML((void *)vlentry_p, UINT_T);
-    	    	    	vlentry_p += sizeof(afs_uint32);
-    	    	    }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    if (isKeyYAML("name")) {
+    	    	readValueYAML((void *)vlentry_p, STR_T);
+    	    	vlentry_p += sizeof(vlentry.name);
+    	    } else if (isKeyYAML("server_number")) {
+    	    	memset(vlentry.serverNumber, 255, sizeof(vlentry.serverNumber));
+    	    	readBlockYAML((void *)vlentry.serverNumber, NMAXNSERVERS, UCHAR_T);
+    	    	vlentry_p += sizeof(vlentry.serverNumber);
+    	    } else if (isKeyYAML("server_partition")) {
+    	    	memset(vlentry.serverPartition, 255, sizeof(vlentry.serverPartition));
+    	    	readBlockYAML((void *)vlentry.serverPartition, NMAXNSERVERS, UCHAR_T);
+    	    	vlentry_p += sizeof(vlentry.serverPartition);
+    	    } else if (isKeyYAML("server_flags")) {
+    	    	memset(vlentry.serverFlags, 255, sizeof(vlentry.serverFlags));
+    	    	readBlockYAML((void *)vlentry.serverFlags, NMAXNSERVERS, UCHAR_T);
+    	    	vlentry_p += sizeof(vlentry.serverFlags);
+    	    } else {
+    	    	readValueYAML((void *)vlentry_p, UINT_T);
+    	    	vlentry_p += sizeof(afs_uint32);
+    	    }
     	}
     	if (token.type != YAML_BLOCK_END_TOKEN)
     	    yaml_token_delete(&token);
@@ -460,7 +410,6 @@ void
 importMhHeader(struct extentaddr *a_mhentry)
 {
     yaml_token_t token;
-    int state;
 
     /* skipping [Block mapping] */
     yaml_parser_scan(&parser, &token);
@@ -468,24 +417,16 @@ importMhHeader(struct extentaddr *a_mhentry)
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	    	if (!state) {
-    	    	    if (!strcmp(token.data.scalar.value, "count")) {
-    	    	    	readValueYAML((void *)&a_mhentry->ex_count, UINT_T);
-    	    	    } else if (!strcmp(token.data.scalar.value, "flags")) {
-    	    	    	readValueYAML((void *)&a_mhentry->ex_flags, UINT_T);
-    	    	    } else if (!strcmp(token.data.scalar.value, "cont_addrs")) {
-    	    	    	readBlockYAML((void *)&a_mhentry->ex_contaddrs, VL_MAX_ADDREXTBLKS, HEX_T);
-    	    	    }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    if (isKeyYAML("count")) {
+    	    	readValueYAML((void *)&a_mhentry->ex_count, UINT_T);
+    	    } else if (isKeyYAML("flags")) {
+    	    	readValueYAML((void *)&a_mhentry->ex_flags, UINT_T);
+    	    } else if (isKeyYAML("cont_addrs")) {
+    	    	readBlockYAML((void *)&a_mhentry->ex_contaddrs, VL_MAX_ADDREXTBLKS, HEX_T);
+    	    }
     	}
     	if (token.type != YAML_BLOCK_END_TOKEN)
     	    yaml_token_delete(&token);
@@ -497,8 +438,6 @@ void
 importMhEntry(struct extentaddr *a_mhentry)
 {
     yaml_token_t token;
-    struct extentaddr mhentry;
-    int state;
     char uuid_str[40];
 
     /* skipping [Block mapping] */
@@ -507,25 +446,17 @@ importMhEntry(struct extentaddr *a_mhentry)
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	    	if (!state) {
-    	    	    if (!strcmp(token.data.scalar.value, "host_uuid")) {
-    	    	    	readValueYAML((void *)uuid_str, STR_T);
-    	    	    	afsUUID_from_string(uuid_str, &a_mhentry->ex_hostuuid);
-    	    	    } else if (!strcmp(token.data.scalar.value, "uniquifier")) {
-    	    	    	readValueYAML((void *)&a_mhentry->ex_uniquifier, UINT_T);
-    	    	    } else if (!strcmp(token.data.scalar.value, "ip_addr")) {
-    	    	    	readBlockYAML((void *)a_mhentry->ex_addrs, VL_MAX_ADDREXTBLKS, IP_T);
-    	    	    }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    if (isKeyYAML("host_uuid")) {
+    	    	readValueYAML((void *)uuid_str, STR_T);
+    	    	afsUUID_from_string(uuid_str, &a_mhentry->ex_hostuuid);
+    	    } else if (isKeyYAML("uniquifier")) {
+    	    	readValueYAML((void *)&a_mhentry->ex_uniquifier, UINT_T);
+    	    } else if (isKeyYAML("ip_addr")) {
+    	    	readBlockYAML((void *)a_mhentry->ex_addrs, VL_MAX_ADDREXTBLKS, IP_T);
+    	    }
     	}
     	if (token.type != YAML_BLOCK_END_TOKEN)
     	    yaml_token_delete(&token);
@@ -538,7 +469,6 @@ importMhBlock(afs_uint32 a_mhblock_no)
 {
     yaml_token_t token;
     struct extentaddr mhblock[VL_MHSRV_PERBLK];
-    int state;
     afs_uint32 mhblock_addr;
     afs_uint32 mh_entry_no = 0;
 
@@ -549,25 +479,17 @@ importMhBlock(afs_uint32 a_mhblock_no)
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	    	if (!state) {
-    	    	    if (!strcmp(token.data.scalar.value, "header")) {
-    	    	    	importMhHeader(&mhblock[mh_entry_no]);
-    	    	    	mhblock_addr = mhblock[mh_entry_no].ex_contaddrs[a_mhblock_no];
-    	    	    	mh_entry_no++;
-    	    	    } else if (!strcmp(token.data.scalar.value, "entry")) {
-    	    	    	importMhEntry(&mhblock[mh_entry_no]);
-    	    	    	mh_entry_no++;
-    	    	    }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    if (isKeyYAML("header")) {
+    	    	importMhHeader(&mhblock[mh_entry_no]);
+    	    	mhblock_addr = mhblock[mh_entry_no].ex_contaddrs[a_mhblock_no];
+    	    	mh_entry_no++;
+    	    } else if (isKeyYAML("entry")) {
+    	    	importMhEntry(&mhblock[mh_entry_no]);
+    	    	mh_entry_no++;
+    	    }
     	}
     	if (token.type != YAML_BLOCK_END_TOKEN)
       	    yaml_token_delete(&token);
@@ -581,32 +503,23 @@ void
 readYAML(void)
 {
     yaml_token_t token;
-    int state;
     afs_uint32 mhblock_no = 0;
 
     do {
     	yaml_parser_scan(&parser, &token);
-    	switch (token.type) {
-    	    case YAML_KEY_TOKEN:
-    	    	state = 0;
-    	    	break;
-    	    case YAML_VALUE_TOKEN:
-    	    	state = 1;
-    	    	break;
-    	    case YAML_SCALAR_TOKEN:
-    	    	if (!state) {
-    	    	    if (!strcmp(token.data.scalar.value, "ubik_header")) {
-    	    	    	importUbikHeader();
-    	    	    } else if (!strcmp(token.data.scalar.value, "vldb_header")) {
-    	    	    	importVldbHeader();
-    	    	    } else if (!strcmp(token.data.scalar.value, "vol_entry")) {
-    	    	    	importVolEntry();
-    	    	    } else if (!strcmp(token.data.scalar.value, "mh_block")) {
-    	    	    	importMhBlock(mhblock_no);
-    	    	    	mhblock_no++;
-    	    	    }
-    	    	}
-    	    	break;
+    	if (token.type == YAML_KEY_TOKEN) {
+    	    yaml_token_delete(&token);
+    	    yaml_parser_scan(&parser, &token);
+    	    if (isKeyYAML("ubik_header")) {
+    	    	importUbikHeader();
+    	    } else if (isKeyYAML("vldb_header")) {
+    	    	importVldbHeader();
+    	    } else if (isKeyYAML("vol_entry")) {
+    	    	importVolEntry();
+    	    } else if (isKeyYAML("mh_block")) {
+    	    	importMhBlock(mhblock_no);
+    	    	mhblock_no++;
+    	    }
     	}
     	if (token.type != YAML_STREAM_END_TOKEN)
       	    yaml_token_delete(&token);
