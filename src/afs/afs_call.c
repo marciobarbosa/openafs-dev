@@ -1367,6 +1367,7 @@ afs_CheckInit(void)
 }
 
 int afs_shuttingdown = 0;
+static int afs_flushing_cbs = 0;
 void
 afs_shutdown(void)
 {
@@ -1381,15 +1382,17 @@ afs_shutdown(void)
       return;
     }
 
-    if (afs_shuttingdown)
+    if (afs_shuttingdown || afs_flushing_cbs)
 	return;
 
     /* Give up all of our callbacks if we can. This must be done before setting
      * afs_shuttingdown, since it calls afs_InitReq, which will fail if
      * afs_shuttingdown is set. */
+    afs_flushing_cbs = 1;
     afs_FlushVCBs(2);
 
     afs_shuttingdown = 1;
+    afs_flushing_cbs = 0;
 
     if (afs_cold_shutdown)
 	afs_warn("afs: COLD ");
