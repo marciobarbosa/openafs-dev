@@ -281,6 +281,9 @@ hpr_Initialize(struct ubik_client **uclient)
     struct afsconf_cell info;
     afs_int32 i;
     char cellstr[64];
+#ifdef AFS_PTHREAD_ENV
+    afs_int32 *mtime;
+#endif
 
     tdir = afsconf_Open(AFSDIR_SERVER_ETC_DIRPATH);
     if (!tdir) {
@@ -336,6 +339,16 @@ hpr_Initialize(struct ubik_client **uclient)
     if (code) {
 	ViceLog(0, ("hpr_Initialize: ubik client init failed. [%d]", code));
     }
+#ifdef AFS_PTHREAD_ENV
+    mtime = (afs_int32 *)pthread_getspecific(confdir_mtime_key);
+    if (mtime == NULL)
+	mtime = (afs_int32 *)calloc(1, sizeof(afs_int32));
+    if (mtime != NULL) {
+	*mtime = tdir->timeRead;
+	osi_Assert(pthread_setspecific(confdir_mtime_key, (void *)mtime) ==
+		   0);
+    }
+#endif
     afsconf_Close(tdir);
     code = rxs_Release(sc);
     return code;
@@ -352,6 +365,35 @@ hpr_End(struct ubik_client *uclient)
     return code;
 }
 
+#ifdef AFS_PTHREAD_ENV
+static void
+CheckPtConn(void)
+{
+    struct ubik_client *uclient;
+    afs_int32 confdir_mtime;
+    afs_int32 *mtime;
+    struct afsconf_dir *tdir;
+
+    tdir = afsconf_Open(AFSDIR_SERVER_ETC_DIRPATH);
+    if (!tdir) {
+	return;
+    }
+    mtime = (afs_int32 *)pthread_getspecific(confdir_mtime_key);
+    if (!mtime) {
+	afsconf_Close(tdir);
+	return;
+    }
+    confdir_mtime = tdir->timeRead;
+    afsconf_Close(tdir);
+
+    if (confdir_mtime != *mtime) {
+	uclient =
+	    (struct ubik_client *)pthread_getspecific(viced_uclient_key);
+	hpr_Initialize(&uclient);
+    }
+}
+#endif
+
 int
 hpr_GetHostCPS(afs_int32 host, prlist *CPS)
 {
@@ -367,6 +409,8 @@ hpr_GetHostCPS(afs_int32 host, prlist *CPS)
 	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient) == 0);
 	else
 	    return code;
+    } else {
+	CheckPtConn();
     }
 
     over = 0;
@@ -401,6 +445,8 @@ hpr_NameToId(namelist *names, idlist *ids)
 	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient) == 0);
 	else
 	    return code;
+    } else {
+	CheckPtConn();
     }
 
     for (i = 0; i < names->namelist_len; i++)
@@ -426,6 +472,8 @@ hpr_IdToName(idlist *ids, namelist *names)
 	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient) == 0);
 	else
 	    return code;
+    } else {
+	CheckPtConn();
     }
 
     code = ubik_PR_IDToName(uclient, 0, ids, names);
@@ -450,6 +498,8 @@ hpr_GetCPS(afs_int32 id, prlist *CPS)
 	    osi_Assert(pthread_setspecific(viced_uclient_key, (void *)uclient) == 0);
 	else
 	    return code;
+    } else {
+	CheckPtConn();
     }
 
     over = 0;

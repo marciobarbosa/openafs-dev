@@ -29,6 +29,7 @@ extern pthread_mutex_t host_glock_mutex;
 #define H_LOCK MUTEX_ENTER(&host_glock_mutex);
 #define H_UNLOCK MUTEX_EXIT(&host_glock_mutex);
 extern pthread_key_t viced_uclient_key;
+extern pthread_key_t confdir_mtime_key;
 #else /* AFS_PTHREAD_ENV */
 #define H_LOCK
 #define H_UNLOCK
