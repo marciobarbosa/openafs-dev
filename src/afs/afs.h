@@ -35,8 +35,12 @@
 /* Upper bound on number of iovecs out uio routines will deal with. */
 #define	AFS_MAXIOVCNT	    16
 
-
-extern int afs_shuttingdown;
+enum afs_shutdown_state {
+    afs_shutdown_no = 0,
+    afs_shutdown_yes = 1,
+    afs_shutdown_flushing_cb = 2,
+};
+extern enum afs_shutdown_state afs_shuttingdown;
 
 /*
  * Macros to uniquely identify the AFS vfs struct
