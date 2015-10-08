@@ -27,6 +27,7 @@ extern pthread_mutex_t host_glock_mutex;
 #define H_LOCK opr_mutex_enter(&host_glock_mutex)
 #define H_UNLOCK opr_mutex_exit(&host_glock_mutex)
 extern pthread_key_t viced_uclient_key;
+extern pthread_key_t viced_afsconf_key;
 
 #define h_MAXHOSTTABLEENTRIES 1000
 #define h_HASHENTRIES 256	/* Power of 2 */
