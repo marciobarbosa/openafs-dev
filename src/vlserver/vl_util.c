@@ -10,8 +10,8 @@
 
 #define UBIKHDRSIZE     64
 
-#define OP_IMPORT       0
-#define OP_EXPORT       1
+#define OP_IMPORT	0
+#define OP_EXPORT	1
 
 #define HEX_T           0
 #define UINT_T          1
@@ -20,31 +20,113 @@
 #define SHORT_T         4
 #define IP_T            5
 
-#define writeYAML(msg, ...)         fprintf(fd_yaml, msg, __VA_ARGS__)
+#define VLDB		0
+#define YAML		1
+#define XML		2
+#define JSON		3
+
+#define writeYAML(msg, ...)         fprintf(stdout, msg, __VA_ARGS__)
 #define isKeyYAML(key)              !strcmp((char *)token.data.scalar.value, key)
 #define readTokenYAML(type, buffer) sscanf((char *)token.data.scalar.value, type, buffer)
 #define SKIP_TOKEN()                yaml_parser_scan(&parser, &token); \
                                     yaml_token_delete(&token)
 
-int fd_vldb;
-FILE *fd_yaml;
+struct tuple {
+    char *tag;
+    int type;
+    void *value;
+    struct tuple *next;
+};
+
+FILE *fd_input;
+int output_format;
 yaml_parser_t parser;
 
-void
-readVLDB(void *a_buffer, size_t a_size, int a_offset)
+struct tuple*
+insertTuple(struct tuple *a_tuple, char *a_tag, int a_type, void *a_value)
 {
-    int offset, r;
+    if (a_tuple == NULL) {
+	a_tuple = (struct tuple *)calloc(1, sizeof(struct tuple));
+	a_tuple->tag = a_tag;
+	a_tuple->type = a_type;
+	a_tuple->value = a_value;
+    } else {
+	a_tuple->next = insertTuple(a_tuple->next, a_tag, a_type, a_value);
+    }
+    return a_tuple;
+}
 
-    offset = lseek(fd_vldb, a_offset, 0);
-    if (offset != a_offset) {
-	fprintf(stderr, "vl_util: lseek to %d failed: %s\n", a_offset,
-		strerror(errno));
+void
+removeList(struct tuple *a_begin)
+{
+    struct tuple *next_p;
+
+    while (a_begin) {
+    	next_p = a_begin->next;
+	free(a_begin);
+	a_begin = next_p;
+    }
+}
+
+void
+printValue(struct tuple *a_tuple)
+{
+    switch (a_tuple->type) {
+	case HEX_T:
+	    printf("0x%x\n", *(int *)a_tuple->value);
+	    break;
+	case UINT_T:
+	    printf("%u\n", *(unsigned int *)a_tuple->value);
+	    break;
+	case STR_T:
+	    printf("%s\n", (char *)a_tuple->value);
+	    break;
+	case SHORT_T:
+	    printf("%hu\n", *(short *)a_tuple->value);
+	    break;
+    }
+}
+
+void
+exportYAML(struct tuple *a_begin, int a_level)
+{
+    if (a_begin == NULL) {
+    	return;
+    }
+
+    if (a_begin->value == NULL) {
+	printf("%*s%s:\n", a_level, "", a_begin->tag);	
+	exportYAML(a_begin->next, a_level + 4);
+    } else {
+	printf("%*s%s: ", a_level, "", a_begin->tag);	
+	printValue(a_begin);
+	exportYAML(a_begin->next, a_level);
+    }
+}
+
+void
+exportList(struct tuple *a_begin)
+{
+    switch (output_format) {
+	case YAML:
+	    exportYAML(a_begin, 0);
+	    break;
+    }
+}
+
+void
+readVLDB(void *a_buffer, long int a_size, int a_offset)
+{
+    int code, r;
+
+    code = fseek(fd_input, a_offset, 0);
+    if (code) {
+	fprintf(stderr, "vl_util: fseek failed\n");
 	exit(1);
     }
-    r = read(fd_vldb, a_buffer, a_size);
+    r = fread(a_buffer, 1, a_size, fd_input);
     if (r != a_size) {
-	fprintf(stderr, "vl_util: could not read %zu bytes from vldb: %s\n",
-		a_size, strerror(errno));
+	fprintf(stderr, "vl_util: could not read %ld bytes from vldb\n", a_size);
 	exit(1);
     }
 }
@@ -53,16 +135,24 @@ void
 exportUbikHeader(void)
 {
     struct ubik_hdr uheader;
+    struct tuple *begin = NULL;
 
     readVLDB((void *)&uheader, sizeof(uheader), 0);
+    uheader.magic = ntohl(uheader.magic); 
+    uheader.size = ntohs(uheader.size);
+    uheader.version.epoch = ntohl(uheader.version.epoch);
+    uheader.version.counter = ntohl(uheader.version.counter); 
 
-    writeYAML("%s:\n", "ubik_header");
-    writeYAML("    magic: 0x%x\n", ntohl(uheader.magic));
-    writeYAML("    size: %u\n", ntohs(uheader.size));
-    writeYAML("    epoch: %u\n", ntohl(uheader.version.epoch));
-    writeYAML("    counter: %u\n", ntohl(uheader.version.counter));
+    begin = insertTuple(begin, "ubik_header", STR_T, NULL);
+    begin = insertTuple(begin, "magic", HEX_T, (void *)&uheader.magic);
+    begin = insertTuple(begin, "size", SHORT_T, (void *)&uheader.size);
+    begin = insertTuple(begin, "epoch", UINT_T, (void *)&uheader.version.epoch);
+    begin = insertTuple(begin, "counter", UINT_T, (void *)&uheader.version.counter);
+
+    exportList(begin);
+    removeList(begin);
 }
-
+/*
 void
 exportVldbHeader(struct vlheader *a_vlheader, size_t a_size)
 {
@@ -542,57 +632,68 @@ readYAML(void)
     } while (token.type != YAML_STREAM_END_TOKEN);
     yaml_token_delete(&token);
 }
+*/
+static int
+getFileExt(const char *a_file)
+{
+    char *ext = strrchr(a_file, '.');
+
+    if (ext == NULL) {
+	fprintf(stderr, "vl_util: could not get the extension of %s\n", a_file);
+	exit(1);
+    }
+
+    ext += 1;
+    if (!strncmp(ext, "DB", 2)) {
+	return VLDB;
+    } else if (!strncmp(ext, "yaml", 4)) {
+	return YAML;
+    }
+    return -1;
+}
 
 static int
 CommandProc(struct cmd_syndesc *a_cs, void *a_rock)
 {
-    struct vlheader vl_hdr;
-    char *vldb_file, *yaml_file;
-    char *op;
-    int op_no;
-    int vldb_mode;
-    char *yaml_mode;
+    /*struct vlheader vl_hdr;*/
+    char *input_file;
+    char *output_ext;
+    int op_no = OP_EXPORT;
 
-    vldb_file = a_cs->parms[0].items->data;	/* -vldb */
-    yaml_file = a_cs->parms[1].items->data;	/* -yaml */
-    op = a_cs->parms[2].items->data;	/* -op   */
+    input_file = a_cs->parms[0].items->data;	/* -input */
+    output_ext = a_cs->parms[1].items->data;	/* -format */
 
-    if (!strcmp(op, "import") && !strcmp(op, "export")) {
-	fprintf(stderr, "vl_util: operation '%s' not found\n", op);
+    if (strcmp(output_ext, "yaml")) {
+	fprintf(stderr, "vl_util: format not supported\n");
 	exit(1);
     }
-    op_no = (!strcmp(op, "import")) ? OP_IMPORT : OP_EXPORT;
-    vldb_mode = (op_no == OP_IMPORT) ? (O_WRONLY | O_CREAT) : O_RDONLY;
-    yaml_mode = (op_no == OP_IMPORT) ? "r" : "w";
+    output_format = YAML;
 
-    fd_vldb = open(vldb_file, vldb_mode, 0);
-    if (fd_vldb < 0) {
-	fprintf(stderr, "vl_util: cannot open %s: %s\n", vldb_file,
-		strerror(errno));
-	exit(1);
+    if (getFileExt(input_file) != VLDB) {
+	op_no = OP_IMPORT;
     }
-    fd_yaml = fopen(yaml_file, yaml_mode);
-    if (fd_yaml == NULL) {
-	fprintf(stderr, "vl_util: cannot open %s: %s\n", yaml_file,
+    fd_input = fopen(input_file, op_no == OP_EXPORT ? "rb" : "r");
+
+    if (fd_input == NULL) {
+	fprintf(stderr, "vl_util: cannot open %s: %s\n", input_file,
 		strerror(errno));
 	exit(1);
     }
 
     if (op_no == OP_EXPORT) {
 	exportUbikHeader();
-	exportVldbHeader(&vl_hdr, sizeof(vl_hdr));
-	exportVldbEntries(&vl_hdr);
-    } else {
+	/*exportVldbHeader(&vl_hdr, sizeof(vl_hdr));
+	exportVldbEntries(&vl_hdr);*/
+    } /*else {
 	if (!yaml_parser_initialize(&parser)) {
 	    fprintf(stderr, "vl_util: could not initialize the parser\n");
 	    exit(1);
 	}
-	yaml_parser_set_input_file(&parser, fd_yaml);
+	yaml_parser_set_input_file(&parser, fd_input);
 	readYAML();
 	yaml_parser_delete(&parser);
-    }
-    close(fd_vldb);
-    fclose(fd_yaml);
+    }*/
+    fclose(fd_input);
 
     return 0;
 }
@@ -604,9 +705,8 @@ main(int argc, char **argv)
 
     cs = cmd_CreateSyntax(NULL, CommandProc, NULL,
 			  "import/export volume location database");
-    cmd_AddParm(cs, "-vldb", CMD_SINGLE, CMD_REQUIRED, "vldb_file");
-    cmd_AddParm(cs, "-yaml", CMD_SINGLE, CMD_REQUIRED, "yaml_file");
-    cmd_AddParm(cs, "-op", CMD_SINGLE, CMD_REQUIRED, "import/export");
+    cmd_AddParm(cs, "-input", CMD_SINGLE, CMD_REQUIRED, "vldb/yaml (so far...");
+    cmd_AddParm(cs, "-format", CMD_SINGLE, CMD_REQUIRED, "output format (yaml so far...)");
 
     return cmd_Dispatch(argc, argv);
 }
