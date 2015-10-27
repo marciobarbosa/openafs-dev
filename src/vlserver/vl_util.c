@@ -19,7 +19,11 @@
 #define IP_T		7
 #define UUID_T		8
 
-#define YAML		1
+#define YAML		0
+#define XML		1
+#define JSON		2
+
+#define insert(root, tag, type, value, level) insert_tuple(root, tuple_wrapper(tag, type, (void *)value, level)) 
 
 FILE *fd_input; 
 int output_format;
@@ -42,7 +46,7 @@ insert_tuple(struct vldb_tuple *a_tree, struct vldb_tuple *a_element)
     if (a_tree->vt_right != NULL) {
     	a_tree->vt_right = insert_tuple(a_tree->vt_right, a_element);
     } else {
-	if (a_element->vt_level < a_tree->vt_level)
+	if (a_element->vt_level > a_tree->vt_level)
 	    a_tree->vt_left = insert_tuple(a_tree->vt_left, a_element);
 	else
 	    a_tree->vt_right = insert_tuple(a_tree->vt_right, a_element);
@@ -94,27 +98,27 @@ print_value(struct vldb_tuple *a_tuple)
 
     switch (a_tuple->vt_type) {
 	case HEX_T:
-	    fprintf(stdout, "0x%x\n", ntohl(*(int *)a_tuple->vt_value));
+	    fprintf(stdout, "0x%x", ntohl(*(int *)a_tuple->vt_value));
 	    break;
 	case UINT_T:
-	    fprintf(stdout, "%u\n", ntohl(*(unsigned int *)a_tuple->vt_value));
+	    fprintf(stdout, "%u", ntohl(*(unsigned int *)a_tuple->vt_value));
 	    break;
 	case STR_T:
-	    fprintf(stdout, "%s\n", (char *)a_tuple->vt_value);
+	    fprintf(stdout, "%s", (char *)a_tuple->vt_value);
 	    break;
 	case SHORT_T:
-	    fprintf(stdout, "%hu\n", ntohs(*(short *)a_tuple->vt_value));
+	    fprintf(stdout, "%hu", ntohs(*(short *)a_tuple->vt_value));
 	    break;
 	case INT_T:
-	    fprintf(stdout, "%d\n", ntohl(*(int *)a_tuple->vt_value));
+	    fprintf(stdout, "%d", ntohl(*(int *)a_tuple->vt_value));
 	    break;
 	case IP_T:
 	    afs_inet_ntoa_r(*(afs_uint32 *)a_tuple->vt_value, host_str);
-	    fprintf(stdout, "%s\n", host_str);
+	    fprintf(stdout, "%s", host_str);
 	    break;
 	case UUID_T:
 	    afsUUID_to_string((afsUUID *)a_tuple->vt_value, uuid_str, sizeof(uuid_str));
-	    fprintf(stdout, "%s\n", uuid_str);
+	    fprintf(stdout, "%s", uuid_str);
 	    break;
     }
 }
@@ -131,6 +135,7 @@ export_yaml(struct vldb_tuple *a_root)
     } else {
 	fprintf(stdout, " ");
 	print_value(a_root);
+    	fprintf(stdout, "\n");
     }
     if (a_root->vt_left != NULL) {
     	export_yaml(a_root->vt_left);
@@ -142,11 +147,75 @@ export_yaml(struct vldb_tuple *a_root)
 }
 
 void
+export_xml(struct vldb_tuple *a_root)
+{
+    if (a_root == NULL) {
+	return;
+    }
+    fprintf(stdout, "%*s<%s>", 4 * a_root->vt_level, "", a_root->vt_tag);
+    if (a_root->vt_value == NULL) {
+    	fprintf(stdout, "\n");
+    } else {
+	fprintf(stdout, " ");
+	print_value(a_root);
+	fprintf(stdout, " </%s>\n", a_root->vt_tag);
+    }
+    if (a_root->vt_left != NULL) {
+    	export_xml(a_root->vt_left);
+    }
+    if (a_root->vt_value == NULL) {
+	fprintf(stdout, "%*s</%s>\n", 4 * a_root->vt_level, "", a_root->vt_tag);
+    }
+    if (a_root->vt_right != NULL) {
+    	export_xml(a_root->vt_right);
+    }
+    free(a_root);
+}
+    
+void
+export_json(struct vldb_tuple *a_root)
+{
+    if (a_root == NULL) {
+	return;
+    }
+    a_root->vt_level += 1;
+    if (a_root->vt_value == NULL) {
+	fprintf(stdout, "%*s\"%s\" : {\n", 4 * a_root->vt_level, "", a_root->vt_tag);
+    } else {
+	fprintf(stdout, "%*s\"%s\": ", 4 * a_root->vt_level, "", a_root->vt_tag);
+	print_value(a_root);
+	if (a_root->vt_right != NULL)
+	    fprintf(stdout, ",\n");
+	else
+	    fprintf(stdout, "\n");
+    }
+    if (a_root->vt_left != NULL) {
+    	export_json(a_root->vt_left);
+    }
+    if (a_root->vt_value == NULL) {
+	if (a_root->vt_right != NULL)
+	    fprintf(stdout, "%*s},\n", 4 * a_root->vt_level, "");
+	else
+	    fprintf(stdout, "%*s}\n", 4 * a_root->vt_level, "");
+    }
+    if (a_root->vt_right != NULL) {
+    	export_json(a_root->vt_right);
+    }
+    free(a_root);
+}
+
+void
 export_list(struct vldb_tuple *a_root)
 {
     switch (output_format) {
 	case YAML:
 	    export_yaml(a_root);
+	    break;
+	case XML:
+	    export_xml(a_root);
+	    break;
+	case JSON:
+	    export_json(a_root);
 	    break;
     }
 }
@@ -159,11 +228,11 @@ export_ubik_header(void)
 
     read_vldb((void *)&uheader, sizeof(uheader), 0);
 
-    root = insert_tuple(root, tuple_wrapper("ubik_header", NONE_T, NULL, 0));
-    root = insert_tuple(root, tuple_wrapper("magic", HEX_T, (void *)&uheader.magic, 1));
-    root = insert_tuple(root, tuple_wrapper("size", SHORT_T, (void *)&uheader.size, 1));
-    root = insert_tuple(root, tuple_wrapper("epoch", UINT_T, (void *)&uheader.version.epoch, 1));
-    root = insert_tuple(root, tuple_wrapper("counter", UINT_T, (void *)&uheader.version.counter, 1));
+    root = insert(root, "ubik_header", NONE_T, NULL, 0);
+    root = insert(root, "magic", HEX_T, &uheader.magic, 1);
+    root = insert(root, "size", SHORT_T, &uheader.size, 1);
+    root = insert(root, "epoch", UINT_T, &uheader.version.epoch, 1);
+    root = insert(root, "counter", UINT_T, &uheader.version.counter, 1);
 
     export_list(root);
 }
@@ -176,23 +245,23 @@ export_vldb_header(struct vlheader *a_vlheader)
 
     read_vldb((void *)a_vlheader, sizeof(*a_vlheader), UBIKHDRSIZE);
 
-    root = insert_tuple(root, tuple_wrapper("vldb_header", NONE_T, NULL, 0));
-    root = insert_tuple(root, tuple_wrapper("vldb_version", UINT_T, (void *)&a_vlheader->vital_header.vldbversion, 1));
-    root = insert_tuple(root, tuple_wrapper("header_size", UINT_T, (void *)&a_vlheader->vital_header.headersize, 1));
-    root = insert_tuple(root, tuple_wrapper("free_ptr", HEX_T, (void *)&a_vlheader->vital_header.freePtr, 1));
-    root = insert_tuple(root, tuple_wrapper("eof_ptr", UINT_T, (void *)&a_vlheader->vital_header.eofPtr, 1));
-    root = insert_tuple(root, tuple_wrapper("allocs", UINT_T, (void *)&a_vlheader->vital_header.allocs, 1));
-    root = insert_tuple(root, tuple_wrapper("frees", UINT_T, (void *)&a_vlheader->vital_header.frees, 1));
-    root = insert_tuple(root, tuple_wrapper("max_volume_id", UINT_T, (void *)&a_vlheader->vital_header.MaxVolumeId, 1));
-    root = insert_tuple(root, tuple_wrapper("total_entries_rw", UINT_T, (void *)&a_vlheader->vital_header.totalEntries[0], 1));
-    root = insert_tuple(root, tuple_wrapper("total_entries_ro", UINT_T, (void *)&a_vlheader->vital_header.totalEntries[1], 1));
-    root = insert_tuple(root, tuple_wrapper("total_entries_bk", UINT_T, (void *)&a_vlheader->vital_header.totalEntries[2], 1));
-    root = insert_tuple(root, tuple_wrapper("sit", HEX_T, (void *)&a_vlheader->SIT, 1));
+    root = insert(root, "vldb_header", NONE_T, NULL, 0);
+    root = insert(root, "vldb_version", UINT_T, &a_vlheader->vital_header.vldbversion, 1);
+    root = insert(root, "header_size", UINT_T, &a_vlheader->vital_header.headersize, 1);
+    root = insert(root, "free_ptr", HEX_T, &a_vlheader->vital_header.freePtr, 1);
+    root = insert(root, "eof_ptr", UINT_T, &a_vlheader->vital_header.eofPtr, 1);
+    root = insert(root, "allocs", UINT_T, &a_vlheader->vital_header.allocs, 1);
+    root = insert(root, "frees", UINT_T, &a_vlheader->vital_header.frees, 1);
+    root = insert(root, "max_volume_id", UINT_T, &a_vlheader->vital_header.MaxVolumeId, 1);
+    root = insert(root, "total_entries_rw", UINT_T, &a_vlheader->vital_header.totalEntries[0], 1);
+    root = insert(root, "total_entries_ro", UINT_T, &a_vlheader->vital_header.totalEntries[1], 1);
+    root = insert(root, "total_entries_bk", UINT_T, &a_vlheader->vital_header.totalEntries[2], 1);
+    root = insert(root, "sit", HEX_T, &a_vlheader->SIT, 1);
 
-    root = insert_tuple(root, tuple_wrapper("ip_mapped_addr", NONE_T, NULL, 1));
+    root = insert(root, "ip_mapped_addr", NONE_T, NULL, 1);
     for (i = 0; i <= MAXSERVERID; i++) {
 	if (a_vlheader->IpMappedAddr[i] != 0)
-	    root = insert_tuple(root, tuple_wrapper("addr", HEX_T, (void *)&a_vlheader->IpMappedAddr[i], 2));
+	    root = insert(root, "addr", HEX_T, &a_vlheader->IpMappedAddr[i], 2);
     }
 
     export_list(root);
@@ -206,15 +275,15 @@ export_mh_block(afs_uint32 a_addr, struct vldb_tuple *a_root)
 
     read_vldb((void *)&mh_entry[0], sizeof(mh_entry[0]), a_addr);
 
-    a_root = insert_tuple(a_root, tuple_wrapper("mh_block", NONE_T, NULL, 0));
-    a_root = insert_tuple(a_root, tuple_wrapper("header", NONE_T, NULL, 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("count", INT_T, (void *)&mh_entry[0].ex_count, 2));
-    a_root = insert_tuple(a_root, tuple_wrapper("flags", INT_T, (void *)&mh_entry[0].ex_flags, 2));
-    a_root = insert_tuple(a_root, tuple_wrapper("cont_addrs", NONE_T, NULL, 2));
+    a_root = insert(a_root, "mh_block", NONE_T, NULL, 0);
+    a_root = insert(a_root, "header", NONE_T, NULL, 1);
+    a_root = insert(a_root, "count", INT_T, &mh_entry[0].ex_count, 2);
+    a_root = insert(a_root, "flags", INT_T, &mh_entry[0].ex_flags, 2);
+    a_root = insert(a_root, "cont_addrs", NONE_T, NULL, 2);
 
     for (i = 0; i < VL_MAX_ADDREXTBLKS; i++) {
 	if (ntohl(mh_entry[0].ex_contaddrs[i]) != 0) {
-	    a_root = insert_tuple(a_root, tuple_wrapper("addr", HEX_T, (void *)&mh_entry[0].ex_contaddrs[i], 3));
+	    a_root = insert(a_root, "addr", HEX_T, &mh_entry[0].ex_contaddrs[i], 3);
 	}
     }
     for (i = 1; i < VL_MHSRV_PERBLK; i++) {
@@ -222,13 +291,13 @@ export_mh_block(afs_uint32 a_addr, struct vldb_tuple *a_root)
 		 a_addr + (i * sizeof(mh_entry[i])));
 	if (afs_uuid_is_nil(&mh_entry[i].ex_hostuuid))
 	    continue;
-	a_root = insert_tuple(a_root, tuple_wrapper("entry", NONE_T, NULL, 1));
-	a_root = insert_tuple(a_root, tuple_wrapper("host_uuid", UUID_T, (void *)&mh_entry[i].ex_hostuuid, 2));
-	a_root = insert_tuple(a_root, tuple_wrapper("uniquifier", INT_T, (void *)&mh_entry[i].ex_uniquifier, 2));
-	a_root = insert_tuple(a_root, tuple_wrapper("ip_addr", NONE_T, NULL, 2));
+	a_root = insert(a_root, "entry", NONE_T, NULL, 1);
+	a_root = insert(a_root, "host_uuid", UUID_T, &mh_entry[i].ex_hostuuid, 2);
+	a_root = insert(a_root, "uniquifier", INT_T, &mh_entry[i].ex_uniquifier, 2);
+	a_root = insert(a_root, "ip_addr", NONE_T, NULL, 2);
 	for (j = 0; j < VL_MAXIPADDRS_PERMH; j++) {
 	    if (mh_entry[i].ex_addrs[j] != 0) 
-		a_root = insert_tuple(a_root, tuple_wrapper("ip", IP_T, (void *)&mh_entry[i].ex_addrs[j], 3));
+		a_root = insert(a_root, "ip", IP_T, &mh_entry[i].ex_addrs[j], 3);
 	}
     }
     export_list(a_root);
@@ -239,34 +308,34 @@ export_volume(struct nvlentry *a_vlentry, struct vldb_tuple *a_root)
 {
     int i;
 
-    a_root = insert_tuple(a_root, tuple_wrapper("vol_entry", NONE_T, NULL, 0));
-    a_root = insert_tuple(a_root, tuple_wrapper("volume_id_rw", UINT_T, (void *)&a_vlentry->volumeId[0], 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("volume_id_ro", UINT_T, (void *)&a_vlentry->volumeId[1], 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("volume_id_bk", UINT_T, (void *)&a_vlentry->volumeId[2], 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("flags", INT_T, (void *)&a_vlentry->flags, 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("lock_afs_id", INT_T, (void *)&a_vlentry->LockAfsId, 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("lock_time_stamp", INT_T, (void *)&a_vlentry->LockTimestamp, 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("clone_id", UINT_T, (void *)&a_vlentry->cloneId, 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("next_id_hash_rw", UINT_T, (void *)&a_vlentry->nextIdHash[0], 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("next_id_hash_ro", UINT_T, (void *)&a_vlentry->nextIdHash[1], 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("next_id_hash_bk", UINT_T, (void *)&a_vlentry->nextIdHash[2], 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("next_name_hash", UINT_T, (void *)&a_vlentry->nextNameHash, 1));
-    a_root = insert_tuple(a_root, tuple_wrapper("name", STR_T, (void *)&a_vlentry->name, 1));
+    a_root = insert(a_root, "vol_entry", NONE_T, NULL, 0);
+    a_root = insert(a_root, "volume_id_rw", UINT_T, &a_vlentry->volumeId[0], 1);
+    a_root = insert(a_root, "volume_id_ro", UINT_T, &a_vlentry->volumeId[1], 1);
+    a_root = insert(a_root, "volume_id_bk", UINT_T, &a_vlentry->volumeId[2], 1);
+    a_root = insert(a_root, "flags", INT_T, &a_vlentry->flags, 1);
+    a_root = insert(a_root, "lock_afs_id", INT_T, &a_vlentry->LockAfsId, 1);
+    a_root = insert(a_root, "lock_time_stamp", INT_T, &a_vlentry->LockTimestamp, 1);
+    a_root = insert(a_root, "clone_id", UINT_T, &a_vlentry->cloneId, 1);
+    a_root = insert(a_root, "next_id_hash_rw", UINT_T, &a_vlentry->nextIdHash[0], 1);
+    a_root = insert(a_root, "next_id_hash_ro", UINT_T, &a_vlentry->nextIdHash[1], 1);
+    a_root = insert(a_root, "next_id_hash_bk", UINT_T, &a_vlentry->nextIdHash[2], 1);
+    a_root = insert(a_root, "next_name_hash", UINT_T, &a_vlentry->nextNameHash, 1);
+    a_root = insert(a_root, "name", STR_T, &a_vlentry->name, 1);
 
-    a_root = insert_tuple(a_root, tuple_wrapper("server_number", NONE_T, NULL, 1));
+    a_root = insert(a_root, "server_number", NONE_T, NULL, 1);
     for (i = 0; i < NMAXNSERVERS; i++) {
 	if (a_vlentry->serverNumber[i] != 255)
-	    a_root = insert_tuple(a_root, tuple_wrapper("number", UINT_T, (void *)&a_vlentry->serverNumber[i], 2));
+	    a_root = insert(a_root, "number", UINT_T, &a_vlentry->serverNumber[i], 2);
     }
-    a_root = insert_tuple(a_root, tuple_wrapper("server_partition", NONE_T, NULL, 1));
+    a_root = insert(a_root, "server_partition", NONE_T, NULL, 1);
     for (i = 0; i < NMAXNSERVERS; i++) {
 	if (a_vlentry->serverPartition[i] != 255)
-	    a_root = insert_tuple(a_root, tuple_wrapper("part", INT_T, (void *)&a_vlentry->serverPartition[i], 2));
+	    a_root = insert(a_root, "part", INT_T, &a_vlentry->serverPartition[i], 2);
     }
-    a_root = insert_tuple(a_root, tuple_wrapper("server_flags", NONE_T, NULL, 1));
+    a_root = insert(a_root, "server_flags", NONE_T, NULL, 1);
     for (i = 0; i < NMAXNSERVERS; i++) {
 	if (a_vlentry->serverFlags[i] != 255)
-	    a_root = insert_tuple(a_root, tuple_wrapper("flag", INT_T, (void *)&a_vlentry->serverFlags[i], 2));
+	    a_root = insert(a_root, "flag", INT_T, &a_vlentry->serverFlags[i], 2);
     }
     export_list(a_root);
 }
@@ -311,11 +380,16 @@ command_proc(struct cmd_syndesc *a_cs, void *a_rock)
     input_file = a_cs->parms[0].items->data;	/* -input */
     output_ext = a_cs->parms[1].items->data;	/* -format */
 
-    if (strcmp(output_ext, "yaml")) {
+    if (strcmp(output_ext, "yaml") == 0) {
+	output_format = YAML;
+    } else if (strcmp(output_ext, "xml") == 0) {
+	output_format = XML;
+    } else if (strcmp(output_ext, "json") == 0) {
+	output_format = JSON;
+    } else {
 	fprintf(stderr, "vl_util: format not supported\n");
 	exit(1);
     }
-    output_format = YAML;
     fd_input = fopen(input_file, "rb"); 
 
     if (fd_input == NULL) {
@@ -323,9 +397,15 @@ command_proc(struct cmd_syndesc *a_cs, void *a_rock)
 	exit(1);
     }
 
+    if (output_format == JSON) {
+    	fprintf(stdout, "{\n");
+    }
     export_ubik_header();
     export_vldb_header(&vl_hdr);
     export_vldb_entries(&vl_hdr);
+    if (output_format == JSON) {
+    	fprintf(stdout, "}\n");
+    }
     fclose(fd_input);
 
     return 0;
