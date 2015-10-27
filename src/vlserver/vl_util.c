@@ -4,118 +4,54 @@
 
 #include <fcntl.h>
 #include <errno.h>
-#include <yaml.h>
 
 #include "vlserver.h"
 
 #define UBIKHDRSIZE     64
 
-#define OP_IMPORT	0
-#define OP_EXPORT	1
+#define NONE_T		0
+#define HEX_T           1
+#define UINT_T          2
+#define STR_T           3
+#define UCHAR_T         4
+#define SHORT_T         5
+#define INT_T		6
+#define IP_T		7
+#define UUID_T		8
 
-#define HEX_T           0
-#define UINT_T          1
-#define STR_T           2
-#define UCHAR_T         3
-#define SHORT_T         4
-#define IP_T            5
-
-#define VLDB		0
 #define YAML		1
-#define XML		2
-#define JSON		3
 
-#define writeYAML(msg, ...)         fprintf(stdout, msg, __VA_ARGS__)
-#define isKeyYAML(key)              !strcmp((char *)token.data.scalar.value, key)
-#define readTokenYAML(type, buffer) sscanf((char *)token.data.scalar.value, type, buffer)
-#define SKIP_TOKEN()                yaml_parser_scan(&parser, &token); \
-                                    yaml_token_delete(&token)
+FILE *fd_input; 
+int output_format;
 
-struct tuple {
-    char *tag;
-    int type;
-    void *value;
-    struct tuple *next;
+struct vldb_tuple {
+    char *vt_tag;
+    short vt_type;
+    void *vt_value;
+    unsigned int vt_level;
+    struct vldb_tuple *vt_left;
+    struct vldb_tuple *vt_right;
 };
 
-FILE *fd_input;
-int output_format;
-yaml_parser_t parser;
-
-struct tuple*
-insertTuple(struct tuple *a_tuple, char *a_tag, int a_type, void *a_value)
+struct vldb_tuple*
+insert_tuple(struct vldb_tuple *a_tree, struct vldb_tuple *a_element)
 {
-    if (a_tuple == NULL) {
-	a_tuple = (struct tuple *)calloc(1, sizeof(struct tuple));
-	a_tuple->tag = a_tag;
-	a_tuple->type = a_type;
-	a_tuple->value = a_value;
+    if (a_tree == NULL) {
+    	return a_element;
+    }
+    if (a_tree->vt_right != NULL) {
+    	a_tree->vt_right = insert_tuple(a_tree->vt_right, a_element);
     } else {
-	a_tuple->next = insertTuple(a_tuple->next, a_tag, a_type, a_value);
+	if (a_element->vt_level < a_tree->vt_level)
+	    a_tree->vt_left = insert_tuple(a_tree->vt_left, a_element);
+	else
+	    a_tree->vt_right = insert_tuple(a_tree->vt_right, a_element);
     }
-    return a_tuple;
+    return a_tree;
 }
 
 void
-removeList(struct tuple *a_begin)
-{
-    struct tuple *next_p;
-
-    while (a_begin) {
-    	next_p = a_begin->next;
-	free(a_begin);
-	a_begin = next_p;
-    }
-}
-
-void
-printValue(struct tuple *a_tuple)
-{
-    switch (a_tuple->type) {
-	case HEX_T:
-	    printf("0x%x\n", *(int *)a_tuple->value);
-	    break;
-	case UINT_T:
-	    printf("%u\n", *(unsigned int *)a_tuple->value);
-	    break;
-	case STR_T:
-	    printf("%s\n", (char *)a_tuple->value);
-	    break;
-	case SHORT_T:
-	    printf("%hu\n", *(short *)a_tuple->value);
-	    break;
-    }
-}
-
-void
-exportYAML(struct tuple *a_begin, int a_level)
-{
-    if (a_begin == NULL) {
-    	return;
-    }
-
-    if (a_begin->value == NULL) {
-	printf("%*s%s:\n", a_level, "", a_begin->tag);	
-	exportYAML(a_begin->next, a_level + 4);
-    } else {
-	printf("%*s%s: ", a_level, "", a_begin->tag);	
-	printValue(a_begin);
-	exportYAML(a_begin->next, a_level);
-    }
-}
-
-void
-exportList(struct tuple *a_begin)
-{
-    switch (output_format) {
-	case YAML:
-	    exportYAML(a_begin, 0);
-	    break;
-    }
-}
-
-void
-readVLDB(void *a_buffer, long int a_size, int a_offset)
+read_vldb(void *a_buffer, long int a_size, int a_offset)
 {
     int code, r;
 
@@ -131,154 +67,212 @@ readVLDB(void *a_buffer, long int a_size, int a_offset)
     }
 }
 
-void
-exportUbikHeader(void)
+struct vldb_tuple*
+tuple_wrapper(char *a_tag, short a_type, void *a_value, unsigned int a_level)
 {
-    struct ubik_hdr uheader;
-    struct tuple *begin = NULL;
+    struct vldb_tuple *tuplep;
 
-    readVLDB((void *)&uheader, sizeof(uheader), 0);
-    uheader.magic = ntohl(uheader.magic); 
-    uheader.size = ntohs(uheader.size);
-    uheader.version.epoch = ntohl(uheader.version.epoch);
-    uheader.version.counter = ntohl(uheader.version.counter); 
+    tuplep = (struct vldb_tuple *)calloc(1, sizeof(*tuplep));
 
-    begin = insertTuple(begin, "ubik_header", STR_T, NULL);
-    begin = insertTuple(begin, "magic", HEX_T, (void *)&uheader.magic);
-    begin = insertTuple(begin, "size", SHORT_T, (void *)&uheader.size);
-    begin = insertTuple(begin, "epoch", UINT_T, (void *)&uheader.version.epoch);
-    begin = insertTuple(begin, "counter", UINT_T, (void *)&uheader.version.counter);
-
-    exportList(begin);
-    removeList(begin);
-}
-/*
-void
-exportVldbHeader(struct vlheader *a_vlheader, size_t a_size)
-{
-    int i, j;
-
-    readVLDB((void *)a_vlheader, a_size, UBIKHDRSIZE);
-
-    writeYAML("%s:\n", "vldb_header");
-    writeYAML("    vldb_version: %u\n",
-	      ntohl(a_vlheader->vital_header.vldbversion));
-    writeYAML("    header_size: %u\n",
-	      ntohl(a_vlheader->vital_header.headersize));
-    writeYAML("    free_ptr: 0x%x\n",
-	      ntohl(a_vlheader->vital_header.freePtr));
-    writeYAML("    eof_ptr: %u\n", ntohl(a_vlheader->vital_header.eofPtr));
-    writeYAML("    allocs: %u\n", ntohl(a_vlheader->vital_header.allocs));
-    writeYAML("    frees: %u\n", ntohl(a_vlheader->vital_header.frees));
-    writeYAML("    max_volume_id: %u\n",
-	      ntohl(a_vlheader->vital_header.MaxVolumeId));
-    writeYAML("    total_entries_rw: %u\n",
-	      ntohl(a_vlheader->vital_header.totalEntries[0]));
-    writeYAML("    total_entries_ro: %u\n",
-	      ntohl(a_vlheader->vital_header.totalEntries[1]));
-    writeYAML("    total_entries_bk: %u\n",
-	      ntohl(a_vlheader->vital_header.totalEntries[2]));
-
-    writeYAML("    %s:\n", "ip_mapped_addr");
-    for (i = 0; i <= MAXSERVERID; i++) {
-	if (a_vlheader->IpMappedAddr[i] != 0)
-	    writeYAML("        %d: 0x%x\n", i,
-		      ntohl(a_vlheader->IpMappedAddr[i]));
+    if (tuplep == NULL) {
+    	fprintf(stderr, "vl_util: no memory\n");
+	exit(1);
     }
-    writeYAML("    %s:\n", "vol_name_hash");
-    for (i = 0; i < HASHSIZE; i++) {
-	if (a_vlheader->VolnameHash[i] != 0)
-	    writeYAML("        %d: %u\n", i,
-		      ntohl(a_vlheader->VolnameHash[i]));
-    }
-    writeYAML("    %s:\n", "vol_id_hash");
-    for (i = 0; i < MAXTYPES; i++) {
-	for (j = 0; j < HASHSIZE; j++) {
-	    if (a_vlheader->VolidHash[i][j] != 0) {
-		writeYAML("        %d:\n", i);
-		writeYAML("            %d: %u\n", j,
-			  ntohl(a_vlheader->VolidHash[i][j]));
-	    }
-	}
-    }
-    writeYAML("    sit: 0x%x\n", ntohl(a_vlheader->SIT));
+    tuplep->vt_tag = a_tag;
+    tuplep->vt_type = a_type;
+    tuplep->vt_value = a_value;
+    tuplep->vt_level = a_level;
+
+    return tuplep;
 }
 
-inline void
-exportMhBlock(afs_uint32 a_addr)
+void
+print_value(struct vldb_tuple *a_tuple)
 {
-    int i, j;
     char host_str[16];
     char uuid_str[40];
-    struct extentaddr mh_entry;
 
-    readVLDB((void *)&mh_entry, sizeof(mh_entry), a_addr);
-    writeYAML("%s:\n", "mh_block");
-    writeYAML("    %s:\n", "header");
-    writeYAML("        count: %d\n", ntohl(mh_entry.ex_count));
-    writeYAML("        flags: %d\n", ntohl(mh_entry.ex_flags));
-    writeYAML("        %s:\n", "cont_addrs");
-    for (i = 0; i < VL_MAX_ADDREXTBLKS; i++) {
-	if (ntohl(mh_entry.ex_contaddrs[i]) != 0)
-	    writeYAML("            %d: 0x%x\n", i,
-		      ntohl(mh_entry.ex_contaddrs[i]));
-    }
-    for (i = 1; i < VL_MHSRV_PERBLK; i++) {
-	readVLDB((void *)&mh_entry, sizeof(mh_entry),
-		 a_addr + (i * sizeof(mh_entry)));
-	if (afs_uuid_is_nil(&mh_entry.ex_hostuuid))
-	    continue;
-	writeYAML("    %s:\n", "entry");
-	afsUUID_to_string(&mh_entry.ex_hostuuid, uuid_str, sizeof(uuid_str));
-	writeYAML("        host_uuid: %s\n", uuid_str);
-	writeYAML("        uniquifier: %d\n", ntohl(mh_entry.ex_uniquifier));
-	writeYAML("        %s:\n", "ip_addr");
-	for (j = 0; j < VL_MAXIPADDRS_PERMH; j++) {
-	    if (mh_entry.ex_addrs[j] != 0)
-		writeYAML("            %d: %s\n", j,
-			  afs_inet_ntoa_r(mh_entry.ex_addrs[j], host_str));
-	}
+    switch (a_tuple->vt_type) {
+	case HEX_T:
+	    fprintf(stdout, "0x%x\n", ntohl(*(int *)a_tuple->vt_value));
+	    break;
+	case UINT_T:
+	    fprintf(stdout, "%u\n", ntohl(*(unsigned int *)a_tuple->vt_value));
+	    break;
+	case STR_T:
+	    fprintf(stdout, "%s\n", (char *)a_tuple->vt_value);
+	    break;
+	case SHORT_T:
+	    fprintf(stdout, "%hu\n", ntohs(*(short *)a_tuple->vt_value));
+	    break;
+	case INT_T:
+	    fprintf(stdout, "%d\n", ntohl(*(int *)a_tuple->vt_value));
+	    break;
+	case IP_T:
+	    afs_inet_ntoa_r(*(afs_uint32 *)a_tuple->vt_value, host_str);
+	    fprintf(stdout, "%s\n", host_str);
+	    break;
+	case UUID_T:
+	    afsUUID_to_string((afsUUID *)a_tuple->vt_value, uuid_str, sizeof(uuid_str));
+	    fprintf(stdout, "%s\n", uuid_str);
+	    break;
     }
 }
 
+void
+export_yaml(struct vldb_tuple *a_root)
+{
+    if (a_root == NULL) {
+	return;
+    }
+    fprintf(stdout, "%*s%s:", 4 * a_root->vt_level, "", a_root->vt_tag);
+    if (a_root->vt_value == NULL) {
+    	fprintf(stdout, "\n");
+    } else {
+	fprintf(stdout, " ");
+	print_value(a_root);
+    }
+    if (a_root->vt_left != NULL) {
+    	export_yaml(a_root->vt_left);
+    }
+    if (a_root->vt_right != NULL) {
+    	export_yaml(a_root->vt_right);
+    }
+    free(a_root);
+}
+
+void
+export_list(struct vldb_tuple *a_root)
+{
+    switch (output_format) {
+	case YAML:
+	    export_yaml(a_root);
+	    break;
+    }
+}
+
+void
+export_ubik_header(void)
+{
+    struct ubik_hdr uheader;
+    struct vldb_tuple *root = NULL;
+
+    read_vldb((void *)&uheader, sizeof(uheader), 0);
+
+    root = insert_tuple(root, tuple_wrapper("ubik_header", NONE_T, NULL, 0));
+    root = insert_tuple(root, tuple_wrapper("magic", HEX_T, (void *)&uheader.magic, 1));
+    root = insert_tuple(root, tuple_wrapper("size", SHORT_T, (void *)&uheader.size, 1));
+    root = insert_tuple(root, tuple_wrapper("epoch", UINT_T, (void *)&uheader.version.epoch, 1));
+    root = insert_tuple(root, tuple_wrapper("counter", UINT_T, (void *)&uheader.version.counter, 1));
+
+    export_list(root);
+}
+
+void
+export_vldb_header(struct vlheader *a_vlheader)
+{
+    int i;
+    struct vldb_tuple *root = NULL;
+
+    read_vldb((void *)a_vlheader, sizeof(*a_vlheader), UBIKHDRSIZE);
+
+    root = insert_tuple(root, tuple_wrapper("vldb_header", NONE_T, NULL, 0));
+    root = insert_tuple(root, tuple_wrapper("vldb_version", UINT_T, (void *)&a_vlheader->vital_header.vldbversion, 1));
+    root = insert_tuple(root, tuple_wrapper("header_size", UINT_T, (void *)&a_vlheader->vital_header.headersize, 1));
+    root = insert_tuple(root, tuple_wrapper("free_ptr", HEX_T, (void *)&a_vlheader->vital_header.freePtr, 1));
+    root = insert_tuple(root, tuple_wrapper("eof_ptr", UINT_T, (void *)&a_vlheader->vital_header.eofPtr, 1));
+    root = insert_tuple(root, tuple_wrapper("allocs", UINT_T, (void *)&a_vlheader->vital_header.allocs, 1));
+    root = insert_tuple(root, tuple_wrapper("frees", UINT_T, (void *)&a_vlheader->vital_header.frees, 1));
+    root = insert_tuple(root, tuple_wrapper("max_volume_id", UINT_T, (void *)&a_vlheader->vital_header.MaxVolumeId, 1));
+    root = insert_tuple(root, tuple_wrapper("total_entries_rw", UINT_T, (void *)&a_vlheader->vital_header.totalEntries[0], 1));
+    root = insert_tuple(root, tuple_wrapper("total_entries_ro", UINT_T, (void *)&a_vlheader->vital_header.totalEntries[1], 1));
+    root = insert_tuple(root, tuple_wrapper("total_entries_bk", UINT_T, (void *)&a_vlheader->vital_header.totalEntries[2], 1));
+    root = insert_tuple(root, tuple_wrapper("sit", HEX_T, (void *)&a_vlheader->SIT, 1));
+
+    root = insert_tuple(root, tuple_wrapper("ip_mapped_addr", NONE_T, NULL, 1));
+    for (i = 0; i <= MAXSERVERID; i++) {
+	if (a_vlheader->IpMappedAddr[i] != 0)
+	    root = insert_tuple(root, tuple_wrapper("addr", HEX_T, (void *)&a_vlheader->IpMappedAddr[i], 2));
+    }
+
+    export_list(root);
+}
+
 inline void
-exportVolume(struct nvlentry *a_vlentry)
+export_mh_block(afs_uint32 a_addr, struct vldb_tuple *a_root)
+{
+    int i, j;
+    struct extentaddr mh_entry[VL_MHSRV_PERBLK];
+
+    read_vldb((void *)&mh_entry[0], sizeof(mh_entry[0]), a_addr);
+
+    a_root = insert_tuple(a_root, tuple_wrapper("mh_block", NONE_T, NULL, 0));
+    a_root = insert_tuple(a_root, tuple_wrapper("header", NONE_T, NULL, 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("count", INT_T, (void *)&mh_entry[0].ex_count, 2));
+    a_root = insert_tuple(a_root, tuple_wrapper("flags", INT_T, (void *)&mh_entry[0].ex_flags, 2));
+    a_root = insert_tuple(a_root, tuple_wrapper("cont_addrs", NONE_T, NULL, 2));
+
+    for (i = 0; i < VL_MAX_ADDREXTBLKS; i++) {
+	if (ntohl(mh_entry[0].ex_contaddrs[i]) != 0) {
+	    a_root = insert_tuple(a_root, tuple_wrapper("addr", HEX_T, (void *)&mh_entry[0].ex_contaddrs[i], 3));
+	}
+    }
+    for (i = 1; i < VL_MHSRV_PERBLK; i++) {
+	read_vldb((void *)&mh_entry[i], sizeof(mh_entry[i]),
+		 a_addr + (i * sizeof(mh_entry[i])));
+	if (afs_uuid_is_nil(&mh_entry[i].ex_hostuuid))
+	    continue;
+	a_root = insert_tuple(a_root, tuple_wrapper("entry", NONE_T, NULL, 1));
+	a_root = insert_tuple(a_root, tuple_wrapper("host_uuid", UUID_T, (void *)&mh_entry[i].ex_hostuuid, 2));
+	a_root = insert_tuple(a_root, tuple_wrapper("uniquifier", INT_T, (void *)&mh_entry[i].ex_uniquifier, 2));
+	a_root = insert_tuple(a_root, tuple_wrapper("ip_addr", NONE_T, NULL, 2));
+	for (j = 0; j < VL_MAXIPADDRS_PERMH; j++) {
+	    if (mh_entry[i].ex_addrs[j] != 0) 
+		a_root = insert_tuple(a_root, tuple_wrapper("ip", IP_T, (void *)&mh_entry[i].ex_addrs[j], 3));
+	}
+    }
+    export_list(a_root);
+}
+
+inline void
+export_volume(struct nvlentry *a_vlentry, struct vldb_tuple *a_root)
 {
     int i;
 
-    writeYAML("%s:\n", "vol_entry");
-    writeYAML("    volume_id_rw: %u\n", ntohl(a_vlentry->volumeId[0]));
-    writeYAML("    volume_id_ro: %u\n", ntohl(a_vlentry->volumeId[1]));
-    writeYAML("    volume_id_bk: %u\n", ntohl(a_vlentry->volumeId[2]));
-    writeYAML("    flags: %d\n", ntohl(a_vlentry->flags));
-    writeYAML("    lock_afs_id: %d\n", ntohl(a_vlentry->LockAfsId));
-    writeYAML("    lock_time_stamp: %d\n", ntohl(a_vlentry->LockTimestamp));
-    writeYAML("    clone_id: %u\n", ntohl(a_vlentry->cloneId));
-    writeYAML("    next_id_hash_rw: %u\n", ntohl(a_vlentry->nextIdHash[0]));
-    writeYAML("    next_id_hash_ro: %u\n", ntohl(a_vlentry->nextIdHash[1]));
-    writeYAML("    next_id_hash_bk: %u\n", ntohl(a_vlentry->nextIdHash[2]));
-    writeYAML("    next_name_hash: %u\n", ntohl(a_vlentry->nextNameHash));
-    writeYAML("    name: %s\n", a_vlentry->name);
+    a_root = insert_tuple(a_root, tuple_wrapper("vol_entry", NONE_T, NULL, 0));
+    a_root = insert_tuple(a_root, tuple_wrapper("volume_id_rw", UINT_T, (void *)&a_vlentry->volumeId[0], 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("volume_id_ro", UINT_T, (void *)&a_vlentry->volumeId[1], 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("volume_id_bk", UINT_T, (void *)&a_vlentry->volumeId[2], 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("flags", INT_T, (void *)&a_vlentry->flags, 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("lock_afs_id", INT_T, (void *)&a_vlentry->LockAfsId, 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("lock_time_stamp", INT_T, (void *)&a_vlentry->LockTimestamp, 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("clone_id", UINT_T, (void *)&a_vlentry->cloneId, 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("next_id_hash_rw", UINT_T, (void *)&a_vlentry->nextIdHash[0], 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("next_id_hash_ro", UINT_T, (void *)&a_vlentry->nextIdHash[1], 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("next_id_hash_bk", UINT_T, (void *)&a_vlentry->nextIdHash[2], 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("next_name_hash", UINT_T, (void *)&a_vlentry->nextNameHash, 1));
+    a_root = insert_tuple(a_root, tuple_wrapper("name", STR_T, (void *)&a_vlentry->name, 1));
 
-    writeYAML("    %s:\n", "server_number");
+    a_root = insert_tuple(a_root, tuple_wrapper("server_number", NONE_T, NULL, 1));
     for (i = 0; i < NMAXNSERVERS; i++) {
 	if (a_vlentry->serverNumber[i] != 255)
-	    writeYAML("        %d: %u\n", i, a_vlentry->serverNumber[i]);
+	    a_root = insert_tuple(a_root, tuple_wrapper("number", UINT_T, (void *)&a_vlentry->serverNumber[i], 2));
     }
-    writeYAML("    %s:\n", "server_partition");
+    a_root = insert_tuple(a_root, tuple_wrapper("server_partition", NONE_T, NULL, 1));
     for (i = 0; i < NMAXNSERVERS; i++) {
 	if (a_vlentry->serverPartition[i] != 255)
-	    writeYAML("        %d: %u\n", i, a_vlentry->serverPartition[i]);
+	    a_root = insert_tuple(a_root, tuple_wrapper("part", INT_T, (void *)&a_vlentry->serverPartition[i], 2));
     }
-    writeYAML("    %s:\n", "server_flags");
+    a_root = insert_tuple(a_root, tuple_wrapper("server_flags", NONE_T, NULL, 1));
     for (i = 0; i < NMAXNSERVERS; i++) {
 	if (a_vlentry->serverFlags[i] != 255)
-	    writeYAML("        %d: %u\n", i, a_vlentry->serverFlags[i]);
+	    a_root = insert_tuple(a_root, tuple_wrapper("flag", INT_T, (void *)&a_vlentry->serverFlags[i], 2));
     }
+    export_list(a_root);
 }
 
 void
-exportVldbEntries(struct vlheader *a_vlheader)
+export_vldb_entries(struct vlheader *a_vlheader)
 {
     struct nvlentry vlentry;
     afs_uint32 entrysize = 0;
@@ -286,379 +280,33 @@ exportVldbEntries(struct vlheader *a_vlheader)
     afs_uint32 addr_begin = ntohl(a_vlheader->vital_header.headersize);
     afs_uint32 addr_end = ntohl(a_vlheader->vital_header.eofPtr);
     addr_begin += UBIKHDRSIZE;
+    struct vldb_tuple *root = NULL;
 
     for (addr = addr_begin; addr < addr_end; addr += entrysize) {
-	readVLDB((void *)&vlentry, sizeof(vlentry), addr);
+	read_vldb((void *)&vlentry, sizeof(vlentry), addr);
 	switch (ntohl(vlentry.flags)) {
 	case VLCONTBLOCK:
-	    exportMhBlock(addr);
+	    export_mh_block(addr, root);
 	    entrysize = VL_ADDREXTBLK_SIZE;
+	    root = NULL;
 	    break;
 	case VLFREE:
 	    entrysize = sizeof(vlentry);
 	    break;
 	default:
-	    exportVolume(&vlentry);
+	    export_volume(&vlentry, root);
 	    entrysize = sizeof(vlentry);
+	    root = NULL;
 	}
     }
-}
-
-void
-readValueYAML(void *a_buffer, short a_type)
-{
-    yaml_token_t token;
-
-    SKIP_TOKEN();
-    yaml_parser_scan(&parser, &token);
-
-    switch (a_type) {
-    case HEX_T:
-	readTokenYAML("%x", (afs_uint32 *) a_buffer);
-	*(afs_uint32 *) a_buffer = htonl(*(afs_uint32 *) a_buffer);
-	break;
-    case STR_T:
-	memcpy(a_buffer, token.data.scalar.value,
-	       strlen((char *)token.data.scalar.value));
-	break;
-    case IP_T:
-	inet_pton(AF_INET, (char *)token.data.scalar.value, a_buffer);
-	break;
-    case UCHAR_T:
-	readTokenYAML("%hhu", (u_char *) a_buffer);
-	break;
-    case SHORT_T:
-	readTokenYAML("%hu", (short *)a_buffer);
-	*(short *)a_buffer = htons(*(short *)a_buffer);
-	break;
-    default:
-	readTokenYAML("%u", (afs_uint32 *) a_buffer);
-	*(afs_uint32 *) a_buffer = htonl(*(afs_uint32 *) a_buffer);
-    }
-    yaml_token_delete(&token);
-}
-
-void
-readBlockYAML(void *a_buffer, size_t a_size, short a_type)
-{
-    yaml_token_t token;
-    afs_uint32 index;
-
-    SKIP_TOKEN();
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    readTokenYAML("%u", &index);
-	    if (index >= a_size) {
-		fprintf(stderr,
-			"vl_util: index out of range (readBlockYAML)\n");
-		exit(1);
-	    }
-	    if (a_type == UCHAR_T)
-		readValueYAML((void *)&((u_char *) a_buffer)[index], a_type);
-	    else
-		readValueYAML((void *)&((afs_uint32 *) a_buffer)[index],
-			      a_type);
-	}
-	if (token.type != YAML_BLOCK_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_BLOCK_END_TOKEN);
-    yaml_token_delete(&token);
-}
-
-void
-readDoubleBlockYAML(afs_uint32(*a_buffer)[HASHSIZE], size_t a_line,
-		    size_t a_col)
-{
-    yaml_token_t token;
-    afs_uint32 index;
-
-    SKIP_TOKEN();
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    readTokenYAML("%u", &index);
-	    if (index >= a_line) {
-		fprintf(stderr,
-			"vl_util: index out of range (readDoubleBlockYAML)\n");
-		exit(1);
-	    }
-	    readBlockYAML(a_buffer[index], a_col, UINT_T);
-	}
-	if (token.type != YAML_BLOCK_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_BLOCK_END_TOKEN);
-    yaml_token_delete(&token);
-}
-
-void
-importUbikHeader(void)
-{
-    yaml_token_t token;
-    struct ubik_hdr uheader;
-
-    SKIP_TOKEN();
-    memset(&uheader, 0, sizeof(uheader));
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    if (isKeyYAML("magic")) {
-		readValueYAML((void *)&uheader.magic, HEX_T);
-	    } else if (isKeyYAML("size")) {
-		readValueYAML((void *)&uheader.size, SHORT_T);
-	    } else if (isKeyYAML("epoch")) {
-		readValueYAML((void *)&uheader.version.epoch, UINT_T);
-	    } else if (isKeyYAML("counter")) {
-		readValueYAML((void *)&uheader.version.counter, UINT_T);
-	    }
-	}
-	if (token.type != YAML_BLOCK_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_BLOCK_END_TOKEN);
-    yaml_token_delete(&token);
-    write(fd_vldb, (void *)&uheader, UBIKHDRSIZE);
-}
-
-void
-importVldbHeader(void)
-{
-    yaml_token_t token;
-    struct vlheader vlhdr;
-    char *vlhdr_p = (char *)&vlhdr;
-
-    SKIP_TOKEN();
-    memset(&vlhdr, 0, sizeof(vlhdr));
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    if (isKeyYAML("free_ptr") || isKeyYAML("sit")) {
-		readValueYAML((void *)vlhdr_p, HEX_T);
-		vlhdr_p += sizeof(afs_uint32);
-	    } else if (isKeyYAML("ip_mapped_addr")) {
-		readBlockYAML((void *)vlhdr.IpMappedAddr, MAXSERVERID + 1,
-			      HEX_T);
-		vlhdr_p += sizeof(afs_uint32) * (MAXSERVERID + 1);
-	    } else if (isKeyYAML("vol_name_hash")) {
-		readBlockYAML((void *)vlhdr.VolnameHash, HASHSIZE, UINT_T);
-		vlhdr_p += sizeof(afs_uint32) * HASHSIZE;
-	    } else if (isKeyYAML("vol_id_hash")) {
-		readDoubleBlockYAML(vlhdr.VolidHash, MAXTYPES, HASHSIZE);
-		vlhdr_p += sizeof(afs_uint32) * MAXTYPES * HASHSIZE;
-	    } else {
-		readValueYAML((void *)vlhdr_p, UINT_T);
-		vlhdr_p += sizeof(afs_uint32);
-	    }
-	}
-	if (token.type != YAML_BLOCK_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_BLOCK_END_TOKEN);
-    yaml_token_delete(&token);
-    write(fd_vldb, (void *)&vlhdr, sizeof(vlhdr));
-}
-
-void
-importVolEntry(void)
-{
-    yaml_token_t token;
-    struct nvlentry vlentry;
-    char *vlentry_p = (char *)&vlentry;
-
-    SKIP_TOKEN();
-    memset(&vlentry, 0, sizeof(vlentry));
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    if (isKeyYAML("name")) {
-		readValueYAML((void *)vlentry_p, STR_T);
-		vlentry_p += sizeof(vlentry.name);
-	    } else if (isKeyYAML("server_number")) {
-		memset(vlentry.serverNumber, 255,
-		       sizeof(vlentry.serverNumber));
-		readBlockYAML((void *)vlentry.serverNumber, NMAXNSERVERS,
-			      UCHAR_T);
-		vlentry_p += sizeof(vlentry.serverNumber);
-	    } else if (isKeyYAML("server_partition")) {
-		memset(vlentry.serverPartition, 255,
-		       sizeof(vlentry.serverPartition));
-		readBlockYAML((void *)vlentry.serverPartition, NMAXNSERVERS,
-			      UCHAR_T);
-		vlentry_p += sizeof(vlentry.serverPartition);
-	    } else if (isKeyYAML("server_flags")) {
-		memset(vlentry.serverFlags, 255, sizeof(vlentry.serverFlags));
-		readBlockYAML((void *)vlentry.serverFlags, NMAXNSERVERS,
-			      UCHAR_T);
-		vlentry_p += sizeof(vlentry.serverFlags);
-	    } else {
-		readValueYAML((void *)vlentry_p, UINT_T);
-		vlentry_p += sizeof(afs_uint32);
-	    }
-	}
-	if (token.type != YAML_BLOCK_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_BLOCK_END_TOKEN);
-    yaml_token_delete(&token);
-    write(fd_vldb, (void *)&vlentry, sizeof(vlentry));
-}
-
-void
-importMhHeader(struct extentaddr *a_mhentry)
-{
-    yaml_token_t token;
-
-    SKIP_TOKEN();
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    if (isKeyYAML("count")) {
-		readValueYAML((void *)&a_mhentry->ex_count, UINT_T);
-	    } else if (isKeyYAML("flags")) {
-		readValueYAML((void *)&a_mhentry->ex_flags, UINT_T);
-	    } else if (isKeyYAML("cont_addrs")) {
-		readBlockYAML((void *)&a_mhentry->ex_contaddrs,
-			      VL_MAX_ADDREXTBLKS, HEX_T);
-	    }
-	}
-	if (token.type != YAML_BLOCK_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_BLOCK_END_TOKEN);
-    yaml_token_delete(&token);
-}
-
-void
-importMhEntry(struct extentaddr *a_mhentry)
-{
-    yaml_token_t token;
-    char uuid_str[40];
-
-    SKIP_TOKEN();
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    if (isKeyYAML("host_uuid")) {
-		readValueYAML((void *)uuid_str, STR_T);
-		afsUUID_from_string(uuid_str, &a_mhentry->ex_hostuuid);
-	    } else if (isKeyYAML("uniquifier")) {
-		readValueYAML((void *)&a_mhentry->ex_uniquifier, UINT_T);
-	    } else if (isKeyYAML("ip_addr")) {
-		readBlockYAML((void *)a_mhentry->ex_addrs,
-			      VL_MAXIPADDRS_PERMH, IP_T);
-	    }
-	}
-	if (token.type != YAML_BLOCK_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_BLOCK_END_TOKEN);
-    yaml_token_delete(&token);
-}
-
-void
-importMhBlock(afs_uint32 a_mhblock_no)
-{
-    yaml_token_t token;
-    struct extentaddr mhblock[VL_MHSRV_PERBLK];
-    afs_uint32 mhblock_addr;
-    afs_uint32 mh_entry_no = 0;
-
-    SKIP_TOKEN();
-    memset(mhblock, 0, sizeof(mhblock));
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    if (isKeyYAML("header")) {
-		importMhHeader(&mhblock[mh_entry_no]);
-		mhblock_addr =
-		    mhblock[mh_entry_no].ex_contaddrs[a_mhblock_no];
-		mh_entry_no++;
-	    } else if (isKeyYAML("entry")) {
-		importMhEntry(&mhblock[mh_entry_no]);
-		mh_entry_no++;
-	    }
-	}
-	if (token.type != YAML_BLOCK_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_BLOCK_END_TOKEN);
-    yaml_token_delete(&token);
-    lseek(fd_vldb, ntohl(mhblock_addr) + UBIKHDRSIZE, 0);
-    write(fd_vldb, (void *)mhblock, sizeof(mhblock));
-}
-
-void
-readYAML(void)
-{
-    yaml_token_t token;
-    afs_uint32 mhblock_no = 0;
-
-    do {
-	yaml_parser_scan(&parser, &token);
-	if (token.type == YAML_KEY_TOKEN) {
-	    yaml_token_delete(&token);
-	    yaml_parser_scan(&parser, &token);
-	    if (isKeyYAML("ubik_header")) {
-		importUbikHeader();
-	    } else if (isKeyYAML("vldb_header")) {
-		importVldbHeader();
-	    } else if (isKeyYAML("vol_entry")) {
-		importVolEntry();
-	    } else if (isKeyYAML("mh_block")) {
-		importMhBlock(mhblock_no);
-		mhblock_no++;
-	    }
-	}
-	if (token.type != YAML_STREAM_END_TOKEN)
-	    yaml_token_delete(&token);
-    } while (token.type != YAML_STREAM_END_TOKEN);
-    yaml_token_delete(&token);
-}
-*/
-static int
-getFileExt(const char *a_file)
-{
-    char *ext = strrchr(a_file, '.');
-
-    if (ext == NULL) {
-	fprintf(stderr, "vl_util: could not get the extension of %s\n", a_file);
-	exit(1);
-    }
-
-    ext += 1;
-    if (!strncmp(ext, "DB", 2)) {
-	return VLDB;
-    } else if (!strncmp(ext, "yaml", 4)) {
-	return YAML;
-    }
-    return -1;
 }
 
 static int
-CommandProc(struct cmd_syndesc *a_cs, void *a_rock)
+command_proc(struct cmd_syndesc *a_cs, void *a_rock)
 {
-    /*struct vlheader vl_hdr;*/
     char *input_file;
     char *output_ext;
-    int op_no = OP_EXPORT;
+    struct vlheader vl_hdr;
 
     input_file = a_cs->parms[0].items->data;	/* -input */
     output_ext = a_cs->parms[1].items->data;	/* -format */
@@ -668,31 +316,16 @@ CommandProc(struct cmd_syndesc *a_cs, void *a_rock)
 	exit(1);
     }
     output_format = YAML;
-
-    if (getFileExt(input_file) != VLDB) {
-	op_no = OP_IMPORT;
-    }
-    fd_input = fopen(input_file, op_no == OP_EXPORT ? "rb" : "r");
+    fd_input = fopen(input_file, "rb"); 
 
     if (fd_input == NULL) {
-	fprintf(stderr, "vl_util: cannot open %s: %s\n", input_file,
-		strerror(errno));
+	fprintf(stderr, "vl_util: cannot open %s\n", input_file);
 	exit(1);
     }
 
-    if (op_no == OP_EXPORT) {
-	exportUbikHeader();
-	/*exportVldbHeader(&vl_hdr, sizeof(vl_hdr));
-	exportVldbEntries(&vl_hdr);*/
-    } /*else {
-	if (!yaml_parser_initialize(&parser)) {
-	    fprintf(stderr, "vl_util: could not initialize the parser\n");
-	    exit(1);
-	}
-	yaml_parser_set_input_file(&parser, fd_input);
-	readYAML();
-	yaml_parser_delete(&parser);
-    }*/
+    export_ubik_header();
+    export_vldb_header(&vl_hdr);
+    export_vldb_entries(&vl_hdr);
     fclose(fd_input);
 
     return 0;
@@ -703,10 +336,9 @@ main(int argc, char **argv)
 {
     struct cmd_syndesc *cs;
 
-    cs = cmd_CreateSyntax(NULL, CommandProc, NULL,
-			  "import/export volume location database");
-    cmd_AddParm(cs, "-input", CMD_SINGLE, CMD_REQUIRED, "vldb/yaml (so far...");
-    cmd_AddParm(cs, "-format", CMD_SINGLE, CMD_REQUIRED, "output format (yaml so far...)");
+    cs = cmd_CreateSyntax(NULL, command_proc, NULL, "export VLDB");
+    cmd_AddParm(cs, "-input", CMD_SINGLE, CMD_REQUIRED, "input file");
+    cmd_AddParm(cs, "-format", CMD_SINGLE, CMD_REQUIRED, "output format");
 
     return cmd_Dispatch(argc, argv);
 }
