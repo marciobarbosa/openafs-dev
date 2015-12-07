@@ -259,7 +259,7 @@ hpr_Initialize(struct ubik_client **uclient)
     afs_int32 code;
     struct rx_connection *serverconns[MAXSERVERS];
     struct rx_securityClass *sc;
-    struct afsconf_dir *tdir;
+    struct afsconf_dir *tdir, *tconfdir;
     afs_int32 scIndex;
     struct afsconf_cell info;
     afs_int32 i;
@@ -322,7 +322,13 @@ hpr_Initialize(struct ubik_client **uclient)
     if (code) {
 	ViceLog(0, ("hpr_Initialize: ubik client init failed. [%d]", code));
     }
-    afsconf_Close(tdir);
+
+    tconfdir = pthread_getspecific(viced_confdir_key);
+    if (tconfdir) {
+	free(tconfdir);
+    }
+
+    opr_Verify(pthread_setspecific(viced_confdir_key, tdir) == 0);
     code = rxs_Release(sc);
     return code;
 }
@@ -342,8 +348,16 @@ static_inline int
 getThreadClient(struct ubik_client **client)
 {
     int code;
+    struct afsconf_dir *tconfdir;
 
     *client = pthread_getspecific(viced_uclient_key);
+    tconfdir = pthread_getspecific(viced_confdir_key);
+
+    if (*client && tconfdir && !afsconf_UpToDate(tconfdir)) {
+	ViceLog(0, ("getThreadClient: updating pt connections...\n"));
+	hpr_End(*client);
+	*client = NULL;
+    }
     if (*client != NULL)
 	return 0;
 
