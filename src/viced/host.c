@@ -325,7 +325,7 @@ hpr_Initialize(struct ubik_client **uclient)
 
     tconfdir = pthread_getspecific(viced_confdir_key);
     if (tconfdir) {
-	free(tconfdir);
+	afsconf_Close(tconfdir);
     }
 
     opr_Verify(pthread_setspecific(viced_confdir_key, tdir) == 0);
