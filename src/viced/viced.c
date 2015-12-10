@@ -174,6 +174,7 @@ static int offline_shutdown_timeout = -1; /* -offline-shutdown-timeout option */
 struct timeval tp;
 
 pthread_key_t viced_uclient_key;
+pthread_key_t viced_confdir_key;
 
 /*
  * FileServer's name and IP address, both network byte order and
@@ -1481,6 +1482,7 @@ InitPR(void)
     }
 
     opr_Verify(pthread_key_create(&viced_uclient_key, NULL) == 0);
+    opr_Verify(pthread_key_create(&viced_confdir_key, NULL) == 0);
 
     SystemId = SYSADMINID;
     SystemAnyUser = ANYUSERID;

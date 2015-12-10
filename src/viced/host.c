@@ -266,8 +266,17 @@ hpr_Initialize(struct ubik_client **uclient)
     char cellstr[64];
 
     *uclient = pthread_getspecific(viced_uclient_key);
-    if (*uclient != NULL)
-	return 0;
+    tdir = pthread_getspecific(viced_confdir_key);
+
+    if (*uclient != NULL) {
+	if (afsconf_UpToDate(tdir)) {
+	    return 0;
+	} else {
+	    afsconf_Close(tdir);
+	    hpr_End(*uclient);
+	    *uclient = NULL;
+	}
+    }
 
     tdir = afsconf_Open(FS_configPath);
     if (!tdir) {
@@ -280,7 +289,6 @@ hpr_Initialize(struct ubik_client **uclient)
     code = afsconf_GetLocalCell(tdir, cellstr, sizeof(cellstr));
     if (code) {
 	ViceLog(0, ("hpr_Initialize: Could not get local cell. [%d]", code));
-	afsconf_Close(tdir);
 	return code;
     }
 
@@ -288,14 +296,12 @@ hpr_Initialize(struct ubik_client **uclient)
     if (code) {
 	ViceLog(0, ("hpr_Initialize: Could not locate cell %s in %s/%s",
 		    cellstr, tdir->name, AFSDIR_CELLSERVDB_FILE));
-	afsconf_Close(tdir);
 	return code;
     }
 
     code = rx_Init(0);
     if (code) {
 	ViceLog(0, ("hpr_Initialize: Could not initialize rx."));
-	afsconf_Close(tdir);
         return code;
     }
 
@@ -327,8 +333,8 @@ hpr_Initialize(struct ubik_client **uclient)
 	ViceLog(0, ("hpr_Initialize: ubik client init failed. [%d]", code));
     } else {
 	opr_Verify(pthread_setspecific(viced_uclient_key, *uclient) == 0);
+	opr_Verify(pthread_setspecific(viced_confdir_key, tdir) == 0);
     }
-    afsconf_Close(tdir);
     code = rxs_Release(sc);
     return code;
 }
