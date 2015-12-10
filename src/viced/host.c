@@ -269,6 +269,7 @@ hpr_Initialize(struct ubik_client **uclient)
     tdir = pthread_getspecific(viced_confdir_key);
 
     if (*uclient != NULL) {
+	/* tdir will never be NULL here */
 	if (afsconf_UpToDate(tdir)) {
 	    return 0;
 	} else {
@@ -277,7 +278,7 @@ hpr_Initialize(struct ubik_client **uclient)
 	    *uclient = NULL;
 	}
     }
-
+    /* from here, *uclient and tdir will always be NULL */
     tdir = afsconf_Open(FS_configPath);
     if (!tdir) {
 	ViceLog(0,
