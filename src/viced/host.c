@@ -265,6 +265,10 @@ hpr_Initialize(struct ubik_client **uclient)
     afs_int32 i;
     char cellstr[64];
 
+    *uclient = pthread_getspecific(viced_uclient_key);
+    if (*uclient != NULL)
+	return 0;
+
     tdir = afsconf_Open(FS_configPath);
     if (!tdir) {
 	ViceLog(0,
@@ -321,6 +325,8 @@ hpr_Initialize(struct ubik_client **uclient)
     code = ubik_ClientInit(serverconns, uclient);
     if (code) {
 	ViceLog(0, ("hpr_Initialize: ubik client init failed. [%d]", code));
+    } else {
+	opr_Verify(pthread_setspecific(viced_uclient_key, *uclient) == 0);
     }
     afsconf_Close(tdir);
     code = rxs_Release(sc);
@@ -338,24 +344,6 @@ hpr_End(struct ubik_client *uclient)
     return code;
 }
 
-static_inline int
-getThreadClient(struct ubik_client **client)
-{
-    int code;
-
-    *client = pthread_getspecific(viced_uclient_key);
-    if (*client != NULL)
-	return 0;
-
-    code = hpr_Initialize(client);
-    if (code)
-	return code;
-
-    opr_Verify(pthread_setspecific(viced_uclient_key, *client) == 0);
-
-    return 0;
-}
-
 int
 hpr_GetHostCPS(afs_int32 host, prlist *CPS)
 {
@@ -363,7 +351,7 @@ hpr_GetHostCPS(afs_int32 host, prlist *CPS)
     afs_int32 over;
     struct ubik_client *uclient;
 
-    code = getThreadClient(&uclient);
+    code = hpr_Initialize(&uclient);
     if (code)
 	return code;
 
@@ -388,7 +376,7 @@ hpr_NameToId(namelist *names, idlist *ids)
     afs_int32 i;
     struct ubik_client *uclient;
 
-    code = getThreadClient(&uclient);
+    code = hpr_Initialize(&uclient);
     if (code)
 	return code;
 
@@ -404,7 +392,7 @@ hpr_IdToName(idlist *ids, namelist *names)
     afs_int32 code;
     struct ubik_client *uclient;
 
-    code = getThreadClient(&uclient);
+    code = hpr_Initialize(&uclient);
     if (code)
 	return code;
 
@@ -419,7 +407,7 @@ hpr_GetCPS(afs_int32 id, prlist *CPS)
     afs_int32 over;
     struct ubik_client *uclient;
 
-    code = getThreadClient(&uclient);
+    code = hpr_Initialize(&uclient);
     if (code)
 	return code;
 
