@@ -265,19 +265,26 @@ hpr_Initialize(struct ubik_client **uclient)
     afs_int32 i;
     char cellstr[64];
 
+    *uclient = pthread_getspecific(viced_uclient_key);
+    if (*uclient != NULL) {
+	code = 0;
+	goto done;
+    }
+
     tdir = afsconf_Open(FS_configPath);
     if (!tdir) {
 	ViceLog(0,
 		("hpr_Initialize: Could not open configuration directory: %s",
 		 FS_configPath));
-	return -1;
+	code = -1;
+	goto done;
     }
 
     code = afsconf_GetLocalCell(tdir, cellstr, sizeof(cellstr));
     if (code) {
 	ViceLog(0, ("hpr_Initialize: Could not get local cell. [%d]", code));
 	afsconf_Close(tdir);
-	return code;
+	goto done;
     }
 
     code = afsconf_GetCellInfo(tdir, cellstr, "afsprot", &info);
@@ -285,14 +292,14 @@ hpr_Initialize(struct ubik_client **uclient)
 	ViceLog(0, ("hpr_Initialize: Could not locate cell %s in %s/%s",
 		    cellstr, tdir->name, AFSDIR_CELLSERVDB_FILE));
 	afsconf_Close(tdir);
-	return code;
+	goto done;
     }
 
     code = rx_Init(0);
     if (code) {
 	ViceLog(0, ("hpr_Initialize: Could not initialize rx."));
 	afsconf_Close(tdir);
-        return code;
+        goto done;
     }
 
     /* Most callers use secLevel==1, however, the fileserver uses secLevel==2
@@ -321,9 +328,12 @@ hpr_Initialize(struct ubik_client **uclient)
     code = ubik_ClientInit(serverconns, uclient);
     if (code) {
 	ViceLog(0, ("hpr_Initialize: ubik client init failed. [%d]", code));
+    } else {
+	opr_Verify(pthread_setspecific(viced_uclient_key, *uclient) == 0);
     }
     afsconf_Close(tdir);
     code = rxs_Release(sc);
+  done:
     return code;
 }
 
@@ -338,24 +348,6 @@ hpr_End(struct ubik_client *uclient)
     return code;
 }
 
-static_inline int
-getThreadClient(struct ubik_client **client)
-{
-    int code;
-
-    *client = pthread_getspecific(viced_uclient_key);
-    if (*client != NULL)
-	return 0;
-
-    code = hpr_Initialize(client);
-    if (code)
-	return code;
-
-    opr_Verify(pthread_setspecific(viced_uclient_key, *client) == 0);
-
-    return 0;
-}
-
 int
 hpr_GetHostCPS(afs_int32 host, prlist *CPS)
 {
@@ -363,7 +355,7 @@ hpr_GetHostCPS(afs_int32 host, prlist *CPS)
     afs_int32 over;
     struct ubik_client *uclient;
 
-    code = getThreadClient(&uclient);
+    code = hpr_Initialize(&uclient);
     if (code)
 	return code;
 
@@ -388,7 +380,7 @@ hpr_NameToId(namelist *names, idlist *ids)
     afs_int32 i;
     struct ubik_client *uclient;
 
-    code = getThreadClient(&uclient);
+    code = hpr_Initialize(&uclient);
     if (code)
 	return code;
 
@@ -404,7 +396,7 @@ hpr_IdToName(idlist *ids, namelist *names)
     afs_int32 code;
     struct ubik_client *uclient;
 
-    code = getThreadClient(&uclient);
+    code = hpr_Initialize(&uclient);
     if (code)
 	return code;
 
@@ -419,7 +411,7 @@ hpr_GetCPS(afs_int32 id, prlist *CPS)
     afs_int32 over;
     struct ubik_client *uclient;
 
-    code = getThreadClient(&uclient);
+    code = hpr_Initialize(&uclient);
     if (code)
 	return code;
 
