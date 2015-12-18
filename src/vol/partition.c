@@ -443,6 +443,10 @@ VAttachPartitions2(void)
 	strncat(pname, de->d_name, 20);
 	pname[sizeof(pname) - 1] = '\0';
 
+#ifdef AFS_DEMAND_ATTACH_FS
+	if (VLookupPartition_r(pname) != NULL)
+	    continue;
+#endif
 	/* Only keep track of "/vicepx" partitions since automounter
 	 * may hose us */
 	if (VIsAlwaysAttach(pname, &wouldattach)) {
@@ -880,7 +884,10 @@ VAttachPartitions(void)
 	/* If we're going to always attach this partition, do it later. */
 	if (VIsAlwaysAttach(mntent->mnt_dir, NULL))
 	    continue;
-
+#ifdef AFS_DEMAND_ATTACH_FS
+	if (VLookupPartition_r(mntent->mnt_dir) == NULL)
+	    continue;
+#endif
 	if (VCheckPartition(mntent->mnt_dir, mntent->mnt_fsname, 0) < 0)
 	    errors++;
     }

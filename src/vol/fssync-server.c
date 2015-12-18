@@ -145,6 +145,8 @@ static void GetHandler(fd_set * fdsetp, int *maxfdp);
 #endif
 extern int LogLevel;
 
+extern int VInit;
+
 static afs_int32 FSYNC_com_VolOp(osi_socket fd, SYNC_command * com, SYNC_response * res);
 
 #ifdef AFS_DEMAND_ATTACH_FS
@@ -182,6 +184,7 @@ static void FSYNC_com_to_info(FSSYNC_VolOp_command * vcom, FSSYNC_VolOp_info * i
 
 static int FSYNC_partMatch(FSSYNC_VolOp_command * vcom, Volume * vp, int match_anon);
 
+static afs_int32 FSYNC_com_LoadPart(osi_socket fd, SYNC_command * com, SYNC_response * res);
 
 /*
  * This lock controls access to the handler array. The overhead
@@ -533,6 +536,9 @@ FSYNC_com(osi_socket fd)
 	break;
     case FSYNC_VOL_QUERY_VNODE:
 	res.hdr.response = FSYNC_com_VnQry(fd, &com, &res);
+	break;
+    case FSYNC_PART_LOAD:
+	res.hdr.response = FSYNC_com_LoadPart(fd, &com, &res);
 	break;
 #ifdef AFS_DEMAND_ATTACH_FS
     case FSYNC_VG_ADD:
@@ -1797,6 +1803,41 @@ FSYNC_com_VnQry(osi_socket fd, SYNC_command * com, SYNC_response * res)
 #endif
 
  done:
+    return code;
+}
+
+static afs_int32
+FSYNC_com_LoadPart(osi_socket fd, SYNC_command * com, SYNC_response * res)
+{
+    afs_int32 code = SYNC_OK;
+#ifdef AFS_DEMAND_ATTACH_FS
+    SYNC_response salv_res;
+    SALVSYNC_response_hdr salv_hdr;
+#endif
+
+    if (com->recv_len != (sizeof(com->hdr))) {
+	res->hdr.reason = SYNC_REASON_MALFORMED_PACKET;
+	res->hdr.flags |= SYNC_FLAG_CHANNEL_SHUTDOWN;
+	code = SYNC_COM_ERROR;
+	goto done;
+    }
+    VInit = 1;
+    VOL_UNLOCK;
+    code = VAttachPartitions();
+
+    if (code) {
+	VOL_LOCK;
+	goto done;
+    }
+    VInitAttachVolumes(fileServer);
+    VOL_LOCK;
+#ifdef AFS_DEMAND_ATTACH_FS
+    salv_res.payload.buf = &salv_hdr;
+    salv_res.payload.len = sizeof(salv_hdr);
+    code = SALVSYNC_SalvageVolume(0, NULL, SALVSYNC_LOADPART, SALVSYNC_WHATEVER, 0, &salv_res);
+#endif
+
+  done:
     return code;
 }
 

@@ -113,6 +113,7 @@ static afs_int32 SALVSYNC_com_Cancel(SALVSYNC_command * com, SALVSYNC_response *
 static afs_int32 SALVSYNC_com_Query(SALVSYNC_command * com, SALVSYNC_response * res);
 static afs_int32 SALVSYNC_com_CancelAll(SALVSYNC_command * com, SALVSYNC_response * res);
 static afs_int32 SALVSYNC_com_Link(SALVSYNC_command * com, SALVSYNC_response * res);
+static afs_int32 SALVSYNC_com_LoadPart(SALVSYNC_command * com, SALVSYNC_response * res);
 
 
 extern int LogLevel;
@@ -458,6 +459,11 @@ SALVSYNC_com(osi_socket fd)
 	/* link a clone to its parent in the scheduler */
 	res.hdr.response = SALVSYNC_com_Link(&scom, &sres);
 	break;
+    case SALVSYNC_LOADPART:
+	/* load new partitions */
+	res.hdr.response = SALVSYNC_com_LoadPart(&scom, &sres);
+	break;
+
     default:
 	res.hdr.response = SYNC_BAD_COMMAND;
 	break;
@@ -700,6 +706,25 @@ SALVSYNC_com_Link(SALVSYNC_command * com, SALVSYNC_response * res)
     }
 
  done:
+    return code;
+}
+
+static afs_int32
+SALVSYNC_com_LoadPart(SALVSYNC_command * com, SALVSYNC_response * res)
+{
+    afs_int32 code = SYNC_OK;
+
+    VInit = 1;
+    VOL_UNLOCK;
+    code = VAttachPartitions();
+
+    if (code) {
+	goto done;
+    }
+    VInitAttachVolumes(salvageServer);
+
+  done:
+    VOL_LOCK;
     return code;
 }
 

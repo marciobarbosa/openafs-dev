@@ -3976,6 +3976,23 @@ SyncServer(struct cmd_syndesc *as, void *arock)
 }
 
 static int
+LoadPartitions(struct cmd_syndesc *as, void *arock)
+{
+    afs_uint32 aserver;
+    afs_int32 code;
+
+    aserver = GetServer(as->parms[0].items->data);
+    if (aserver == 0) {
+	fprintf(STDERR, "vos: server '%s' not found in host table\n",
+		as->parms[0].items->data);
+	exit(1);
+    }
+    code = UV_LoadPartitions(aserver);
+    code = SyncVldb(as, NULL);
+    return code;
+}
+
+static int
 VolumeInfoCmd(char *name)
 {
     struct nvldbentry entry;
@@ -6382,6 +6399,10 @@ main(int argc, char **argv)
     ts = cmd_CreateSyntax("remaddrs", RemoveAddrs, NULL, 0,
 			  "remove the list of IP addresses for a given UUID in the VLDB");
     cmd_AddParm(ts, "-uuid", CMD_SINGLE, 0, "uuid of server");
+    COMMONPARMS;
+
+    ts = cmd_CreateSyntax("loadpart", LoadPartitions, NULL, 0, "load new partitions");
+    cmd_AddParm(ts, "-server", CMD_SINGLE, 0, "machine name");
     COMMONPARMS;
 
     code = cmd_Dispatch(argc, argv);

@@ -39,6 +39,7 @@ typedef enum {
     SALVSYNC_OP_QUERY         = SYNC_COM_CODE_DECL(4),     /**< query status of a salvage */
     SALVSYNC_OP_CANCELALL     = SYNC_COM_CODE_DECL(5),     /**< cancel all pending salvages */
     SALVSYNC_OP_LINK          = SYNC_COM_CODE_DECL(6),     /**< link a clone to its parent */
+    SALVSYNC_OP_LOADPART      = SYNC_COM_CODE_DECL(7),     /**< load new partitions */
     SALVSYNC_OP_MAX_ID /* must be at end of enum */
 } SALVSYNC_op_code_t;
 
@@ -49,6 +50,7 @@ typedef enum {
 #define SALVSYNC_QUERY       SALVSYNC_OP_QUERY
 #define SALVSYNC_CANCELALL   SALVSYNC_OP_CANCELALL
 #define SALVSYNC_LINK        SALVSYNC_OP_LINK
+#define SALVSYNC_LOADPART    SALVSYNC_OP_LOADPART
 
 /**
  * SALVSYNC protocol reason codes.

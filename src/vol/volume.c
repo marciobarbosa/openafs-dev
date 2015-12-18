@@ -841,6 +841,8 @@ VInitAttachVolumes(ProgramType pt)
 	opr_mutex_init(&pq.mutex);
 	for (parts = 0, diskP = DiskPartitionList; diskP; diskP = diskP->next, parts++) {
 	    struct diskpartition_queue_t *dp;
+	    if (diskP->vol_list.len)
+		continue;
 	    dp = malloc(sizeof(struct diskpartition_queue_t));
 	    opr_Assert(dp != NULL);
 	    dp->diskP = diskP;

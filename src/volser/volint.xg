@@ -47,6 +47,7 @@ statindex 16
 #define	    VOLSETINFO		126
 #define	    VOLXLISTPARTITIONS	127
 #define	    VOLFORWARDMULTIPLE  128
+#define	    VOLLOADPARTITIONS   129
 #define     VOLCONVERTRO        65536
 #define     VOLGETSIZE          65537
 #define     VOLDUMPV2           65538
@@ -347,6 +348,9 @@ proc SignalRestore(
 proc ListPartitions(
   OUT struct pIDs *partIDs
 ) = VOLLISTPARTITIONS;
+
+proc LoadPartitions(
+) = VOLLOADPARTITIONS;
 
 proc ListVolumes(
   IN afs_int32 partID,

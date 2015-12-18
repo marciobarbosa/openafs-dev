@@ -5369,6 +5369,19 @@ UV_ListPartitions(afs_uint32 aserver, struct partList *ptrPartList,
     return code;
 }
 
+/*load new partitions on <aserver> */
+int
+UV_LoadPartitions(afs_uint32 aserver)
+{
+    struct rx_connection *aconn;
+    afs_int32 code;
+
+    aconn = UV_Bind(aserver, AFSCONF_VOLUMEPORT);
+    code = AFSVolLoadPartitions(aconn);
+    if (aconn)
+	rx_DestroyConnection(aconn);
+    return code;
+}
 
 /*zap the list of volumes specified by volPtrArray (the volCloneId field).
  This is used by the backup system */

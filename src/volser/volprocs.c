@@ -61,6 +61,7 @@ extern int DoLogging;
 extern struct afsconf_dir *tdir;
 extern int DoPreserveVolumeStats;
 extern int restrictedQueryLevel;
+extern int VInit;
 
 extern void LogError(afs_int32 errcode);
 
@@ -2550,6 +2551,33 @@ SAFSVolListVolumes(struct rx_call *acid, afs_int32 partid, afs_int32 flags,
 
     code = VolListVolumes(acid, partid, flags, volumeInfo);
     osi_auditU(acid, VS_ListVolEvent, code, AUD_END);
+    return code;
+}
+
+/*load new partitions */
+afs_int32
+SAFSVolLoadPartitions(struct rx_call *acid)
+{
+    afs_int32 code;
+    SYNC_PROTO_BUF_DECL(res_buf);
+    SYNC_response res;
+
+    res.hdr.response_len = sizeof(res.hdr);
+    res.payload.buf = res_buf;
+    res.payload.len = SYNC_PROTO_MAX_LEN;
+    code = FSYNC_GenericOp(NULL, 0, FSYNC_PART_LOAD, FSYNC_WHATEVER, &res);
+
+    if (code) {
+	goto done;
+    }
+
+    VOL_LOCK;
+    VInit = 1;
+    VOL_UNLOCK;
+    code = VAttachPartitions();
+    VInitAttachVolumes(volumeServer);
+
+  done:
     return code;
 }
 

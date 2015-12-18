@@ -81,6 +81,7 @@ extern int UV_ChangeLocation(afs_uint32 server, afs_int32 part,
 			     afs_uint32 volid);
 extern int UV_ListPartitions(afs_uint32 aserver, struct partList *ptrPartList,
 			     afs_int32 * cntp);
+extern int UV_LoadPartitions(afs_uint32 aserver);
 extern int UV_ZapVolumeClones(afs_uint32 aserver, afs_int32 apart,
 			      struct volDescription *volPtr,
 			      afs_int32 arraySize);
