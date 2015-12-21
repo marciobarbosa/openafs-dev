@@ -1366,7 +1366,7 @@ afs_CheckInit(void)
     return code;
 }
 
-int afs_shuttingdown = 0;
+enum afs_shutdown_state afs_shuttingdown = afs_shutdown_no;
 void
 afs_shutdown(void)
 {
@@ -1381,15 +1381,15 @@ afs_shutdown(void)
       return;
     }
 
-    if (afs_shuttingdown)
+    if (afs_shuttingdown != afs_shutdown_no)
 	return;
 
-    /* Give up all of our callbacks if we can. This must be done before setting
-     * afs_shuttingdown, since it calls afs_InitReq, which will fail if
-     * afs_shuttingdown is set. */
+    afs_shuttingdown = afs_shutdown_flushing_cb;
+
+    /* Give up all of our callbacks if we can. */
     afs_FlushVCBs(2);
 
-    afs_shuttingdown = 1;
+    afs_shuttingdown = afs_shutdown_yes;
 
     if (afs_cold_shutdown)
 	afs_warn("afs: COLD ");
@@ -1510,7 +1510,7 @@ afs_shutdown(void)
     memset(&afs_stats_cmfullperf, 0, sizeof(struct afs_stats_CMFullPerf));
     afs_warn(" ALL allocated tables... ");
 
-    afs_shuttingdown = 0;
+    afs_shuttingdown = afs_shutdown_no;
     afs_warn("done\n");
 
     return;			/* Just kill daemons for now */

@@ -758,7 +758,7 @@ osi_NetIfPoller()
     if (li)
         (void) ldi_ident_release(li);
 
-    if (afs_shuttingdown) {
+    if (afs_shuttingdown != afs_shutdown_no) {
 	/* do not schedule to run again if we're shutting down */
 	return;
     }

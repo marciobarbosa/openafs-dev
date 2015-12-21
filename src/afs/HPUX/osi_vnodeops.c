@@ -297,7 +297,7 @@ afs_inactive(avc, acred)
     struct vnode *vp = AFSTOV(avc);
     ulong_t context;
     lock_t *sv_lock;
-    if (afs_shuttingdown)
+    if (afs_shuttingdown != afs_shutdown_no)
 	return;
 
     /*

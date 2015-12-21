@@ -33,7 +33,7 @@ afs_vrdwr(struct usr_vnode *avc, struct usr_uio *uio, int rw, int io,
 int
 afs_inactive(struct vcache *avc, afs_ucred_t *acred)
 {
-    if (afs_shuttingdown)
+    if (afs_shuttingdown != afs_shutdown_no)
 	return 0;
 
     usr_assert(avc->vrefCount == 0);

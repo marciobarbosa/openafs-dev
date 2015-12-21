@@ -241,7 +241,7 @@ afs_getattr(OSI_VC_DECL(avc), struct vattr *attrs, afs_ucred_t *acred)
 
     AFS_DISCON_LOCK();
 
-    if (afs_shuttingdown) {
+    if (afs_shuttingdown != afs_shutdown_no) {
 	AFS_DISCON_UNLOCK();
 	return EIO;
     }
