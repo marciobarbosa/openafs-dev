@@ -323,7 +323,7 @@ hpr_Initialize(struct ubik_client **uclient)
 	ViceLog(0, ("hpr_Initialize: ubik client init failed. [%d]\n", code));
     }
     afsconf_Close(tdir);
-    code = rxs_Release(sc);
+    rxs_Release(sc);
     return code;
 }
 
