@@ -266,9 +266,17 @@ hpr_Initialize(struct ubik_client **uclient)
     char cellstr[64];
 
     *uclient = pthread_getspecific(viced_uclient_key);
+    tdir = pthread_getspecific(viced_confdir_key);
+
     if (*uclient != NULL) {
-	code = 0;
-	goto done;
+	if (afsconf_UpToDate(tdir)) {
+	    code = 0;
+	    goto done;
+	} else {
+	    afsconf_Close(tdir);
+	    hpr_End(*uclient);
+	    *uclient = NULL;
+	}
     }
 
     tdir = afsconf_Open(FS_configPath);
@@ -327,13 +335,18 @@ hpr_Initialize(struct ubik_client **uclient)
 
     code = ubik_ClientInit(serverconns, uclient);
     if (code) {
+	afsconf_Close(tdir);
 	ViceLog(0, ("hpr_Initialize: ubik client init failed. [%d]\n", code));
     } else {
 	opr_Verify(pthread_setspecific(viced_uclient_key, *uclient) == 0);
+	opr_Verify(pthread_setspecific(viced_confdir_key, tdir) == 0);
     }
-    afsconf_Close(tdir);
     rxs_Release(sc);
   done:
+    if (code) {
+	opr_Verify(pthread_setspecific(viced_uclient_key, NULL) == 0);
+	opr_Verify(pthread_setspecific(viced_confdir_key, NULL) == 0);
+    }
     return code;
 }
 
