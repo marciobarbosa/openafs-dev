@@ -405,10 +405,6 @@ CallPreamble(struct rx_call *acall, int activecall, struct AFSFid *Fid,
 	    uclient = NULL;
 	}
 	code = hpr_Initialize(&uclient);
-
-	if (!code)
-	    opr_Verify(pthread_setspecific(viced_uclient_key,
-					   (void *)uclient) == 0);
 	H_LOCK;
 
 	if (code) {
