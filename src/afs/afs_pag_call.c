@@ -31,7 +31,7 @@
 
 afs_int32 afs_termState = 0;
 afs_int32 afs_gcpags = AFS_GCPAGS;
-enum afs_shutdown_state afs_shuttingdown = afs_shutdown_no;
+enum afs_shutdown_state afs_shuttingdown = AFS_RUNNING;
 int afs_cold_shutdown = 0;
 int afs_resourceinit_flag = 0;
 afs_int32 afs_nfs_server_addr;
@@ -158,9 +158,9 @@ afspag_Init(afs_int32 nfs_server_addr)
 void
 afspag_Shutdown(void)
 {
-    if (afs_shuttingdown != afs_shutdown_no)
+    if (afs_shuttingdown != AFS_RUNNING)
 	return;
-    afs_shuttingdown = afs_shutdown_yes;
+    afs_shuttingdown = AFS_SHUTDOWN;
     afs_termState = AFSOP_STOP_RXCALLBACK;
     rx_WakeupServerProcs();
     while (afs_termState == AFSOP_STOP_RXCALLBACK)

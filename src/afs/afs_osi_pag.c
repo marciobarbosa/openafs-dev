@@ -455,7 +455,7 @@ afs_InitReq(struct vrequest *av, afs_ucred_t *acred)
 
     AFS_STATCNT(afs_InitReq);
     memset(av, 0, sizeof(*av));
-    if (afs_shuttingdown == afs_shutdown_yes)
+    if (afs_shuttingdown == AFS_SHUTDOWN)
 	return EIO;
 
 #ifdef AFS_LINUX26_ENV
@@ -506,7 +506,7 @@ afs_CreateReq(struct vrequest **avpp, afs_ucred_t *acred)
     int code;
     struct vrequest *treq = NULL;
 
-    if (afs_shuttingdown == afs_shutdown_yes) {
+    if (afs_shuttingdown == AFS_SHUTDOWN) {
 	return EIO;
     }
     if (!avpp || !acred) {

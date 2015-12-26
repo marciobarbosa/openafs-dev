@@ -36,9 +36,9 @@
 #define	AFS_MAXIOVCNT	    16
 
 enum afs_shutdown_state {
-    afs_shutdown_no = 0,
-    afs_shutdown_flushing_cb = 1,
-    afs_shutdown_yes = 2,
+    AFS_RUNNING = 0,
+    AFS_FLUSHING_CB = 1,
+    AFS_SHUTDOWN = 2,
 };
 extern enum afs_shutdown_state afs_shuttingdown;
 
