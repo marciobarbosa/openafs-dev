@@ -24,6 +24,24 @@
 
 #include "afsutil.h"
 
+#ifdef AFS_PTHREAD_ENV
+static opr_mutex_t hostname_cache_mutex;
+#define hostNameCacheLock() do { opr_mutex_enter(&hostname_cache_mutex); } while (0)
+#define hostNameCacheUnlock() do { opr_mutex_exit(&hostname_cache_mutex); } while (0)
+#define hostNameCacheLocked() do { opr_mutex_assert(&hostname_cache_mutex); } while (0)
+#else
+#define hostNameCacheLock() do { } while (0)
+#define hostNameCacheUnlock() do { } while (0)
+#define hostNameCacheLocked() do { } while (0)
+#endif
+
+struct hostname_cache_entry {
+    afs_uint32 address;
+    char *hostname;
+    time_t expires;
+    struct opr_queue link;
+};
+
 /* also parse a.b.c.d addresses */
 struct hostent *
 hostutil_GetHostByName(char *ahost)
