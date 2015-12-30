@@ -15,6 +15,10 @@
 #include <afs/param.h>
 
 #include <roken.h>
+#include <afs/opr.h>
+#include <opr/dict.h>
+#include <opr/jhash.h>
+#include <opr/lock.h>
 
 #ifdef AFS_NT40_ENV
 #include <direct.h>
@@ -23,6 +27,10 @@
 #endif
 
 #include "afsutil.h"
+
+#define HASH_SIZE_LOG2	9		/* 512 buckets */
+
+#define HOSTNAME_TTL	(4*60*60)
 
 #ifdef AFS_PTHREAD_ENV
 static opr_mutex_t hostname_cache_mutex;
@@ -35,12 +43,100 @@ static opr_mutex_t hostname_cache_mutex;
 #define hostNameCacheLocked() do { } while (0)
 #endif
 
+static struct opr_dict *hostname_cache = NULL;
+
 struct hostname_cache_entry {
     afs_uint32 address;
     char *hostname;
     time_t expires;
     struct opr_queue link;
 };
+
+void
+hostutil_InitHostNameCache(void)
+{
+    if (hostname_cache != NULL)
+	return;
+    hostname_cache = opr_dict_Init(opr_jhash_size(HASH_SIZE_LOG2));
+    if (hostname_cache == NULL) {
+	return;
+    }
+#ifdef AFS_PTHREAD_ENV
+    opr_mutex_init(&hostname_cache_mutex);
+#endif
+}
+
+static void
+remove_entry(struct hostname_cache_entry *aentry)
+{
+    opr_queue_Remove(&aentry->link);
+    free(aentry->hostname);
+    free(aentry);
+}
+
+static struct hostname_cache_entry *
+find_hostname(afs_uint32 aaddr)
+{
+    char *hostname;
+    time_t now = time(NULL);
+    struct hostname_cache_entry *hce = NULL;
+    struct opr_queue *cursor, *store;
+    afs_uint32 index = opr_jhash_int((aaddr), 0) & opr_jhash_mask(HASH_SIZE_LOG2); 
+
+    hostNameCacheLocked();
+    if (hostname_cache == NULL)
+	goto done;
+
+    for (opr_dict_ScanBucketSafe(hostname_cache, index, cursor, store)) {
+	hce = opr_queue_Entry(cursor, struct hostname_cache_entry, link);
+	if (hce->address == aaddr) {
+	    if (hce->expires > now) {
+		goto done;
+	    } else {
+		remove_entry(hce);
+		break;
+	    }
+	}
+    }
+    hce = (struct hostname_cache_entry *)calloc(1, sizeof(struct hostname_cache_entry));
+    if (hce == NULL)
+	goto done;
+    hce->address = aaddr;
+    hostname = hostutil_GetNameByINet(aaddr);
+    hce->hostname = strdup(hostname);
+    if (hce->hostname == NULL) {
+	free(hce);
+	hce = NULL;
+	goto done;
+    }
+    hce->expires = time(NULL) + HOSTNAME_TTL;
+    opr_dict_Prepend(hostname_cache, index, &hce->link);
+  done:
+    return hce;
+}
+
+char *
+hostutil_GetNameByINetCached(afs_uint32 aaddr, char *abuffer, size_t alen)
+{
+    struct hostname_cache_entry *hce;
+    char *hostname;
+
+    hostNameCacheLock();
+    hce = find_hostname(aaddr);
+    hostNameCacheUnlock();
+
+    if (hce != NULL && strlen(hce->hostname) < alen) {
+	strlcpy(abuffer, hce->hostname, alen);
+	return abuffer;
+    } else if (hce == NULL) {
+	hostname = hostutil_GetNameByINet(aaddr);
+	if (hostname != NULL && strlen(hostname) < alen) {
+	    strlcpy(abuffer, hostname, alen);
+	    return abuffer;
+	}
+    }
+    return NULL;
+}
 
 /* also parse a.b.c.d addresses */
 struct hostent *
