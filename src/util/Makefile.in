@@ -47,6 +47,7 @@ all: ${includes} \
 	${TOP_LIBDIR}/util.a \
 	${TOP_LIBDIR}/libafsutil.a \
 	${TOP_LIBDIR}/libafsutil_pic.a \
+	${TOP_LIBDIR}/libafsutil_pic.a \
 	sys \
 	liboafs_util.la \
 	libafsrpc_util.la
