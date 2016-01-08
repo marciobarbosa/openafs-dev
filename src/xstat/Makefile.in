@@ -21,8 +21,8 @@ LIBS=${TOP_LIBDIR}/libafsint.a \
 	${TOP_LIBDIR}/libafshcrypto_lwp.a \
 	${TOP_LIBDIR}/liblwp.a \
 	${TOP_LIBDIR}/libsys.a \
-	${TOP_LIBDIR}/libopr.a \
-	${TOP_LIBDIR}/util.a
+	${TOP_LIBDIR}/util.a \
+	${TOP_LIBDIR}/libopr.a
 
 all: \
 	${TOP_INCDIR}/afs/xstat_fs.h \

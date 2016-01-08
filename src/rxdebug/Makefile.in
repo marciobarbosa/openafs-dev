@@ -15,8 +15,8 @@ LIBS=${TOP_LIBDIR}/librx.a \
      ${TOP_LIBDIR}/liblwp.a \
      ${TOP_LIBDIR}/libcmd.a \
      ${TOP_LIBDIR}/libsys.a \
-     ${TOP_LIBDIR}/libopr.a \
-     ${TOP_LIBDIR}/libafsutil.a
+     ${TOP_LIBDIR}/libafsutil.a \
+     ${TOP_LIBDIR}/libopr.a
 
 all: rxdebug rxdumptrace
 
