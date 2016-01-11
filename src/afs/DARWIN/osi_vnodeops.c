@@ -644,6 +644,21 @@ afs_vop_access(ap)
     if (code == 0 && (bits == (PRSFS_INSERT|PRSFS_DELETE)))
 	code = afs_AccessOK(tvc, PRSFS_INSERT, &treq, cmb);
 
+#ifdef AFS_DARWIN150_ENV
+    /* When removing a dir via Finder (as a normal user), DesktopServicesHelper
+     * will check for PRSFS_LOOKUP on the dir (as root). Throwing an EACCES
+     * error causes the operation to fail even when the normal user has access
+     * to the dir, so force it to succeed here. */
+    if (code == 0 && vnode_vtype(ap->a_vp) == VDIR && bits == PRSFS_LOOKUP &&
+        vfs_context_suser(ap->a_context) == 0) {
+        /* Note that the documentation for vfs_context_suser is a bit
+         * confusing/wrong. It actually returns 0 when the accessing user _is_
+         * the superuser, not the other way around. If we have reached here, we
+         * are root. */
+        code = 1;
+    }
+#endif
+
     if (code == 1 && vnode_vtype(ap->a_vp) == VREG &&
         ap->a_action & KAUTH_VNODE_EXECUTE &&
         (tvc->f.m.Mode & 0100) != 0100) {
