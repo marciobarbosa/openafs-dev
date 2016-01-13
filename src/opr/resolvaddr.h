@@ -1,4 +1,4 @@
-#include <opr/queue.h>
+#include <opr/dict.h>
 
 #define	HASH_SIZE_LOG2	6	/* 64 buckets */
 #define	MAX_SIZE	1024	/* maximum number of entries */
@@ -6,6 +6,7 @@
 
 struct hostname_cache_entry {
     union {
+	struct sockaddr sa;
 	struct sockaddr_in sa4;
 	struct sockaddr_in6 sa6;
     } address;
@@ -14,4 +15,4 @@ struct hostname_cache_entry {
     struct opr_queue link;
 };
 
-extern char *opr_resolvaddr(struct sockaddr *sa, char *buffer, size_t len);
+extern char *opr_resolvaddr(void *addr, size_t addrlen, int af, char *buffer, size_t len);
