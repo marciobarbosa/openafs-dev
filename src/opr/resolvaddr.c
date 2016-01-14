@@ -1,3 +1,27 @@
+/*
+ * Copyright (c) 2016 Sine Nomine Associates. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR `AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include <afsconfig.h>
 #include <afs/param.h>
 
@@ -188,7 +212,7 @@ cache_evict(afs_uint32 new_size, time_t time)
     }
 }
 
-int
+static int
 address_found(struct sockaddr *sa, void *addr, size_t addrlen, int af)
 {
     int equal = 0;
@@ -216,11 +240,12 @@ address_found(struct sockaddr *sa, void *addr, size_t addrlen, int af)
 static struct hostname_cache_entry *
 cache_find(void *addr, size_t addrlen, int af)
 {
-    int code;
+    int code, len;
     time_t now;
     struct hostname_cache_entry *hce;
     struct opr_queue *cursor, *store;
     struct sockaddr *sa;
+    const char *p;
     afs_uint32 index;
 
     hce = NULL;
@@ -273,9 +298,20 @@ cache_find(void *addr, size_t addrlen, int af)
     }
     code = resolve_addr(addr, addrlen, af, &hce->hostname, &hce->expires);
     if (code < 0) {
-	free(hce);
-	hce = NULL;
-	goto done;
+	len = (af == AF_INET) ? INET_ADDRSTRLEN : INET6_ADDRSTRLEN;
+	hce->hostname = (char *) calloc(len, sizeof(char));
+	if (hce->hostname == NULL) {
+	    free(hce);
+	    hce = NULL;
+	    goto done;
+	}
+	p = inet_ntop(af, addr, hce->hostname, len);
+	if (p == NULL) {
+	    free(hce->hostname);
+	    free(hce);
+	    hce = NULL;
+	    goto done;
+	}
     }
     if (hce->expires <= 0) {
 	hce->expires = DEFAULT_TTL;
@@ -293,23 +329,47 @@ char *
 opr_resolvaddr(void *addr, size_t addrlen, int af, char *buffer, size_t len)
 {
     struct hostname_cache_entry *hce;
+    struct sockaddr *sa;
+    struct sockaddr_in sa4;
+    struct sockaddr_in6 sa6;
+    size_t sa_size;
+    int code;
     afs_uint32 inited;
 
     if (af != AF_INET && af != AF_INET6) {
 	goto done;
     }
     inited = cache_init_once();
+    memset(buffer, 0, len);
 
     if (inited) {
 	cache_lock();
 	hce = cache_find(addr, addrlen, af);
 	cache_unlock();
 
-	if (hce != NULL && strlen(hce->hostname) < len) {
+	if (hce != NULL) {
 	    strlcpy(buffer, hce->hostname, len);
-	    return buffer;
+	    goto done;
 	}
     }
+    switch (af) {
+    case AF_INET:
+	sa4.sin_addr.s_addr = *(afs_uint32 *)addr;
+	sa = (struct sockaddr *)&sa4;
+	sa_size = sizeof(sa4);
+	break;
+    case AF_INET6:
+	memcpy(sa6.sin6_addr.s6_addr, addr, addrlen);
+	sa = (struct sockaddr *)&sa6;
+	sa_size = sizeof(sa6);
+	break;
+    }
+    sa->sa_family = af;
+    code = getnameinfo(sa, sa_size, buffer, len, NULL, 0, 0);
+    if (code == 0) {
+	goto done;
+    }
+    inet_ntop(af, addr, buffer, len);
   done:
-    return NULL;
+    return buffer;
 }
