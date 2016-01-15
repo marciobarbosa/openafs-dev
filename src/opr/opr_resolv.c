@@ -31,7 +31,7 @@
 #include <opr/lock.h>
 #include <opr/jhash.h>
 
-#include "resolvaddr.h"
+#include "opr_resolv.h"
 
 #ifdef AFS_PTHREAD_ENV
 
@@ -53,7 +53,7 @@ static pthread_once_t cache_init_th = PTHREAD_ONCE_INIT;
 static afs_uint32 cache_inited;
 static struct opr_dict *cache;
 static afs_uint32 cache_size;
-static afs_uint32 next_expire_time;
+static time_t next_expire_time;
 static time_t greatest_ttl;
 static const char hex[] = "0123456789abcdef";
 
@@ -180,6 +180,9 @@ check_bucket(afs_uint32 index, time_t time, time_t early_expire)
     for (opr_dict_ScanBucketSafe(cache, index, cursor, store)) {
 	hce = opr_queue_Entry(cursor, struct hostname_cache_entry, link);
 	if (time + early_expire < hce->expires) {
+	    if (hce->ttl > greatest_ttl) {
+		greatest_ttl = hce->ttl;
+	    }
 	    continue;
 	}
 	remove_entry(hce);
@@ -196,6 +199,7 @@ check_expirations(time_t time, time_t early_expire)
     if (cache_size == 0) {
 	return;
     }
+    greatest_ttl = 0;
     for (index = 0; index < opr_jhash_size(HASH_SIZE_LOG2); index++) {
 	check_bucket(index, time, early_expire);
     }
@@ -241,7 +245,7 @@ static struct hostname_cache_entry *
 cache_find(void *addr, size_t addrlen, int af)
 {
     int code, len;
-    time_t now;
+    time_t now, ttl;
     struct hostname_cache_entry *hce;
     struct opr_queue *cursor, *store;
     struct sockaddr *sa;
@@ -296,7 +300,8 @@ cache_find(void *addr, size_t addrlen, int af)
 	memcpy(hce->address.sa6.sin6_addr.s6_addr, addr, addrlen);
 	break;
     }
-    code = resolve_addr(addr, addrlen, af, &hce->hostname, &hce->expires);
+    code = resolve_addr(addr, addrlen, af, &hce->hostname, &ttl);
+    hce->expires = now + ttl;
     if (code < 0) {
 	len = (af == AF_INET) ? INET_ADDRSTRLEN : INET6_ADDRSTRLEN;
 	hce->hostname = (char *) calloc(len, sizeof(char));
@@ -313,11 +318,12 @@ cache_find(void *addr, size_t addrlen, int af)
 	    goto done;
 	}
     }
-    if (hce->expires <= 0) {
-	hce->expires = DEFAULT_TTL;
+    hce->ttl = ttl;
+    if (hce->expires <= now) {
+	hce->expires = now + DEFAULT_TTL;
     }
-    if (hce->expires > greatest_ttl) {
-	greatest_ttl = hce->expires;
+    if (ttl > greatest_ttl) {
+	greatest_ttl = ttl;
     }
     opr_dict_Prepend(cache, index, &hce->link);
     cache_size++;
@@ -326,7 +332,7 @@ cache_find(void *addr, size_t addrlen, int af)
 }
 
 char *
-opr_resolvaddr(void *addr, size_t addrlen, int af, char *buffer, size_t len)
+opr_gethostname(void *addr, size_t addrlen, int af, char *buffer, size_t len)
 {
     struct hostname_cache_entry *hce;
     struct sockaddr *sa;
@@ -340,7 +346,6 @@ opr_resolvaddr(void *addr, size_t addrlen, int af, char *buffer, size_t len)
 	goto done;
     }
     inited = cache_init_once();
-    memset(buffer, 0, len);
 
     if (inited) {
 	cache_lock();

@@ -36,7 +36,8 @@ struct hostname_cache_entry {
     } address;
     char *hostname;
     time_t expires;
+    time_t ttl;
     struct opr_queue link;
 };
 
-extern char *opr_resolvaddr(void *addr, size_t addrlen, int af, char *buffer, size_t len);
+extern char *opr_gethostname(void *addr, size_t addrlen, int af, char *buffer, size_t len);
