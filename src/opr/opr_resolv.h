@@ -22,6 +22,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef AFS_NT40_ENV
+
 #include <opr/dict.h>
 
 #define	HASH_SIZE_LOG2	6	/* 64 buckets */
@@ -39,5 +41,7 @@ struct hostname_cache_entry {
     time_t ttl;
     struct opr_queue link;
 };
+
+#endif
 
 extern char *opr_gethostname(void *addr, size_t addrlen, int af, char *buffer, size_t len);

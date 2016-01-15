@@ -26,12 +26,13 @@
 #include <afs/param.h>
 
 #include <roken.h>
+#include "opr_resolv.h"
+
+#ifndef AFS_NT40_ENV
 
 #include <afs/opr.h>
 #include <opr/lock.h>
 #include <opr/jhash.h>
-
-#include "opr_resolv.h"
 
 #ifdef AFS_PTHREAD_ENV
 
@@ -331,20 +332,24 @@ cache_find(void *addr, size_t addrlen, int af)
     return hce;
 }
 
+#endif
+
 char *
 opr_gethostname(void *addr, size_t addrlen, int af, char *buffer, size_t len)
 {
-    struct hostname_cache_entry *hce;
     struct sockaddr *sa;
     struct sockaddr_in sa4;
     struct sockaddr_in6 sa6;
     size_t sa_size;
     int code;
+#ifndef AFS_NT40_ENV
+    struct hostname_cache_entry *hce;
     afs_uint32 inited;
-
+#endif
     if (af != AF_INET && af != AF_INET6) {
 	goto done;
     }
+#ifndef AFS_NT40_ENV
     inited = cache_init_once();
 
     if (inited) {
@@ -357,6 +362,11 @@ opr_gethostname(void *addr, size_t addrlen, int af, char *buffer, size_t len)
 	    goto done;
 	}
     }
+#else
+    if (afs_winsockInit() < 0) {
+	goto done;
+    }
+#endif
     switch (af) {
     case AF_INET:
 	sa4.sin_addr.s_addr = *(afs_uint32 *)addr;
