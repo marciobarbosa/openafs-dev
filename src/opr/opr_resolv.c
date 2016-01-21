@@ -37,7 +37,6 @@
 #ifdef AFS_PTHREAD_ENV
 
 static opr_mutex_t cache_mutex;
-static pthread_once_t cache_init_th = PTHREAD_ONCE_INIT;
 
 #define cache_lock() do { opr_mutex_enter(&cache_mutex); } while (0)
 #define cache_unlock() do { opr_mutex_exit(&cache_mutex); } while (0)
@@ -93,13 +92,11 @@ cache_init(void)
 static afs_uint32
 cache_init_once(void)
 {
-#ifdef AFS_PTHREAD_ENV
-    pthread_once(&cache_init_th, cache_init);
-#else
+    cache_lock();
     if (cache_inited == 0) {
 	cache_init();
     }
-#endif
+    cache_unlock();
     return cache_inited;
 }
 
