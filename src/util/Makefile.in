@@ -19,7 +19,7 @@ LT_objs =$(LT_rpc_objs) \
 	 hputil.lo kreltime.lo uuid.lo serverLog.lo \
 	 dirpath.lo fileutil.lo flipbase64.lo fstab.lo \
 	 afs_atomlist.lo afs_lhash.lo pthread_glock.lo tabular_output.lo \
-	 pthread_threadname.lo softsig.lo ${REGEX_OBJ}
+	 pthread_threadname.lo softsig.lo hostresolv.lo ${REGEX_OBJ}
 
 LT_deps = $(top_builddir)/src/opr/liboafs_opr.la
 LT_libs = $(LIB_roken) $(MT_LIBS)
@@ -228,4 +228,4 @@ check-splint:
 	    base64.c ktime.c volparse.c hostparse.c \
 	    hputil.c kreltime.c uuid.c serverLog.c \
 	    dirpath.c fileutil.c flipbase64.c \
-	    afs_atomlist.c afs_lhash.c fstab.c
+	    afs_atomlist.c afs_lhash.c fstab.c hostresolv.c
