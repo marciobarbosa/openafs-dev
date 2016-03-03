@@ -701,7 +701,8 @@ afs_ProcessOpCreate(struct vcache *avc, struct vrequest *areq,
 	ttargetName = afs_osi_Alloc(tlen);
 	if (!ttargetName) {
 	    afs_PutDCache(tdc);
-	    return ENOMEM;
+	    code = ENOMEM;
+	    goto end;
 	}
 	ObtainReadLock(&tdc->lock);
 	tfile = afs_CFileOpen(&tdc->f.inode);
