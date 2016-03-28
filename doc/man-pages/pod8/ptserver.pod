@@ -20,6 +20,7 @@ ptserver S<<< [B<-database> | B<-db> <I<db path>>] >>>
     S<<< [B<-logfile <I<log file>>] >>>
     S<<< [B<-config <I<configuration path>>] >>>
     S<<< [B<-rxmaxmtu> <I<bytes>>] >>>
+    S<<< [B<-udpsize> <I<size of socket buffer in bytes>>] >>>
     [B<-help>]
 
 =for html
@@ -186,6 +187,11 @@ L<fileserver(8)> for an explanation of each interface.
 =item B<-rxmaxmtu> <I<bytes>>
 
 Sets the maximum transmission unit for the RX protocol.
+
+=item B<-udpsize> <I<size of socket buffer in bytes>>
+
+Sets the size of the UDP buffer, which is 64 KB by default. Provide a
+positive integer, preferably larger than the default.
 
 =item B<-help>
 

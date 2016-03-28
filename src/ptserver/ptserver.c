@@ -149,6 +149,7 @@ extern afs_int32 depthsg;
 int restricted = 0;
 int restrict_anonymous = 0;
 int rxMaxMTU = -1;
+int udpBufSize = 0;		/* UDP buffer size for receive */
 int rxBind = 0;
 int rxkadDisableDotCheck = 0;
 
@@ -227,6 +228,7 @@ enum optionsList {
     OPT_process,
     OPT_rxbind,
     OPT_rxmaxmtu,
+    OPT_udpsize,
     OPT_dotted
 };
 
@@ -245,6 +247,7 @@ main(int argc, char **argv)
     afs_uint32 host = htonl(INADDR_ANY);
     struct cmd_syndesc *opts;
     struct cmd_item *list;
+    int optval;
 
     char *pr_dbaseName;
     char *configDir;
@@ -348,6 +351,8 @@ main(int argc, char **argv)
 		        CMD_OPTIONAL, "bind only to the primary interface");
     cmd_AddParmAtOffset(opts, OPT_rxmaxmtu, "-rxmaxmtu", CMD_SINGLE,
 		        CMD_OPTIONAL, "maximum MTU for RX");
+    cmd_AddParmAtOffset(opts, OPT_udpsize, "-udpsize", CMD_SINGLE,
+			CMD_OPTIONAL, "size of socket buffer in bytes");
 
     /* rxkad options */
     cmd_AddParmAtOffset(opts, OPT_dotted, "-allow-dotted-principals",
@@ -427,6 +432,15 @@ main(int argc, char **argv)
 
     cmd_OptionAsInt(opts, OPT_rxmaxmtu, &rxMaxMTU);
 
+    if (cmd_OptionAsInt(opts, OPT_udpsize, &optval) == 0) {
+	if (optval < rx_GetMinUdpBufSize()) {
+	    printf("Warning:udpsize %d is less than minimum %d; ignoring\n",
+		   optval, rx_GetMinUdpBufSize());
+	} else {
+	    udpBufSize = optval;
+	}
+    }
+
     /* rxkad options */
     cmd_OptionAsFlag(opts, OPT_dotted, &rxkadDisableDotCheck);
 
@@ -494,6 +508,10 @@ main(int argc, char **argv)
      * and the header are in separate Ubik buffers then 120 buffers may be
      * required. */
     ubik_nBuffers = 120 + /*fudge */ 40;
+
+    if (udpBufSize) {
+	rx_SetUdpBufSize(udpBufSize);	/* set the UDP buffer size for receive */
+    }
 
     if (rxBind) {
 	afs_int32 ccode;
