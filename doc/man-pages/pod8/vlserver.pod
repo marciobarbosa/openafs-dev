@@ -12,6 +12,7 @@ vlserver [B<-noauth>] [B<-smallmem>]
     [B<-jumbo>] [B<-rxbind>]
     S<<< [B<-d> <I<debug level>>] >>>
     S<<< [B<-rxmaxmtu> <I<bytes>>] >>>
+    S<<< [B<-udpsize> <I<size of socket buffer in bytes>>] >>>
     S<<< [B<-trace> <I<trace file>>] >>>
     [B<-allow-dotted-principals>]
     S<<< [B<-database> | B<-db> <I<database path>>] >>>
@@ -160,6 +161,11 @@ limited, and should not be needed on any remotely modern system.
 =item B<-rxmaxmtu> <I<bytes>>
 
 Sets the maximum transmission unit for the RX protocol.
+
+=item B<-udpsize> <I<size of socket buffer in bytes>>
+
+Sets the size of the UDP buffer, which is 64 KB by default. Provide a
+positive integer, preferably larger than the default.
 
 =item B<-trace> <I<trace file>>
 

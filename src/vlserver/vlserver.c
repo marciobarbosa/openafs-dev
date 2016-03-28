@@ -56,6 +56,7 @@ int smallMem = 0;
 int restrictedQueryLevel = RESTRICTED_QUERY_ANYUSER;
 int rxJumbograms = 0;		/* default is to not send and receive jumbo grams */
 int rxMaxMTU = -1;
+int udpBufSize = 0;		/* UDP buffer size for receive */
 afs_int32 rxBind = 0;
 int rxkadDisableDotCheck = 0;
 
@@ -155,6 +156,7 @@ enum optionsList {
     OPT_jumbo,
     OPT_rxbind,
     OPT_rxmaxmtu,
+    OPT_udpsize,
     OPT_trace,
     OPT_dotted,
     OPT_restricted_query,
@@ -179,6 +181,7 @@ main(int argc, char **argv)
     afs_uint32 host = ntohl(INADDR_ANY);
     struct cmd_syndesc *opts;
     struct logOptions logopts;
+    int optval;
 
     char *vl_dbaseName;
     char *configDir;
@@ -268,6 +271,8 @@ main(int argc, char **argv)
 		        CMD_OPTIONAL, "bind only to the primary interface");
     cmd_AddParmAtOffset(opts, OPT_rxmaxmtu, "-rxmaxmtu", CMD_SINGLE,
 		        CMD_OPTIONAL, "maximum MTU for RX");
+    cmd_AddParmAtOffset(opts, OPT_udpsize, "-udpsize", CMD_SINGLE,
+			CMD_OPTIONAL, "size of socket buffer in bytes");
     cmd_AddParmAtOffset(opts, OPT_trace, "-trace", CMD_SINGLE,
 		        CMD_OPTIONAL, "rx trace file");
     cmd_AddParmAtOffset(opts, OPT_restricted_query, "-restricted_query",
@@ -368,6 +373,15 @@ main(int argc, char **argv)
 
     cmd_OptionAsInt(opts, OPT_rxmaxmtu, &rxMaxMTU);
 
+    if (cmd_OptionAsInt(opts, OPT_udpsize, &optval) == 0) {
+	if (optval < rx_GetMinUdpBufSize()) {
+	    printf("Warning:udpsize %d is less than minimum %d; ignoring\n",
+		   optval, rx_GetMinUdpBufSize());
+	} else {
+	    udpBufSize = optval;
+	}
+    }
+
     /* rxkad options */
     cmd_OptionAsFlag(opts, OPT_dotted, &rxkadDisableDotCheck);
 
@@ -445,6 +459,10 @@ main(int argc, char **argv)
 
     if (noAuth)
 	afsconf_SetNoAuthFlag(tdir, 1);
+
+    if (udpBufSize) {
+	rx_SetUdpBufSize(udpBufSize);	/* set the UDP buffer size for receive */
+    }
 
     if (rxBind) {
 	afs_int32 ccode;
