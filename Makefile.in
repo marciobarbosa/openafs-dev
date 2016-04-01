@@ -93,6 +93,8 @@ dest_only_libafs: only_libafs dest_dirs
 
 packages: dest
 	@case ${SYS_NAME} in \
+	*_darwin_1[4-5]0 ) \
+		${COMPILE_PART1} packaging/MacOS && bash ./pkgbuild.sh ${DEST} ;; \
 	*_darwin_* ) \
 		${COMPILE_PART1} packaging/MacOS && bash ./buildpkg.sh ${DEST} ;; \
 	hp_ux110 ) \
