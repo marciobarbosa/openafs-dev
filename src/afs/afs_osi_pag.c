@@ -169,6 +169,8 @@ afs_pag_sleep(afs_ucred_t **acred)
 static int
 afs_pag_wait(afs_ucred_t **acred)
 {
+    int code = 0;
+
     if (afs_pag_sleep(acred)) {
 	if (!afs_pag_sleepcnt) {
 	    afs_warn("%s() PAG throttling triggered, pid %d... sleeping.  sleepcnt %d\n",
@@ -178,14 +180,13 @@ afs_pag_wait(afs_ucred_t **acred)
 	afs_pag_sleepcnt++;
 
 	do {
-	    /* XXX spins on EINTR */
-	    afs_osi_Wait(1000, (struct afs_osi_WaitHandle *)0, 0);
-	} while (afs_pag_sleep(acred));
+	    code = afs_osi_Wait(1000, (struct afs_osi_WaitHandle *)0, 0);
+	} while (afs_pag_sleep(acred) && !code);
 
 	afs_pag_sleepcnt--;
     }
 
-    return 0;
+    return code;
 }
 
 int
@@ -219,7 +220,10 @@ afs_setpag(void)
 
     AFS_STATCNT(afs_setpag);
 
-    afs_pag_wait(acred);
+    code = afs_pag_wait(acred);
+    if (code) {
+	return code;
+    }
 
 
 #if	defined(AFS_SUN5_ENV)
@@ -329,7 +333,10 @@ afs_setpag_val(int pagval)
 
     AFS_STATCNT(afs_setpag);
 
-    afs_pag_wait(acred);
+    code = afs_pag_wait(acred);
+    if (code) {
+	return code;
+    }
 
 #if	defined(AFS_SUN5_ENV)
     code = AddPag(pagval, credpp);
