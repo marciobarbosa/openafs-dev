@@ -222,7 +222,7 @@ afs_setpag(void)
 
     code = afs_pag_wait(acred);
     if (code) {
-	return code;
+	goto done;
     }
 
 
@@ -282,6 +282,7 @@ afs_setpag(void)
     code = AddPag(genpag(), &u.u_cred);
 #endif
 
+  done:
     afs_Trace1(afs_iclSetp, CM_TRACE_SETPAG, ICL_TYPE_INT32, code);
 
 #if defined(KERNEL_HAVE_UERROR)
@@ -335,7 +336,7 @@ afs_setpag_val(int pagval)
 
     code = afs_pag_wait(acred);
     if (code) {
-	return code;
+	goto done;
     }
 
 #if	defined(AFS_SUN5_ENV)
@@ -386,6 +387,7 @@ afs_setpag_val(int pagval)
     code = AddPag(pagval, &u.u_cred);
 #endif
 
+  done:
     afs_Trace1(afs_iclSetp, CM_TRACE_SETPAG, ICL_TYPE_INT32, code);
 #if defined(KERNEL_HAVE_UERROR)
     if (!getuerror())
