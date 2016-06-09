@@ -163,7 +163,7 @@ do_klog(const char *user, const char *password, const char *lifetime,
 	close(pipedes[0]);
 	close(pipedes[1]);
 	if (pid != wait(&status))
-	    return (0);
+	    goto out;
 	if (WIFEXITED(status)) {
 	    ret = WEXITSTATUS(status);
 	    goto out;
