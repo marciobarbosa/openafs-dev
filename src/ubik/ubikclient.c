@@ -29,6 +29,12 @@
 #define UBIK_LEGACY_CALLITER
 #include "ubik.h"
 
+#include <afs/venus.h>
+
+#define AFS_PIOCTL_MAXSIZE 2048
+
+extern int pioctl(char *, afs_int32, struct ViceIoctl *, afs_int32);
+
 short ubik_initializationState;	/*!< initial state is zero */
 
 
@@ -183,10 +189,25 @@ int
 ubik_ClientInit(struct rx_connection **serverconns,
 		struct ubik_client **aclient)
 {
+    /* Set flag to 0 to preserve old randomize behavior */
+    return ubik_ClientInit2(serverconns, aclient, 0);
+}
+
+int
+ubik_ClientInit2(struct rx_connection **serverconns,
+		 struct ubik_client **aclient, int flags)
+{
     int i, j;
     int count;
     int offset;
     struct ubik_client *tc;
+
+    struct ranktable {
+	struct rx_connection *rx_conn;
+	int isset;
+	afs_uint32 rank;
+    };
+    struct ranktable rt[MAXSERVERS];
 
     initialize_U_error_table();
 
@@ -228,12 +249,153 @@ ubik_ClientInit(struct rx_connection **serverconns,
 #endif
     tc->initializationState = ++ubik_initializationState;
 
-    /* first count the # of server conns so we can randomize properly */
-    count = 0;
+    /* initialize the ranktable */
     for (i = 0; i < MAXSERVERS; i++) {
-	if (serverconns[i] == (struct rx_connection *)0)
+	rt[i].rx_conn = serverconns[i];
+	rt[i].isset = 0;
+	/* highest possible rank = unassigned rank */
+	rt[i].rank = 0xFFFFFFFF;
+	/* ensure one null entry */
+	if (!serverconns[i]) {
 	    break;
-	count++;
+	}
+    }
+
+    /* # of server conns */
+    count = i;
+
+    if (flags & UBIK_KERNEL_DBPREFS) {
+	afs_int32 code;
+	afs_uint32 addr;
+	struct ViceIoctl blob;
+	struct sprefrequest *in;
+	struct sprefinfo *out;
+	int rankneeded = 0;
+	char space[AFS_PIOCTL_MAXSIZE];
+	afs_uint32 r_IPv4;
+	struct rx_connection *swapconn;
+	int swapped;
+
+	in = (struct sprefrequest *)space;
+	in->offset = 0;
+
+	do {
+	    /* this is not the first iteration */
+	    if (rankneeded) {
+		if (blob.out != space) {
+		    free(blob.out);
+		}
+	    }
+
+	    blob.in_size = sizeof(struct sprefrequest);
+	    blob.in = (char *)in;
+	    blob.out = space;
+	    blob.out_size = AFS_PIOCTL_MAXSIZE;
+
+	    /* we only use ubik_ClientInit to reach DB servers, never file
+	     * servers */
+	    in->flags = DBservers;
+
+	    do {
+		code = pioctl(0, VIOC_GETSPREFS, &blob, 1);
+		switch (code) {
+		case 0:
+		    break;
+		case E2BIG:
+		    /* with a starting size of 2kB, the max buffer size we
+		     * can reach is 16kB */
+		    if (2 * blob.out_size > 0x7FFF) {
+			goto done;
+		    }
+		    blob.out_size *= 2;
+		    if (blob.out == space) {
+			blob.out = malloc(blob.out_size);
+		    } else {
+			blob.out = realloc(blob.out, blob.out_size);
+		    }
+		    break;
+		default:
+		    goto done;
+		}
+	    } while (code != 0);
+
+	    /* we now have a set of prefs in no particular order; parse and
+	     * process them */
+	    out = (struct sprefinfo *)blob.out;
+	    rankneeded = 0;
+	    for (j = 0; j < MAXSERVERS; j++) {
+		if (rt[j].rx_conn == NULL) {
+		    /* no more servers */
+		    break;
+		}
+		if (rt[j].isset) {
+		    /* already has a rank from a previous loop */
+		    continue;
+		}
+		/* net byte order */
+		r_IPv4 = rx_HostOf(rx_PeerOf(rt[j].rx_conn));
+
+		/* search for r_IPv4 among the server prefs */
+		for (i = 0; i < out->num_servers; i++) {
+		    /* net byte order */
+		    addr = out->servers[i].server.s_addr;
+		    if (addr == r_IPv4) {
+			rt[j].rank = out->servers[i].rank;
+			rt[j].isset = 1;
+			break;
+		    }
+		}
+		if (!rt[j].isset) {
+		    /* no match found */
+		    rankneeded = 1;
+		}
+	    }
+
+	    if (rankneeded == 0) {
+		/* all servers have been found, we can quit early */
+		break;
+	    }
+	    in->offset = out->next_offset;
+	} while (out->next_offset > 0);
+
+	/* swap/bubble sort the ranktable by ascending rank; the table is so
+	 * small there's no point to optimizing the sort' */
+	do {
+	    swapped = 0;
+	    for (j = 0; j < (count - 1); j++) {
+		if (rt[j].rank > rt[j + 1].rank) {
+		    swapconn = rt[j].rx_conn;
+		    rt[j].rx_conn = rt[j + 1].rx_conn;
+		    rt[j + 1].rx_conn = swapconn;
+
+		    /* swap ranks too  */
+		    i = rt[j].rank;
+		    rt[j].rank = rt[j + 1].rank;
+		    rt[j + 1].rank = i;
+		    swapped = 1;
+		}
+	    }
+	} while (swapped == 1);
+
+	/* copy the rx_conns, now sorted by rank, to the tc ubik_client */
+	for (i = 0; i < MAXSERVERS; i++) {
+	    tc->conns[i] = rt[i].rx_conn;
+	    if (rt[i].rx_conn == NULL) {
+		break;
+	    }
+	}
+
+      done:
+	if (blob.out != space) {
+	    free(blob.out);
+	}
+
+	if (code) {
+	    free(tc);
+	} else {
+	    *aclient = tc;
+	}
+	return code;
     }
 
     /* here count is the # of servers we're actually passed in.  Compute
