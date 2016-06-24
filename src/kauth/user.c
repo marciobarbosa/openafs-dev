@@ -38,6 +38,8 @@
 #include "kautils.h"
 #include <afs/ktc.h>
 
+extern int ka_ClientInit_flags;
+
 afs_int32
 GetTickets(char *name, char *instance, char *realm,
 	   struct ktc_encryptionKey * key, Date lifetime,
@@ -80,7 +82,9 @@ ka_GetAFSTicket(char *name, char *instance, char *realm, Date lifetime,
 	code = ka_ExpandCell(realm, server.cell, &local);
 	if (code)
 	    return code;
-	code = pr_Initialize(0, AFSDIR_CLIENT_ETC_DIRPATH, server.cell);
+	code =
+	    pr_Initialize2(0, AFSDIR_CLIENT_ETC_DIRPATH, server.cell,
+			   ka_ClientInit_flags);
 	if (code) {
 	    afs_com_err(whoami, code, "initializing ptserver in cell '%s'",
 		    server.cell);
