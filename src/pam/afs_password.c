@@ -40,6 +40,7 @@ pam_sm_chauthtok(pam_handle_t * pamh, int flags, int argc, const char **argv)
     int ignore_root = 0;
     char *torch_password = NULL;
     int i;
+    int kprefs = 1;
     char my_password_buf[256];
     char instance[256];
     char realm[256];
@@ -197,12 +198,21 @@ pam_sm_chauthtok(pam_handle_t * pamh, int flags, int argc, const char **argv)
 	password = torch_password = my_password_buf;
     }
 
+  retry_verify:
+    ka_UseKernelPrefs(kprefs);	/* set ka_AuthServerConn server pref behavior */
+
     if ((code = ka_VerifyUserPassword(KA_USERAUTH_VERSION + KA_USERAUTH_DOSETPAG, (char *)user,	/* kerberos name */
 				      NULL,	/* instance */
 				      NULL,	/* realm */
 				      (char *)password,	/* password */
 				      0,	/* spare 2 */
 				      &reason /* error string */ )) != 0) {
+	if (code == KAUBIKINIT && kprefs) {
+	    kprefs = 0;
+	    syslog(LOG_ERR,
+		   "Unable to use kernel DB server prefs; using random prefs");
+	    goto retry_verify;
+	}
 	pam_afs_syslog(LOG_ERR, PAMAFS_LOGIN_FAILED, user, reason);
 	RET(PAM_AUTH_ERR);
     }
@@ -272,15 +282,33 @@ pam_sm_chauthtok(pam_handle_t * pamh, int flags, int argc, const char **argv)
     /* oldkey is not used in ka_ChangePassword (only for ka_auth) */
     ka_StringToKey((char *)password, realm, &oldkey);
     ka_StringToKey(new_password, realm, &newkey);
+
+  retry_token:
     if ((code =
 	 ka_GetAdminToken((char *)user, instance, realm, &oldkey, 20, &token,
 			  0)) != 0) {
+	if (code == KAUBIKINIT && kprefs) {
+	    kprefs = 0;
+	    ka_UseKernelPrefs(kprefs);
+	    syslog(LOG_ERR,
+		   "Unable to use kernel DB server prefs; using random prefs");
+	    goto retry_token;
+	}
 	pam_afs_syslog(LOG_ERR, PAMAFS_KAERROR, code);
 	RET(PAM_AUTH_ERR);
     }
+
+  retry_auth:
     if ((code =
 	 ka_AuthServerConn(realm, KA_MAINTENANCE_SERVICE, &token,
 			   &conn)) != 0) {
+	if (code == KAUBIKINIT && kprefs) {
+	    kprefs = 0;
+	    ka_UseKernelPrefs(kprefs);
+	    syslog(LOG_ERR,
+		   "Unable to use kernel DB server prefs; using random prefs");
+	    goto retry_auth;
+	}
 	pam_afs_syslog(LOG_ERR, PAMAFS_KAERROR, code);
 	RET(PAM_AUTH_ERR);
     }

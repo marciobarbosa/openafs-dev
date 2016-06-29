@@ -52,6 +52,7 @@ pam_sm_setcred(pam_handle_t * pamh, int flags, int argc, const char **argv)
     char sbuffer[100];
     char *torch_password = NULL;
     int auth_ok = 0;
+    int kprefs = 1;
     PAM_CONST char *user = NULL;
     const char *password = NULL;
     int password_expires = -1;
@@ -271,18 +272,30 @@ pam_sm_setcred(pam_handle_t * pamh, int flags, int argc, const char **argv)
 #endif
 	}
 
+	ka_UseKernelPrefs(kprefs);
+
 	if (flags & PAM_REFRESH_CRED) {
 	    if (use_klog) {
 		auth_ok = !do_klog(user, password, "00:00:01", cell_ptr);
 		ktc_ForgetAllTokens();
 	    } else {
-		if (ka_VerifyUserPassword(KA_USERAUTH_VERSION, (char *)user,	/* kerberos name */
-					  NULL,	/* instance */
-					  cell_ptr,	/* realm */
-					  (char*)password,	/* password */
-					  0,	/* spare 2 */
-					  &reason	/* error string */
-		    )) {
+		int code;
+	      retry_refresh:
+		code = ka_VerifyUserPassword(KA_USERAUTH_VERSION, (char *)user,	/* kerberos name */
+					     NULL,	/* instance */
+					     cell_ptr,	/* realm */
+					     (char *)password,	/* password */
+					     0,	/* spare 2 */
+					     &reason	/* error string */
+		    );
+		if (code == KAUBIKINIT && kprefs) {
+		    kprefs = 0;
+		    ka_UseKernelPrefs(kprefs);
+		    syslog(LOG_ERR,
+			   "Unable to use kernel DB server prefs; using random prefs");
+		    goto retry_refresh;
+		}
+		if (code) {
 		    pam_afs_syslog(LOG_ERR, PAMAFS_LOGIN_FAILED, user,
 				   reason);
 		} else {
@@ -295,14 +308,24 @@ pam_sm_setcred(pam_handle_t * pamh, int flags, int argc, const char **argv)
 	    if (use_klog)
 		auth_ok = !do_klog(user, password, NULL, cell_ptr);
 	    else {
-		if (ka_UserAuthenticateGeneral(KA_USERAUTH_VERSION, (char *)user,	/* kerberos name */
-					       NULL,	/* instance */
-					       cell_ptr,	/* realm */
-					       (char*)password,	/* password */
-					       0,	/* default lifetime */
-					       &password_expires, 0,	/* spare 2 */
-					       &reason	/* error string */
-		    )) {
+		int code;
+	      retry_establish:
+		code = ka_UserAuthenticateGeneral(KA_USERAUTH_VERSION, (char *)user,	/* kerberos name */
+						  NULL,	/* instance */
+						  cell_ptr,	/* realm */
+						  (char *)password,	/* password */
+						  0,	/* default lifetime */
+						  &password_expires, 0,	/* spare 2 */
+						  &reason	/* error string */
+		    );
+		if (code == KAUBIKINIT && kprefs) {
+		    kprefs = 0;
+		    ka_UseKernelPrefs(kprefs);
+		    syslog(LOG_ERR,
+			   "Unable to use kernel DB server prefs; using random prefs");
+		    goto retry_establish;
+		}
+		if (code) {
 		    pam_afs_syslog(LOG_ERR, PAMAFS_LOGIN_FAILED, user,
 				   reason);
 		} else {
