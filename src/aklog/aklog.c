@@ -289,6 +289,7 @@ static int zsubs = FALSE;	/* Are we keeping track of zephyr subs? */
 static int hosts = FALSE;	/* Are we keeping track of hosts? */
 static int noprdb = FALSE;	/* Skip resolving name to id? */
 static int linked = FALSE;      /* try for both AFS nodes */
+static int nokprefs = FALSE;	/* do not use kernel dbserver preferences */
 static int afssetpag = FALSE;   /* setpag for AFS */
 static int force = FALSE;	/* Bash identical tokens? */
 static int do524 = FALSE;	/* Should we do 524 instead of rxkad2b? */
@@ -918,6 +919,7 @@ auth_to_cell(krb5_context context, const char *config,
     struct ktc_setTokenData *token;
     struct ktc_setTokenData *btoken = NULL;
     struct afsconf_cell cellconf;
+    int kprefs = nokprefs ? 0 : 1;
 
     /* NULL or empty cell returns information on local cell */
     if ((status = get_cellconfig(config, cell, &cellconf, &local_cell)))
@@ -1018,13 +1020,21 @@ auth_to_cell(krb5_context context, const char *config,
 	    afs_dprintf("About to resolve name %s to id in cell %s.\n", username,
 		    cellconf.name);
 
-	    if (!pr_Initialize (0,  AFSDIR_CLIENT_ETC_DIRPATH, cellconf.name))
-		status = pr_SNameToId (username, &viceId);
+	  retry:
+	    if (!pr_Initialize2
+		(0, AFSDIR_CLIENT_ETC_DIRPATH, cellconf.name, kprefs)) {
+		status = pr_SNameToId(username, &viceId);
+	    } else if (kprefs) {
+		kprefs = 0;
+		afs_dprintf
+		    ("Unable to use kernel DB server prefs; using random prefs.\n");
+		goto retry;
+	    }
 
 	    if (status)
 		afs_dprintf("Error %d\n", status);
 	    else
-		afs_dprintf("Id %d\n", (int) viceId);
+		afs_dprintf("Id %d\n", (int)viceId);
 
 
 	    /*
@@ -1421,7 +1431,7 @@ usage(void)
 	    "[-d] [[-cell | -c] cell [-k krb_realm]] ",
 	    "[[-p | -path] pathname]\n",
 	    "    [-zsubs] [-hosts] [-noauth] [-noprdb] [-force] [-setpag] \n"
-		"    [-linked]"
+		"    [-linked] [-nokernelprefs]"
 #ifndef HAVE_NO_KRB5_524
 		" [-524]"
 #endif
@@ -1436,6 +1446,7 @@ usage(void)
     fprintf(stderr, "    -noprdb means don't try to determine AFS ID.\n");
     fprintf(stderr, "    -force means replace identical tickets. \n");
     fprintf(stderr, "    -linked means if AFS node is linked, try both. \n");
+    fprintf(stderr, "    -nokernelprefs means don't use kernel dbserver preferences\n");
     fprintf(stderr, "    -setpag set the AFS process authentication group.\n");
 #ifndef HAVE_NO_KRB5_524
     fprintf(stderr, "    -524 means use the 524 converter instead of V5 directly\n");
@@ -1562,6 +1573,8 @@ main(int argc, char *argv[])
 	    noprdb++;
 	else if (strcmp(argv[i], "-linked") == 0)
 		linked++;
+	else if (strcmp(argv[i], "-nokernelprefs") == 0)
+	    nokprefs++;
 	else if (strcmp(argv[i], "-force") == 0)
 	    force++;
 #ifndef HAVE_NO_KRB5_524
