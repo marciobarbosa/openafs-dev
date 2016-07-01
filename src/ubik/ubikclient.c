@@ -280,13 +280,6 @@ ubik_ClientInit2(struct rx_connection **serverconns,
 	in->offset = 0;
 
 	do {
-	    /* this is not the first iteration */
-	    if (rankneeded) {
-		if (blob.out != space) {
-		    free(blob.out);
-		}
-	    }
-
 	    blob.in_size = sizeof(struct sprefrequest);
 	    blob.in = (char *)in;
 	    blob.out = space;
@@ -305,6 +298,7 @@ ubik_ClientInit2(struct rx_connection **serverconns,
 		    /* with a starting size of 2kB, the max buffer size we
 		     * can reach is 16kB */
 		    if (2 * blob.out_size > 0x7FFF) {
+			free(blob.out);
 			goto done;
 		    }
 		    blob.out_size *= 2;
@@ -315,6 +309,9 @@ ubik_ClientInit2(struct rx_connection **serverconns,
 		    }
 		    break;
 		default:
+		    if (blob.out != space) {
+			free(blob.out);
+		    }
 		    goto done;
 		}
 	    } while (code != 0);
@@ -356,7 +353,10 @@ ubik_ClientInit2(struct rx_connection **serverconns,
 		break;
 	    }
 	    in->offset = out->next_offset;
-	} while (out->next_offset > 0);
+	    if (blob.out != space) {
+		free(blob.out);
+	    }
+	} while (in->offset > 0);
 
 	/* swap/bubble sort the ranktable by ascending rank; the table is so
 	 * small there's no point to optimizing the sort' */
@@ -386,10 +386,6 @@ ubik_ClientInit2(struct rx_connection **serverconns,
 	}
 
       done:
-	if (blob.out != space) {
-	    free(blob.out);
-	}
-
 	if (code) {
 	    free(tc);
 	} else {
