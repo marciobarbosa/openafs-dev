@@ -174,6 +174,14 @@ CreateIdList(struct idhash *idhash, idlist * alist, afs_int32 select)
 afs_int32
 pr_Initialize(IN afs_int32 secLevel, IN const char *confDir, IN char *cell)
 {
+    /* existing callers will not use DBserver kernel prefs */
+    return pr_Initialize2(secLevel, confDir, cell, 0);
+}
+
+afs_int32
+pr_Initialize2(IN afs_int32 secLevel, IN const char *confDir, IN char *cell,
+	       IN int flags)
+{
     afs_int32 code;
     struct rx_connection *serverconns[MAXSERVERS];
     struct rx_securityClass *sc = NULL;
@@ -309,7 +317,7 @@ pr_Initialize(IN afs_int32 secLevel, IN const char *confDir, IN char *cell)
 			     info.hostAddr[i].sin_port, PRSRV, sc,
 			     scIndex);
 
-    code = ubik_ClientInit(serverconns, &pruclient);
+    code = ubik_ClientInit2(serverconns, &pruclient, flags);
     if (code) {
 	afs_com_err(whoami, code, "ubik client init failed.");
 	return code;
