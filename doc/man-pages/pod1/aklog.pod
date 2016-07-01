@@ -8,11 +8,11 @@ aklog - Obtain tokens for authentication to AFS
 <div class="synopsis">
 
 B<aklog> [B<-d>] [B<-hosts>] [B<-zsubs>] [B<-noprdb>] [B<-noauth>] [B<-linked>]
-    [B<-force>] [B<-524>] [B<-setpag>]
+    [B<-force>] [B<-nokernelprefs>] [B<-524>] [B<-setpag>]
     S<<< [[B<-cell> | B<-c>] <I<cell>> [B<-k> <I<Kerberos realm>>]]+ >>>
 
 B<aklog> [B<-d>] [B<-hosts>] [B<-zsubs>] [B<-noprdb>] [B<-noauth>] [B<-linked>]
-    [B<-force>] [B<-524>] [B<-setpag>] [B<-path> | B<-p>] <I<path>>+
+    [B<-force>] [B<-nokernelprefs>] [B<-524>] [B<-setpag>] [B<-path> | B<-p>] <I<path>>+
 
 =for html
 </div>
@@ -134,6 +134,11 @@ with the foreign cell.  Specifying this flag turns off this functionality.
 This may be desirable if the protection database is unavailable for some
 reason and tokens are desired anyway, or if one wants to disable user
 registration.
+
+=item B<-nokernelprefs>
+
+Do not use kernel dbserver preferences. Find server via old randomized
+mechanism.
 
 =item B<-path> <I<pathname>>, B<-p> <I<pathname>>
 
