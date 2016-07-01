@@ -41,6 +41,7 @@ static struct afsconf_cell explicit_cell_server_list;
 static struct afsconf_cell debug_cell_server_list;
 static int explicit = 0;
 static int debug = 0;
+int ka_ClientInit_flags = 0;
 
 #ifdef ENCRYPTIONBLOCKSIZE
 #undef ENCRYPTIONBLOCKSIZE
@@ -74,6 +75,16 @@ ka_ExplicitCell(char *cell, afs_uint32 serverList[])
 	} else
 	    break;
     UNLOCK_GLOBAL_MUTEX;
+}
+
+void
+ka_UseKernelPrefs(int kprefs)
+{
+    if (kprefs) {
+	ka_ClientInit_flags |= UBIK_KERNEL_DBPREFS;
+    } else {
+	ka_ClientInit_flags &= ~UBIK_KERNEL_DBPREFS;
+    }
 }
 
 static int
@@ -322,7 +333,7 @@ ka_AuthServerConn(char *cell, int service, struct ktc_token * token,
      * to put the returned client structure that we'll use in all of our rpc
      * calls (via ubik_Call) */
     *conn = 0;
-    code = ubik_ClientInit(serverconns, conn);
+    code = ubik_ClientInit2(serverconns, conn, ka_ClientInit_flags);
     rxs_Release(sc);
     UNLOCK_GLOBAL_MUTEX;
     if (code)

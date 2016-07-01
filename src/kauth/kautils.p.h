@@ -64,6 +64,8 @@ extern afs_int32 ka_VerifyUserToken(char *name, char *instance, char *cell,
 extern void ka_ExplicitCell(char *cell, afs_uint32 serverList[]
     );
 
+extern void ka_UseKernelPrefs(int kprefs);
+
 extern afs_int32 ka_GetServers(char *cell, struct afsconf_cell *cellinfo);
 
 extern afs_int32 ka_GetSecurity(int service, struct ktc_token *token,

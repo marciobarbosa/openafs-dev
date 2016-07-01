@@ -12,7 +12,7 @@ B<klog> [B<-x>] S<<< [B<-principal> <I<user name>>] >>>
     S<<< [B<-servers> <I<explicit list of servers>>+] >>>
     [B<-pipe>] [B<-silent>]
     S<<< [B<-lifetime> <I<ticket lifetime in hh[:mm[:ss]]>>] >>>
-    [B<-setpag>] [B<-tmp>] [B<-help>]
+    [B<-setpag>] [B<-tmp>] [B<-nokernelprefs>] [B<-help>]
 
 B<klog> [B<-x>] S<<< [B<-pr> <I<user name>>] >>> S<<< [B<-pa> <I<user's password>>] >>>
     S<<< [B<-c> <I<cell name>>] >>>  S<<< [B<-s> <I<explicit list of servers>>+] >>>
@@ -24,7 +24,7 @@ B<klog.krb> [B<-x>] S<<< [B<-principal> <I<user name>>] >>>
     S<<< [B<-servers> <I<explicit list of servers>>+] >>>
     [B<-pipe>] [B<-silent>]
     S<<< [B<-lifetime> <I<ticket lifetime in hh[:mm[:ss]]>>] >>>
-    [B<-setpag>] [B<-tmp>] [B<-help>]
+    [B<-setpag>] [B<-tmp>] [B<-nokernelprefs>] [B<-help>]
 
 =for html
 </div>
@@ -293,6 +293,11 @@ authentication. The token is associated with the newly created PAG.
 Creates a Kerberos-style ticket file in the F</tmp> directory of the local
 machine. The file is called F<tkt.I<AFS_UID>> where I<AFS_UID> is the AFS
 UID of the issuer.
+
+=item B<-nokernelprefs>
+
+Makes the client do not use kernel dbserver preferences. As a result,
+an authentication server will be chosen randomly.
 
 =item B<-help>
 

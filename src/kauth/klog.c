@@ -103,6 +103,7 @@ main(int argc, char *argv[])
 #define aLIFETIME 7
 #define aSETPAG 8
 #define aTMP 9
+#define aKPREF 10
 
 
     cmd_AddParm(ts, "-x", CMD_FLAG, CMD_OPTIONAL, "(obsolete, noop)");
@@ -121,6 +122,8 @@ main(int argc, char *argv[])
 		"Create a new setpag before authenticating");
     cmd_AddParm(ts, "-tmp", CMD_FLAG, CMD_OPTIONAL,
 		"write Kerberos-style ticket file in /tmp");
+    cmd_AddParm(ts, "-nokernelprefs", CMD_FLAG, CMD_OPTIONAL,
+		"do not use kernel dbserver preferences");
 
     code = cmd_Dispatch(argc, argv);
     KLOGEXIT(code);
@@ -163,6 +166,7 @@ CommandProc(struct cmd_syndesc *as, void *arock)
     static char rn[] = "klog";	/*Routine name */
     static int Pipe = 0;	/* reading from a pipe */
     static int Silent = 0;	/* Don't want error messages */
+    static int KPrefs = 1;	/* default to use kernel DBserver prefs */
 
     int explicit;		/* servers specified explicitly */
     int local;			/* explicit cell is same a local one */
@@ -181,6 +185,9 @@ CommandProc(struct cmd_syndesc *as, void *arock)
     /* first determine quiet flag based on -silent switch */
     Silent = (as->parms[aSILENT].items ? 1 : 0);
     Pipe = (as->parms[aPIPE].items ? 1 : 0);
+
+    /* find server via old randomized mechanism based on -nokernelprefs switch */
+    KPrefs = (as->parms[aKPREF].items ? 0 : 1);
 
     /* Determine if we should also do a setpag based on -setpag switch */
     dosetpag = (as->parms[aSETPAG].items ? 1 : 0);
@@ -354,14 +361,28 @@ CommandProc(struct cmd_syndesc *as, void *arock)
 	}
     }
 
+    if (KPrefs) {
+	ka_UseKernelPrefs(1);
+    }
+
     if (explicit)
 	ka_ExplicitCell(realm, serverList);
 
+  retry:
     code =
 	ka_UserAuthenticateGeneral(KA_USERAUTH_VERSION +
 				   (dosetpag ? KA_USERAUTH_DOSETPAG2 : 0),
 				   pw->pw_name, instance, realm, passwd,
 				   lifetime, &password_expires, 0, &reason);
+    if (code == KAUBIKINIT && KPrefs) {
+	ka_UseKernelPrefs(0);
+	KPrefs = 0;
+	if (!Silent) {
+	    fprintf(stderr,
+		    "Unable to use kernel DB server prefs; using random prefs.\n");
+	}
+	goto retry;
+    }
     memset(passwd, 0, sizeof(passwd));
     if (code) {
 	if (!Silent) {
