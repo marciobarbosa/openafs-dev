@@ -11,7 +11,7 @@ B<klog.krb5> [B<-x>] S<<< [B<-principal> <I<user name>>] >>>
     [-password <I<user's password>>] S<<< [B<-cell> <I<cell name>>] >>>
     S<<< [B<-k> <I<realm>>] >>> [B<-pipe>] [B<-silent>]
     S<<< [B<-lifetime> <I<ticket lifetime in hh[:mm[:ss]]>>] >>>
-    [B<-setpag>] [B<-tmp>] [B<-noprdb>] [B<-unwrap>] [B<-help>]
+    [B<-setpag>] [B<-tmp>] [B<-noprdb>] [B<-unwrap>] [B<-nokernelprefs>] [B<-help>]
 
 B<klog.krb5> [B<-x>] S<<< [B<-pr> <I<user name>>] >>>
     S<<< [B<-pa> <I<user's password>>] >>>
@@ -226,6 +226,11 @@ if you are using older OpenAFS software that cannot handle large ticket
 sizes in conjunction with Active Directory as the Kerberos server, using
 B<-unwrap> can shrink the AFS token size so that older software can handle
 it more easily.
+
+=item B<-nokernelprefs>
+
+Do not use kernel dbserver preferences. Find server via old randomized
+mechanism.
 
 =item B<-help>
 

@@ -116,6 +116,7 @@ main(int argc, char *argv[])
 #define aUNWRAP 11
 #define aK5 12
 #define aK4 13
+#define aKPREF 14
 
     cmd_AddParm(ts, "-x", CMD_FLAG, CMD_OPTIONAL, "obsolete, noop");
     cmd_Seek(ts, aPRINCIPAL);
@@ -141,6 +142,8 @@ main(int argc, char *argv[])
     ++ts->nParms;	/* skip -k5 */
     cmd_AddParm(ts, "-k4", CMD_FLAG, CMD_OPTIONAL|CMD_HIDDEN, 0);
 #endif
+    cmd_AddParm(ts, "-nokernelprefs", CMD_FLAG, CMD_OPTIONAL,
+		"do not use kernel dbserver preferences");
 
     code = cmd_Dispatch(argc, argv);
     KLOGEXIT(code);
@@ -211,14 +214,26 @@ static int
 whoami(struct ktc_token *atoken,
     struct afsconf_cell *cellconfig,
     struct ktc_principal *aclient,
-    int *vicep)
+    int *vicep, int *kprefs, int silent)
 {
     int code;
     char tempname[PR_MAXNAMELEN + 1];
 
-    code = pr_Initialize(0, AFSDIR_CLIENT_ETC_DIRPATH, cellconfig->name);
-    if (code)
+  retry:
+    code =
+	pr_Initialize2(0, AFSDIR_CLIENT_ETC_DIRPATH, cellconfig->name,
+		       *kprefs);
+    if (code) {
+	if (*kprefs) {
+	    *kprefs = 0;
+	    if (!silent) {
+		fprintf(stderr,
+			"Unable to use kernel DB server prefs; using random prefs.\n");
+	    }
+	    goto retry;
+	}
 	goto Failed;
+    }
 
     if (*aclient->instance)
 	snprintf (tempname, sizeof tempname, "%s.%s",
@@ -354,6 +369,7 @@ CommandProc(struct cmd_syndesc *as, void *arock)
     int code;
     char *what;
     int i, dosetpag, evil, noprdb, id;
+    int KPrefs;
 #ifdef AFS_RXK5
     int authtype;
 #endif
@@ -428,6 +444,7 @@ CommandProc(struct cmd_syndesc *as, void *arock)
     writeTicketFile = !! as->parms[aTMP].items;
     noprdb = !! as->parms[aNOPRDB].items;
     evil = (always_evil&1) || !! as->parms[aUNWRAP].items;
+    KPrefs = (as->parms[aKPREF].items ? 0 : 1);
 
 #ifdef AFS_RXK5
     authtype = 0;
@@ -716,7 +733,8 @@ CommandProc(struct cmd_syndesc *as, void *arock)
 	if (!noprdb) {
 	    int viceid = 0;
 	    k5_to_k4_name(k5context, afscred->client, aclient);
-	    code = whoami(atoken, cellconfig, aclient, &viceid);
+	    code =
+		whoami(atoken, cellconfig, aclient, &viceid, &KPrefs, Silent);
 	    if (code) {
 		afs_com_err(rn, code, "Can't get your viceid for cell %s", cellconfig->name);
 		*aclient->name = 0;
