@@ -65,6 +65,7 @@ pam_sm_authenticate(pam_handle_t * pamh, int flags, int argc,
     char *reason = NULL;
     pid_t cpid, rcpid;
     int status;
+    int kprefs = 1;
     struct sigaction newAction, origAction;
 #if !(defined(AFS_LINUX20_ENV) || defined(AFS_FBSD_ENV) || defined(AFS_DFBSD_ENV) || defined(AFS_NBSD_ENV))
     char upwd_buf[2048];       /* size is a guess. */
@@ -276,6 +277,8 @@ pam_sm_authenticate(pam_handle_t * pamh, int flags, int argc,
 	    syslog(LOG_DEBUG, "New PAG created in pam_authenticate()");
     }
 
+    ka_UseKernelPrefs(kprefs);
+
     if (!dont_fork) {
 	/* Prepare for fork(): set SIGCHLD signal handler to default */
 	sigemptyset(&newAction.sa_mask);
@@ -308,6 +311,7 @@ pam_sm_authenticate(pam_handle_t * pamh, int flags, int argc,
 	    if (cpid <= 0) {	/* The child process */
 		if (logmask & LOG_MASK(LOG_DEBUG))
 		    syslog(LOG_DEBUG, "in child");
+	      retry_child:
 		if (refresh_token || set_token)
 		    code = ka_UserAuthenticateGeneral(KA_USERAUTH_VERSION, (char *)user,	/* kerberos name */
 						      NULL,	/* instance */
@@ -325,6 +329,14 @@ pam_sm_authenticate(pam_handle_t * pamh, int flags, int argc,
 						 0,	/* spare 2 */
 						 &reason /* error string */ );
 		if (code) {
+		    if (code == KAUBIKINIT && kprefs) {
+			kprefs = 0;
+			ka_UseKernelPrefs(kprefs);
+			syslog(LOG_ERR,
+			       "Unable to use kernel DB server prefs; \
+			       using random prefs");
+			goto retry_child;
+		    }
 		    pam_afs_syslog(LOG_ERR, PAMAFS_LOGIN_FAILED, user,
 				   reason);
 		    auth_ok = 0;
@@ -359,6 +371,8 @@ pam_sm_authenticate(pam_handle_t * pamh, int flags, int argc,
     } else {			/* dont_fork, used by httpd */
 	if (logmask & LOG_MASK(LOG_DEBUG))
 	    syslog(LOG_DEBUG, "dont_fork");
+
+      retry_nochild:
 	if (refresh_token || set_token)
 	    code = ka_UserAuthenticateGeneral(KA_USERAUTH_VERSION, (char *)user,	/* kerberos name */
 					      NULL,	/* instance */
@@ -374,6 +388,13 @@ pam_sm_authenticate(pam_handle_t * pamh, int flags, int argc,
 					 (char *)password,	/* password */
 					 0,	/* spare 2 */
 					 &reason /* error string */ );
+	if (code == KAUBIKINIT && kprefs) {
+	    kprefs = 0;
+	    ka_UseKernelPrefs(kprefs);
+	    syslog(LOG_ERR,
+		   "Unable to use kernel DB server prefs; using random prefs");
+	    goto retry_nochild;
+	}
 	if (logmask & LOG_MASK(LOG_DEBUG))
 	    syslog(LOG_DEBUG, "dont_fork, code = %d", code);
 	if (code) {
