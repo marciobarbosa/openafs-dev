@@ -42,6 +42,9 @@
 #define	MAXSERVERS	    20	/*!< max number of servers */
 /*\}*/
 
+/* flags for ubik_ClientInit2 */
+#define UBIK_KERNEL_DBPREFS 0x1
+
 /*! version comparison macro */
 #define vcmp(a,b) ((a).epoch == (b).epoch? ((a).counter - (b).counter) : ((a).epoch - (b).epoch))
 
@@ -615,6 +618,8 @@ extern int ubik_ParseClientList(int argc, char **argv, afs_uint32 * aothers);
 extern unsigned int afs_random(void);
 extern int ubik_ClientInit(struct rx_connection **serverconns,
 			   struct ubik_client **aclient);
+extern int ubik_ClientInit2(struct rx_connection **serverconns,
+			    struct ubik_client **aclient, int flags);
 extern afs_int32 ubik_ClientDestroy(struct ubik_client *aclient);
 extern struct rx_connection *ubik_RefreshConn(struct rx_connection *tc);
 #ifdef UBIK_LEGACY_CALLITER
