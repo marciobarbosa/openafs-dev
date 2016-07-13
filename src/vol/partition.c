@@ -1500,12 +1500,151 @@ AddPartitionToTable_r(struct DiskPartition64 *dp)
     DiskPartitionTable[dp->index] = dp;
 }
 
-#if 0
 static void
 DeletePartitionFromTable_r(struct DiskPartition64 *dp)
 {
     opr_Assert(dp->index >= 0 && dp->index <= VOLMAXPARTS);
     DiskPartitionTable[dp->index] = NULL;
 }
+
+/**
+ * Attach new partitions dynamically.
+ *
+ * This function enables the addition of new partitions
+ * to the servers without have to reboot it.
+ *
+ * @param[out] partIds ids of the new partitions
+ * @param[out] acount  number of new partitions
+ *
+ * @return operation status
+ *   @retval 0 success
+ *
+ * @note the new partitions must be empty
+ */
+int
+VAttachNewPartitions(afs_int32 *partIds, int *acount)
+{
+    int i, j;
+    int code;
+
+    afs_uint32 parts[VOLMAXPARTS + 1];
+    int count = 0;
+
+    *acount = 0;
+
+    VOL_LOCK;
+    /* save the id of the partitions already attached */
+    for (i = 0; i < VOLMAXPARTS + 1; i++) {
+	if (DiskPartitionTable[i]) {
+	    parts[count] = DiskPartitionTable[i]->index;
+	    count++;
+	}
+    }
+    VOL_UNLOCK;
+    code = VAttachPartitions();
+    VOL_LOCK;
+
+    /* find out the ids of the new partitions comparing the new table
+     * with the one saved at the beginning of this function */
+    for (i = 0; i < VOLMAXPARTS + 1; i++) {
+	if (!DiskPartitionTable[i])
+	    continue;
+	for (j = 0; j < count; j++) {
+	    if (DiskPartitionTable[i]->index == parts[j])
+		break;
+	}
+	if (j == count) {
+	    partIds[*acount] = DiskPartitionTable[i]->index;
+	    *acount = *acount + 1;
+	}
+    }
+    VOL_UNLOCK;
+    return code;
+}
+
+static void
+ReleasePartition(struct DiskPartition64 *dp)
+{
+    /* the partition must be empty */
+    opr_Assert(dp && dp->vol_list.len == 0);
+
+#if defined(AFS_NAMEI_ENV)
+    /* remove the lock file and folder */
+    char *last_dirsep;
+    struct afs_stat_st status;
+
+    /* the lock file might have been removed by another server */
+    if (afs_stat(dp->devName, &status) == 0) {
+	unlink(dp->devName);
+	last_dirsep = strrchr(dp->devName, '/');
+	*last_dirsep = '\0';
+	rmdir(dp->devName);
+    }
+
+    /* removing .volheaders.lock */
+    if (afs_stat(dp->headerLockFile.path, &status) == 0) {
+	unlink(dp->headerLockFile.path);
+    }
+
+    /* removing .volume.lock */
+    if (afs_stat(dp->volLockFile.path, &status) == 0) {
+	unlink(dp->volLockFile.path);
+    }
+
+    /* remove vice readme file and folder */
+    if (programType == fileServer) {
+	char filename[MAXPATHLEN + 1];
+	snprintf(filename, sizeof filename,
+		 "%s" OS_DIRSEP "%s" OS_DIRSEP "README", VPartitionPath(dp),
+		 INODEDIR);
+	unlink(filename);
+	last_dirsep = strrchr(filename, '/');
+	*last_dirsep = '\0';
+	rmdir(filename);
+    }
 #endif
+    CV_DESTROY(&dp->vol_list.cv);
+    free(dp->headerLockFile.path);
+    free(dp->volLockFile.path);
+    opr_mutex_destroy(&dp->headerLock.mutex);
+    opr_cv_destroy(&dp->headerLock.cv);
+    free(dp->name);
+    free(dp->devName);
+}
+
+/**
+ * Delete a partition object using its index number.
+ *
+ * This funtion removes the partition object from the
+ * liked list and from the table. The partition must
+ * be empty. The memory used by the partition will be
+ * released. Also, the lock and readme files associated
+ * with it will be removed.
+ *
+ * @param[in] id partition index number
+ */
+void
+VDeletePartitionById(afs_int32 id)
+{
+    struct DiskPartition64 *op;
+    struct DiskPartition64 *prev = DiskPartitionList;
+
+    VOL_LOCK;
+
+    for (op = DiskPartitionList; op; op = op->next) {
+	if (op && op->index == id)
+	    break;
+	prev = op;
+    }
+    if (op && !op->vol_list.len) {
+	if (op == prev)
+	    DiskPartitionList = op->next;
+	else
+	    prev->next = op->next;
+	DeletePartitionFromTable_r(op);
+	ReleasePartition(op);
+    }
+
+    VOL_UNLOCK;
+}
 #endif /* AFS_DEMAND_ATTACH_FS */

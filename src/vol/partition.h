@@ -176,6 +176,8 @@ extern struct DiskPartition64 *VGetPartitionById(afs_int32 index, int abortp);
 extern struct DiskPartition64 *VGetPartitionById_r(afs_int32 index, int abortp);
 extern int VPartHeaderLock(struct DiskPartition64 *dp, int locktype);
 extern void VPartHeaderUnlock(struct DiskPartition64 *dp, int locktype);
+extern int VAttachNewPartitions(afs_int32 *partIds, int *acount);
+extern void VDeletePartitionById(afs_int32 id);
 #endif
 extern int VAttachPartitions(void);
 extern void VLockPartition(char *name);
