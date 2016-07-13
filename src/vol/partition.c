@@ -284,6 +284,14 @@ VCheckPartition(char *part, char *devname, int logging)
     char AFSIDatPath[MAXPATHLEN];
 #endif
 
+#ifdef AFS_DEMAND_ATTACH_FS
+    /* Check if the partition is already attached. Useful
+     * when the 'vos loadpart' command is used. */
+    if (VLookupPartition_r(part) != NULL) {
+	return 0;
+    }
+#endif
+
     /* Only keep track of "/vicepx" partitions since it can get hairy
      * when NFS mounts are involved.. */
     if (strncmp(part, VICE_PARTITION_PREFIX, VICE_PREFIX_SIZE)) {
