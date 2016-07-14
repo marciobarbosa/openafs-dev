@@ -3199,3 +3199,71 @@ GetPartName(afs_int32 partid, char *pname)
     } else
 	return -1;
 }
+
+static afs_int32
+VolLoadPartitions(struct rx_call *acid, struct pIDs *partIds,
+		  afs_uint32 *acount)
+{
+    afs_int32 code;
+#ifndef AFS_DEMAND_ATTACH_FS
+    code = -1;	/* only supported by dafs */
+#else
+    int i;
+    struct DiskPartition64 *dp;
+    char caller[MAXKTCNAMELEN];
+
+    afs_int32 parts[VOLMAXPARTS + 1];
+    int count;
+
+    if (!afsconf_SuperUser(tdir, acid, caller))
+	return VOLSERBAD_ACCESS;
+
+    /* attach new partitions on the volume server */
+    code = VAttachNewPartitions(parts, &count);
+    *acount = count;
+
+    if (code)
+	goto done;
+
+    /* attach new partitions on the file server */
+    code = FSYNC_VolOp(0, NULL, FSYNC_PART_LOAD, FSYNC_WHATEVER, NULL);
+
+  done:
+    /* If the attachment of the new partitions did not work as expected in at
+     * least one server, remove the partitions previously attached to keep the
+     * partition list / table consistent between the servers. Otherwise, report
+     * the success.*/
+    for (i = 0; i < count; i++) {
+	if (code) {
+	    VDeletePartitionById(parts[i]);
+	} else {
+	    partIds->partIds[i] = parts[i];
+	    dp = VGetPartitionById_r(parts[i], 0);
+	    Log("Partition %s successfully attached\n", dp->name);
+	}
+    }
+#endif	/* AFS_DEMAND_ATTACH_FS */
+    return code;
+}
+
+/**
+ * Load new partitions on the server at runtime.
+ *
+ * @param[in]  acid	incoming rx call
+ * @param[out] partIds	ids of the partitions attached by this function
+ * @param[out] count	number of new partitions attached
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+afs_int32
+SAFSVolLoadPartitions(struct rx_call *acid, struct pIDs *partIds,
+		      afs_uint32 *count)
+{
+    afs_int32 code;
+
+    code = VolLoadPartitions(acid, partIds, count);
+    osi_auditU(acid, VS_LoadPartEvent, code, AUD_END);
+    return code;
+}

@@ -162,6 +162,7 @@ static afs_int32 FSYNC_com_VolOpQuery(FSSYNC_VolOp_command * com, SYNC_response 
 static afs_int32 FSYNC_com_VGQuery(FSSYNC_VolOp_command * com, SYNC_response * res);
 static afs_int32 FSYNC_com_VGScan(FSSYNC_VolOp_command * com, SYNC_response * res);
 static afs_int32 FSYNC_com_VGScanAll(FSSYNC_VolOp_command * com, SYNC_response * res);
+static afs_int32 FSYNC_com_LoadPart(FSSYNC_VolOp_command * com, SYNC_response * res);
 #endif /* AFS_DEMAND_ATTACH_FS */
 
 static afs_int32 FSYNC_com_VnQry(osi_socket fd, SYNC_command * com, SYNC_response * res);
@@ -520,6 +521,7 @@ FSYNC_com(osi_socket fd)
     case FSYNC_VG_QUERY:
     case FSYNC_VG_SCAN:
     case FSYNC_VG_SCAN_ALL:
+    case FSYNC_PART_LOAD:
 #endif
 	res.hdr.response = FSYNC_com_VolOp(fd, &com, &res);
 	break;
@@ -635,6 +637,9 @@ FSYNC_com_VolOp(osi_socket fd, SYNC_command * com, SYNC_response * res)
 	break;
     case FSYNC_VG_SCAN_ALL:
 	code = FSYNC_com_VGScanAll(&vcom, res);
+	break;
+    case FSYNC_PART_LOAD:
+	code = FSYNC_com_LoadPart(&vcom, res);
 	break;
 #endif /* AFS_DEMAND_ATTACH_FS */
     default:
@@ -1735,6 +1740,55 @@ FSYNC_com_VGScanAll(FSSYNC_VolOp_command * com, SYNC_response * res)
 	code = SYNC_OK;
     }
 
+    return code;
+}
+
+/**
+ * Load new partitions on the server at runtime.
+ *
+ * @param[in]  vcom	pointer to command packet
+ * @param[out] res	response
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+static afs_int32
+FSYNC_com_LoadPart(FSSYNC_VolOp_command * vcom, SYNC_response * res)
+{
+    int i;
+    afs_int32 code;
+    struct DiskPartition64 *dp;
+
+    afs_int32 parts[VOLMAXPARTS + 1];
+    int count;
+
+    VOL_UNLOCK;
+    /* attach new partitions on the file server */
+    code = VAttachNewPartitions(parts, &count);
+    VOL_LOCK;
+
+    if (code)
+	goto done;
+
+    /* attach new partitions on salvager */
+    code =
+	SALVSYNC_SalvageVolume(0, NULL, SALVSYNC_PART_LOAD, SALVSYNC_WHATEVER,
+			       0, NULL);
+
+  done:
+    /* If the attachment of the new partitions did not work as expected in at
+     * least one server, remove the partitions previously attached to keep the
+     * partition list / table consistent between the servers. Otherwise, report
+     * the success.*/
+    for (i = 0; i < count; i++) {
+	if (code) {
+	    VDeletePartitionById(parts[i]);
+	} else {
+	    dp = VGetPartitionById_r(parts[i], 0);
+	    ViceLog(0, ("Partition %s successfully attached\n", dp->name));
+	}
+    }
     return code;
 }
 #endif /* AFS_DEMAND_ATTACH_FS */

@@ -58,6 +58,7 @@ enum FSYNCOpCode {
     FSYNC_VG_DEL              = SYNC_COM_CODE_DECL(21), /**< delete a volume id from a vg */
     FSYNC_VG_SCAN             = SYNC_COM_CODE_DECL(22), /**< force a re-scan of a given partition */
     FSYNC_VG_SCAN_ALL         = SYNC_COM_CODE_DECL(23), /**< force a re-scan of all vice partitions */
+    FSYNC_PART_LOAD           = SYNC_COM_CODE_DECL(24),	/**< load new partitions */
     FSYNC_OP_CODE_END
 };
 

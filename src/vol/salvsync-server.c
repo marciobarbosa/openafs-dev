@@ -113,6 +113,7 @@ static afs_int32 SALVSYNC_com_Cancel(SALVSYNC_command * com, SALVSYNC_response *
 static afs_int32 SALVSYNC_com_Query(SALVSYNC_command * com, SALVSYNC_response * res);
 static afs_int32 SALVSYNC_com_CancelAll(SALVSYNC_command * com, SALVSYNC_response * res);
 static afs_int32 SALVSYNC_com_Link(SALVSYNC_command * com, SALVSYNC_response * res);
+static afs_int32 SALVSYNC_com_LoadPart(SALVSYNC_command * com, SALVSYNC_response * res);
 
 
 extern int VInit;
@@ -456,6 +457,10 @@ SALVSYNC_com(osi_socket fd)
     case SALVSYNC_OP_LINK:
 	/* link a clone to its parent in the scheduler */
 	res.hdr.response = SALVSYNC_com_Link(&scom, &sres);
+	break;
+    case SALVSYNC_PART_LOAD:
+	/* load new partitions */
+	res.hdr.response = SALVSYNC_com_LoadPart(&scom, &sres);
 	break;
     default:
 	res.hdr.response = SYNC_BAD_COMMAND;
@@ -1357,6 +1362,46 @@ SALVSYNC_doneWorkByPid(int pid, int status)
 	    }
 	}
     }
+}
+
+/**
+ * Load new partitions on the server at runtime.
+ *
+ * @param[in]  com	inbound command object
+ * @param[out] res	outbound response object
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+static afs_int32
+SALVSYNC_com_LoadPart(SALVSYNC_command * com, SALVSYNC_response * res)
+{
+    int i;
+    afs_int32 code;
+    struct DiskPartition64 *dp;
+
+    afs_int32 parts[VOLMAXPARTS + 1];
+    int count;
+
+    VOL_UNLOCK;
+    /* attach new partitions on salvager */
+    code = VAttachNewPartitions(parts, &count);
+    VOL_LOCK;
+
+    /* If the attachment of the new partitions did not work as expected in at
+     * least one server, remove the partitions previously attached to keep the
+     * partition list / table consistent between the servers. Otherwise, report
+     * the success.*/
+    for (i = 0; i < count; i++) {
+	if (code) {
+	    VDeletePartitionById(parts[i]);
+	} else {
+	    dp = VGetPartitionById_r(parts[i], 0);
+	    Log("Partition %s successfully attached\n", dp->name);
+	}
+    }
+    return code;
 }
 
 #endif /* AFS_DEMAND_ATTACH_FS */
