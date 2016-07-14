@@ -69,6 +69,7 @@
 #define VS_MonitorEvent    "AFS_VS_Monitor"
 #define VS_SetIdTyEvent    "AFS_VS_SetIdTy"
 #define VS_SetDateEvent    "AFS_VS_SetDate"
+#define VS_LoadPartEvent   "AFS_VS_LoadPart"
 /* Next 2 lines on behalf of MR-AFS */
 #define VS_SelectiveDumpEvent "AFS_VS_DmpSelct"
 #define VS_ListVolumeResidencyInfoEvent "AFS_VS_LstVInfo"
