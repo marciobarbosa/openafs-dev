@@ -3566,6 +3566,47 @@ ListPartitions(struct cmd_syndesc *as, void *arock)
 
 }
 
+/**
+ * Load new partitions on the server at runtime.
+ *
+ * @param[in] as ptr to parsed command line arguments
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+static int
+LoadPartitions(struct cmd_syndesc *as, void *arock)
+{
+    afs_int32 code = 0;
+    afs_uint32 aserver;
+    char *host = as->parms[0].items->data;
+
+    int i;
+    char pname[10];
+
+    afs_int32 parts[VOLMAXPARTS + 1];
+    afs_uint32 count;
+
+    aserver = GetServer(host);
+    if (aserver == 0) {
+	fprintf(STDERR, "vos: server '%s' not found in host table\n", host);
+	exit(1);
+    }
+    code = UV_LoadPartitions(aserver, parts, &count);
+
+    if (code) {
+	PrintError("", code);
+	exit(1);
+    }
+    fprintf(STDERR, "vos: loading new partitions\n");
+    for (i = 0; i < count; i++) {
+	MapPartIdIntoName(parts[i], pname);
+	fprintf(STDERR, "\t%s successfully loaded\n", pname);
+    }
+    return code;
+}
+
 static int
 CompareVolName(const void *p1, const void *p2)
 {
@@ -6188,6 +6229,11 @@ main(int argc, char **argv)
     COMMONPARMS;
 
     ts = cmd_CreateSyntax("listpart", ListPartitions, NULL, 0, "list partitions");
+    cmd_AddParm(ts, "-server", CMD_SINGLE, 0, "machine name");
+    COMMONPARMS;
+
+    ts = cmd_CreateSyntax("loadpart", LoadPartitions, NULL, 0,
+			  "load new partitions");
     cmd_AddParm(ts, "-server", CMD_SINGLE, 0, "machine name");
     COMMONPARMS;
 

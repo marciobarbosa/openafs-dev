@@ -60,6 +60,7 @@ statindex 16
 #define     VOLLISTOBJECTS      65546
 #define     VOLSPLIT            65547
 #define     VOLARCHCAND         65548
+#define     VOLLOADPARTITIONS   65549
 
 /* Bits for flags for DumpV2 */
 %#define     VOLDUMPV2_OMITDIRS 1
@@ -451,3 +452,8 @@ proc SplitVolume (
   IN afs_uint32 where,
   IN afs_int32 verbose
 ) split = VOLSPLIT;
+
+proc LoadPartitions(
+  OUT struct pIDs *partIDs,
+  OUT afs_uint32 *count
+) = VOLLOADPARTITIONS;
