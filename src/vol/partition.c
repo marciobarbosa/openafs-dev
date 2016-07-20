@@ -140,6 +140,8 @@ struct DiskPartition64 *DiskPartitionList;
 #define AFS_PARTLOCK_FILE ".volheaders.lock"
 #define AFS_VOLUMELOCK_FILE ".volume.lock"
 
+extern int VInit;
+
 static struct DiskPartition64 *DiskPartitionTable[VOLMAXPARTS+1];
 
 static struct DiskPartition64 * VLookupPartition_r(char * path);
@@ -284,6 +286,14 @@ VCheckPartition(char *part, char *devname, int logging)
     char AFSIDatPath[MAXPATHLEN];
 #endif
 
+#ifdef AFS_DEMAND_ATTACH_FS
+    /* Check if the partition is already attached. Useful
+     * when the 'vos loadpart' command is used. */
+    if (VLookupPartition_r(part) != NULL) {
+	return 0;
+    }
+#endif
+
     /* Only keep track of "/vicepx" partitions since it can get hairy
      * when NFS mounts are involved.. */
     if (strncmp(part, VICE_PARTITION_PREFIX, VICE_PREFIX_SIZE)) {
@@ -302,6 +312,39 @@ VCheckPartition(char *part, char *devname, int logging)
 	    "fileserver backend. Aborting...\n", part);
 	return -1;
     }
+#ifdef AFS_DEMAND_ATTACH_FS
+    /* If VInit > 1, we are trying to load new partitions using the
+     * 'vos loadpart' command. VCheckPartition is called during
+     * initialization (VInit == 1) or when the 'vos loadpart' command
+     * is executed (VInit > 1). The goal of this section is to make
+     * sure that the new partition does not have any volume. */
+    if (VInit > 1) {
+	DIR *dir;
+	struct dirent *dent;
+	char *ext;
+
+	if ((dir = opendir(part)) == NULL) {
+	    Log("VCheckPartition: Error opening directory.\n");
+	    return -1;
+	}
+	/* Check if the new partition has at least one volume. */
+	while ((dent = readdir(dir))) {
+	    ext = strrchr(dent->d_name, '.');
+	    if (!ext)
+		continue;
+	    if (!strcmp(ext, ".vol"))
+		break;
+	}
+	/* If the partition has at least one volume, return. */
+	if (dent) {
+	    Log("VCheckPartition: %s is not empty.\n", part);
+	    closedir(dir);
+	    return -1;
+	}
+	closedir(dir);
+    }
+#endif
+
 #ifndef AFS_AIX32_ENV
     if (programType == fileServer) {
 	char salvpath[MAXPATHLEN];
