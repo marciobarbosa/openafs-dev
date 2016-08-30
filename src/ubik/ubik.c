@@ -150,6 +150,55 @@ ContactQuorum_NoArguments(afs_int32 (*proc)(struct rx_connection *, ubik_tid *),
 }
 
 afs_int32
+ContactQuorum_DISK_Begin(struct ubik_trans *atrans, int aflags)
+{
+    struct ubik_server *ts;
+    afs_int32 code;
+    afs_int32 rcode, okcalls;
+#ifndef AFS_PTHREAD_ENV
+    struct timeval tv;
+#endif
+
+    rcode = 0;
+    okcalls = 0;
+    for (ts = ubik_servers; ts; ts = ts->next) {
+	/* for each server */
+	if (!ts->up || !ts->currentDB) {
+	    ts->currentDB = 0;	/* db is no longer current; we just missed an update */
+	    continue;		/* not up-to-date, don't bother */
+	}
+	/* DBRELE(atrans->dbase); */
+	code = DISK_Begin(ts->disk_rxcid, &atrans->tid);
+#ifndef AFS_PTHREAD_ENV
+	tv.tv_sec = 30;
+	tv.tv_usec = 0;
+	ubik_print("[marcio] DISK_Begin: going to the bed...\n");
+	IOMGR_Select(0, 0, 0, 0, &tv);
+	ubik_print("[marcio] DISK_Begin: waking up!\n");
+#endif
+	/* DBHOLD(atrans->dbase); */
+	if (code) {		/* failure */
+	    rcode = code;
+	    ts->up = 0;		/* mark as down now; beacons will no longer be sent */
+	    ts->currentDB = 0;
+	    ts->beaconSinceDown = 0;
+	    urecovery_LostServer();	/* tell recovery to try to resend dbase later */
+	} else {		/* success */
+	    if (!ts->isClone)
+		okcalls++;	/* count up how many worked */
+	    if (aflags & CStampVersion) {
+		ts->version = atrans->dbase->version;
+	    }
+	}
+    }
+    /* return 0 if we successfully contacted a quorum, otherwise return error code.  We don't have to contact ourselves (that was done locally) */
+    if (okcalls + 1 >= ubik_quorum)
+	return 0;
+    else
+	return rcode;
+}
+
+afs_int32
 ContactQuorum_DISK_Lock(struct ubik_trans *atrans, int aflags,afs_int32 file,
 			afs_int32 position, afs_int32 length, afs_int32 type)
 {
@@ -718,7 +767,7 @@ BeginTrans(struct ubik_dbase *dbase, afs_int32 transMode,
 	dbase->writeTidCounter = tt->tid.counter;
 
 	/* next try to start transaction on appropriate number of machines */
-	code = ContactQuorum_NoArguments(DISK_Begin, tt, 0);
+	code = ContactQuorum_DISK_Begin(tt, 0);
 	if (code) {
 	    /* we must abort the operation */
 	    udisk_abort(tt);
