@@ -1323,11 +1323,11 @@ ubik_SetLock(struct ubik_trans *atrans, afs_int32 apos, afs_int32 alen,
 	if (!ubeacon_AmSyncSite())
 	    ERROR_EXIT(UNOTSYNC);
 
-	/* now do the operation locally, and propagate it out */
-	code = ulock_getLock(atrans, atype, 1);
+	/* now do the operation remotely first, and then locally */
+	code = ContactQuorum_DISK_Lock(atrans, 0, 0, 1 /*unused */ ,
+				       1 /*unused */ , LOCKWRITE);
 	if (code == 0) {
-	    code = ContactQuorum_DISK_Lock(atrans, 0, 0, 1 /*unused */ ,
-				 	   1 /*unused */ , LOCKWRITE);
+	    code = ulock_getLock(atrans, atype, 1);
 	}
 	if (code) {
 	    /* we must abort the operation */
