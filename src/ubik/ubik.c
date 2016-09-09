@@ -216,8 +216,22 @@ ContactQuorum_DISK_Lock(struct ubik_trans *atrans, int aflags,afs_int32 file,
 	    ts->currentDB = 0;	/* db is no longer current; we just missed an update */
 	    continue;		/* not up-to-date, don't bother */
 	}
+
+	/* drop the version lock to allow read transactions */
+	DBRELE(atrans->dbase);
 	code = DISK_Lock(ts->disk_rxcid, &atrans->tid, file, position, length,
-			   type);
+			 type);
+	DBHOLD(atrans->dbase);
+
+	/* read transactions can change the global ubik_amSyncSite */
+	if (!ubeacon_AmSyncSite()) {
+	    return UNOTSYNC;
+	}
+	/* the recovery thread can abort the transactions */
+	if (atrans->flags & TRABORT) {
+	    return UDONE;
+	}
+
 	if (code) {		/* failure */
 	    rcode = code;
 	    ts->up = 0;		/* mark as down now; beacons will no longer be sent */
