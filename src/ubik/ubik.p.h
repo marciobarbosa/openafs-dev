@@ -408,6 +408,9 @@ extern afs_int32 ContactQuorum_NoArguments(afs_int32 (*proc)
 					   struct ubik_trans *atrans,
 					   int aflags);
 
+extern afs_int32 ContactQuorum_DISK_Begin(struct ubik_trans *atrans,
+					  int aflags);
+
 extern afs_int32 ContactQuorum_DISK_Lock(struct ubik_trans *atrans,
 					 int aflags,
 					 afs_int32 file, afs_int32 position,
