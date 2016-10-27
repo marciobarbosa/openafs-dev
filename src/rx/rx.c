@@ -544,6 +544,7 @@ rx_InitHost(u_int host, u_int port)
     /* Malloc up a bunch of packets & buffers */
     rx_nFreePackets = 0;
     queue_Init(&rx_freePacketQueue);
+    queue_Init(&rx_totalPacketsQueue);
     rxi_NeedMorePackets = FALSE;
     rx_nPackets = 0;	/* rx_nPackets is managed by rxi_MorePackets* */
 

@@ -634,3 +634,5 @@ EXT int rx_enable_hot_thread GLOBALSINIT(0);
 
 EXT int RX_IPUDP_SIZE GLOBALSINIT(_RX_IPUDP_SIZE);
 #endif /* AFS_RX_GLOBALS_H */
+
+EXT struct rx_queue rx_totalPacketsQueue;

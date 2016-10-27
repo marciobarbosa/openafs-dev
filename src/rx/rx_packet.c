@@ -85,6 +85,12 @@
 #endif
 #endif /* KERNEL */
 
+struct packets_block {
+    struct rx_queue queueItemHeader;
+    struct rx_packet *begin;
+    afs_uint32 size;
+};
+
 #ifdef RX_LOCKS_DB
 /* rxdb_fileID is used to identify the lock location, along with line#. */
 static int rxdb_fileID = RXDB_FILE_RX_PACKET;
@@ -532,6 +538,7 @@ void
 rxi_MorePackets(int apackets)
 {
     struct rx_packet *p, *e;
+    struct packets_block *pb;
     struct rx_ts_info_t * rx_ts_info;
     int getme;
     SPLVAR;
@@ -539,9 +546,12 @@ rxi_MorePackets(int apackets)
     getme = apackets * sizeof(struct rx_packet);
     p = (struct rx_packet *)osi_Alloc(getme);
     osi_Assert(p);
+    pb = (struct packets_block *)osi_Alloc(sizeof(struct packets_block));
+    osi_Assert(pb);
 
     PIN(p, getme);		/* XXXXX */
     memset(p, 0, getme);
+    memset(pb, 0, sizeof(struct packets_block));
     RX_TS_INFO_GET(rx_ts_info);
 
     RX_TS_FPQ_LOCAL_ALLOC(rx_ts_info,apackets);
@@ -550,6 +560,10 @@ rxi_MorePackets(int apackets)
     MUTEX_ENTER(&rx_packets_mutex);
     rx_nPackets += apackets;
     RX_TS_FPQ_COMPUTE_LIMITS;
+
+    pb->begin = p;
+    pb->size = apackets;
+    queue_Append(&rx_totalPacketsQueue, pb);
     MUTEX_EXIT(&rx_packets_mutex);
 
     for (e = p + apackets; p < e; p++) {
@@ -587,17 +601,25 @@ void
 rxi_MorePackets(int apackets)
 {
     struct rx_packet *p, *e;
+    struct packets_block *pb;
     int getme;
     SPLVAR;
 
     getme = apackets * sizeof(struct rx_packet);
     p = (struct rx_packet *)osi_Alloc(getme);
     osi_Assert(p);
+    pb = (struct packets_block *)osi_Alloc(sizeof(struct packets_block));
+    osi_Assert(pb);
 
     PIN(p, getme);		/* XXXXX */
     memset(p, 0, getme);
+    memset(pb, 0, sizeof(struct packets_block));
     NETPRI;
     MUTEX_ENTER(&rx_freePktQ_lock);
+
+    pb->begin = p;
+    pb->size = apackets;
+    queue_Append(&rx_totalPacketsQueue, pb);
 
     for (e = p + apackets; p < e; p++) {
         RX_PACKET_IOV_INIT(p);
@@ -629,15 +651,18 @@ void
 rxi_MorePacketsTSFPQ(int apackets, int flush_global, int num_keep_local)
 {
     struct rx_packet *p, *e;
+    struct packets_block *pb;
     struct rx_ts_info_t * rx_ts_info;
     int getme;
     SPLVAR;
 
     getme = apackets * sizeof(struct rx_packet);
     p = (struct rx_packet *)osi_Alloc(getme);
+    pb = (struct packets_block *)osi_Alloc(sizeof(struct packets_block));
 
     PIN(p, getme);		/* XXXXX */
     memset(p, 0, getme);
+    memset(pb, 0, sizeof(struct packets_block));
     RX_TS_INFO_GET(rx_ts_info);
 
     RX_TS_FPQ_LOCAL_ALLOC(rx_ts_info,apackets);
@@ -645,6 +670,10 @@ rxi_MorePacketsTSFPQ(int apackets, int flush_global, int num_keep_local)
     MUTEX_ENTER(&rx_packets_mutex);
     rx_nPackets += apackets;
     RX_TS_FPQ_COMPUTE_LIMITS;
+
+    pb->begin = p;
+    pb->size = apackets;
+    queue_Append(&rx_totalPacketsQueue, pb);
     MUTEX_EXIT(&rx_packets_mutex);
 
     for (e = p + apackets; p < e; p++) {
@@ -688,6 +717,7 @@ rxi_MorePacketsNoLock(int apackets)
     struct rx_ts_info_t * rx_ts_info;
 #endif /* RX_ENABLE_TSFPQ */
     struct rx_packet *p, *e;
+    struct packets_block *pb;
     int getme;
 
     /* allocate enough packets that 1/4 of the packets will be able
@@ -703,6 +733,12 @@ rxi_MorePacketsNoLock(int apackets)
         }
     } while(p == NULL);
     memset(p, 0, getme);
+
+    pb = (struct packets_block *)osi_Alloc(sizeof(struct packets_block));
+    osi_Assert(pb);
+    pb->begin = p;
+    pb->size = apackets;
+    queue_Append(&rx_totalPacketsQueue, pb);
 
 #ifdef RX_ENABLE_TSFPQ
     RX_TS_INFO_GET(rx_ts_info);
@@ -739,11 +775,16 @@ rxi_MorePacketsNoLock(int apackets)
 void
 rxi_FreeAllPackets(void)
 {
+    struct packets_block *pb;
     /* must be called at proper interrupt level, etcetera */
     /* MTUXXX need to free all Packets */
-    osi_Free(rx_mallocedP,
-	     (rx_maxReceiveWindow + 2) * sizeof(struct rx_packet));
-    UNPIN(rx_mallocedP, (rx_maxReceiveWindow + 2) * sizeof(struct rx_packet));
+    while (!queue_IsEmpty(&rx_totalPacketsQueue)) {
+	pb = queue_First(&rx_totalPacketsQueue, packets_block);
+	queue_Remove(pb);
+	osi_Free(pb->begin,
+		 pb->size * sizeof(struct rx_packet));
+	UNPIN(pb->begin, pb->size * sizeof(struct rx_packet));
+    }
 }
 
 #ifdef RX_ENABLE_TSFPQ
