@@ -86,10 +86,13 @@
 #endif /* KERNEL */
 
 #ifdef AFS_DARWIN_ENV
+/*!
+ * \brief structure used on DARWIN to keep track of allocated packets
+ */
 struct rx_mallocedPacket {
-    struct rx_queue queueItemHeader;	/* chained using the queue package */
-    struct rx_packet *addr;		/* address of the first element */
-    afs_uint32 size;			/* number of packets */
+    struct rx_queue queueItemHeader;	/*!< chained using the queue package */
+    struct rx_packet *addr;		/*!< address of the first element */
+    afs_uint32 size;			/*!< array size */
 };
 #endif
 
@@ -535,8 +538,16 @@ rxi_AllocDataBuf(struct rx_packet *p, int nb, int class)
 }
 
 #ifdef AFS_DARWIN_ENV
+/**
+ * Register allocated packets.
+ *
+ * @param[in] a_addr array of packets
+ * @param[in] a_npkt number of packets
+ *
+ * @return none
+ */
 static void
-registerPackets(struct rx_packet *a_addr, afs_uint32 a_size)
+registerPackets(struct rx_packet *a_addr, afs_uint32 a_npkt)
 {
     struct rx_mallocedPacket *mp;
 
@@ -545,7 +556,7 @@ registerPackets(struct rx_packet *a_addr, afs_uint32 a_size)
     memset(mp, 0, sizeof(struct rx_mallocedPacket));
 
     mp->addr = a_addr;
-    mp->size = a_size;
+    mp->size = a_npkt * sizeof(struct rx_packet);
 
     MUTEX_ENTER(&rx_mallocedPktQ_lock);
     queue_Append(&rx_mallocedPacketQueue, mp);
@@ -788,7 +799,7 @@ rxi_FreeAllPackets(void)
     while (!queue_IsEmpty(&rx_mallocedPacketQueue)) {
 	mp = queue_First(&rx_mallocedPacketQueue, rx_mallocedPacket);
 	queue_Remove(mp);
-	osi_Free(mp->addr, mp->size * sizeof(struct rx_packet));
+	osi_Free(mp->addr, mp->size);
 	osi_Free(mp, sizeof(struct rx_mallocedPacket));
     }
 #else

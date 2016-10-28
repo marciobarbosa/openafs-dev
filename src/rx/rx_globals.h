@@ -249,9 +249,13 @@ EXT struct rx_queue rx_freePacketQueue;
 EXT afs_kmutex_t rx_freePktQ_lock;
 #endif /* RX_ENABLE_LOCKS */
 
-/* Queue of allocated packets. This queue is used on DARWIN to keep track of
- * the blocks of allocated packets. This information is used when the kext
- * is being unmounted and the memory used by those packets needs to be released. */
+/*!
+ * \brief Queue of allocated packets.
+ *
+ * This queue is used on DARWIN to keep track of the blocks of allocated
+ * packets. This information is used when the kext is being unmounted and the
+ * memory used by those packets needs to be released.
+ */
 #ifdef AFS_DARWIN_ENV
 EXT struct rx_queue rx_mallocedPacketQueue;
 #ifdef RX_ENABLE_LOCKS
