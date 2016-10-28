@@ -85,6 +85,14 @@
 #endif
 #endif /* KERNEL */
 
+#ifdef AFS_DARWIN_ENV
+struct rx_mallocedPacket {
+    struct rx_queue queueItemHeader;	/* chained using the queue package */
+    struct rx_packet *addr;		/* address of the first element */
+    afs_uint32 size;			/* number of packets */
+};
+#endif
+
 #ifdef RX_LOCKS_DB
 /* rxdb_fileID is used to identify the lock location, along with line#. */
 static int rxdb_fileID = RXDB_FILE_RX_PACKET;
@@ -526,6 +534,25 @@ rxi_AllocDataBuf(struct rx_packet *p, int nb, int class)
     return nb;
 }
 
+#ifdef AFS_DARWIN_ENV
+static void
+registerPackets(struct rx_packet *a_addr, afs_uint32 a_size)
+{
+    struct rx_mallocedPacket *mp;
+
+    mp = (struct rx_mallocedPacket *)osi_Alloc(sizeof(struct rx_mallocedPacket));
+    osi_Assert(mp);
+    memset(mp, 0, sizeof(struct rx_mallocedPacket));
+
+    mp->addr = a_addr;
+    mp->size = a_size;
+
+    MUTEX_ENTER(&rx_mallocedPktQ_lock);
+    queue_Append(&rx_mallocedPacketQueue, mp);
+    MUTEX_EXIT(&rx_mallocedPktQ_lock);
+}
+#endif
+
 /* Add more packet buffers */
 #ifdef RX_ENABLE_TSFPQ
 void
@@ -539,6 +566,10 @@ rxi_MorePackets(int apackets)
     getme = apackets * sizeof(struct rx_packet);
     p = (struct rx_packet *)osi_Alloc(getme);
     osi_Assert(p);
+
+#ifdef AFS_DARWIN_ENV
+    registerPackets(p, apackets);
+#endif
 
     PIN(p, getme);		/* XXXXX */
     memset(p, 0, getme);
@@ -594,6 +625,10 @@ rxi_MorePackets(int apackets)
     p = (struct rx_packet *)osi_Alloc(getme);
     osi_Assert(p);
 
+#ifdef AFS_DARWIN_ENV
+    registerPackets(p, apackets);
+#endif
+
     PIN(p, getme);		/* XXXXX */
     memset(p, 0, getme);
     NETPRI;
@@ -635,6 +670,10 @@ rxi_MorePacketsTSFPQ(int apackets, int flush_global, int num_keep_local)
 
     getme = apackets * sizeof(struct rx_packet);
     p = (struct rx_packet *)osi_Alloc(getme);
+
+#ifdef AFS_DARWIN_ENV
+    registerPackets(p, apackets);
+#endif
 
     PIN(p, getme);		/* XXXXX */
     memset(p, 0, getme);
@@ -704,6 +743,10 @@ rxi_MorePacketsNoLock(int apackets)
     } while(p == NULL);
     memset(p, 0, getme);
 
+#ifdef AFS_DARWIN_ENV
+    registerPackets(p, apackets);
+#endif
+
 #ifdef RX_ENABLE_TSFPQ
     RX_TS_INFO_GET(rx_ts_info);
     RX_TS_FPQ_GLOBAL_ALLOC(rx_ts_info,apackets);
@@ -739,11 +782,22 @@ rxi_MorePacketsNoLock(int apackets)
 void
 rxi_FreeAllPackets(void)
 {
+#ifdef AFS_DARWIN_ENV
+    struct rx_mallocedPacket *mp;
+
+    while (!queue_IsEmpty(&rx_mallocedPacketQueue)) {
+	mp = queue_First(&rx_mallocedPacketQueue, rx_mallocedPacket);
+	queue_Remove(mp);
+	osi_Free(mp->addr, mp->size * sizeof(struct rx_packet));
+	osi_Free(mp, sizeof(struct rx_mallocedPacket));
+    }
+#else
     /* must be called at proper interrupt level, etcetera */
     /* MTUXXX need to free all Packets */
     osi_Free(rx_mallocedP,
 	     (rx_maxReceiveWindow + 2) * sizeof(struct rx_packet));
     UNPIN(rx_mallocedP, (rx_maxReceiveWindow + 2) * sizeof(struct rx_packet));
+#endif
 }
 
 #ifdef RX_ENABLE_TSFPQ
