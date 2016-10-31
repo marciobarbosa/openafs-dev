@@ -263,6 +263,12 @@ rxi_InitPthread(void)
 
     MUTEX_INIT(&rx_rpc_stats, "rx_rpc_stats", MUTEX_DEFAULT, 0);
     MUTEX_INIT(&rx_freePktQ_lock, "rx_freePktQ_lock", MUTEX_DEFAULT, 0);
+
+#ifdef AFS_DARWIN_ENV
+    MUTEX_INIT(&rx_mallocedPktQ_lock, "rx_mallocedPktQ_lock", MUTEX_DEFAULT,
+	       0);
+#endif
+
 #ifdef	RX_ENABLE_LOCKS
 #ifdef RX_LOCKS_DB
     rxdb_init();
@@ -523,6 +529,12 @@ rx_InitHost(u_int host, u_int port)
     MUTEX_INIT(&rx_connHashTable_lock, "rx_connHashTable_lock", MUTEX_DEFAULT,
 	       0);
     MUTEX_INIT(&rx_serverPool_lock, "rx_serverPool_lock", MUTEX_DEFAULT, 0);
+
+#ifdef AFS_DARWIN_ENV
+    MUTEX_INIT(&rx_mallocedPktQ_lock, "rx_mallocedPktQ_lock", MUTEX_DEFAULT,
+	       0);
+#endif
+
 #if defined(AFS_HPUX110_ENV)
     if (!uniprocessor)
 	rx_sleepLock = alloc_spinlock(LAST_HELD_ORDER - 10, "rx_sleepLock");
@@ -546,6 +558,10 @@ rx_InitHost(u_int host, u_int port)
     queue_Init(&rx_freePacketQueue);
     rxi_NeedMorePackets = FALSE;
     rx_nPackets = 0;	/* rx_nPackets is managed by rxi_MorePackets* */
+
+#ifdef AFS_DARWIN_ENV
+    queue_Init(&rx_mallocedPacketQueue);
+#endif
 
     /* enforce a minimum number of allocated packets */
     if (rx_extraPackets < rxi_nSendFrags * rx_maxSendWindow)
