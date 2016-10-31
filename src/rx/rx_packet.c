@@ -796,12 +796,15 @@ rxi_FreeAllPackets(void)
 #ifdef AFS_DARWIN_ENV
     struct rx_mallocedPacket *mp;
 
+    MUTEX_ENTER(&rx_mallocedPktQ_lock);
+
     while (!queue_IsEmpty(&rx_mallocedPacketQueue)) {
 	mp = queue_First(&rx_mallocedPacketQueue, rx_mallocedPacket);
 	queue_Remove(mp);
 	osi_Free(mp->addr, mp->size);
 	osi_Free(mp, sizeof(struct rx_mallocedPacket));
     }
+    MUTEX_EXIT(&rx_mallocedPktQ_lock);
 #else
     /* must be called at proper interrupt level, etcetera */
     /* MTUXXX need to free all Packets */
