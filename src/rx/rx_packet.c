@@ -77,7 +77,7 @@
  * \brief structure used on DARWIN to keep track of allocated packets
  */
 struct rx_mallocedPacket {
-    struct rx_queue queueItemHeader;	/*!< chained using the queue package */
+    struct opr_queue entry;	/*!< chained using opr_queue */
     struct rx_packet *addr;	/*!< address of the first element */
     afs_uint32 size;		/*!< array size */
 };
@@ -571,7 +571,7 @@ registerPackets(struct rx_packet *a_addr, afs_uint32 a_npkt)
     mp->size = a_npkt * sizeof(struct rx_packet);
 
     MUTEX_ENTER(&rx_mallocedPktQ_lock);
-    queue_Append(&rx_mallocedPacketQueue, mp);
+    opr_queue_Append(&rx_mallocedPacketQueue, &mp->entry);
     MUTEX_EXIT(&rx_mallocedPktQ_lock);
 }
 #endif
@@ -810,9 +810,9 @@ rxi_FreeAllPackets(void)
 
     MUTEX_ENTER(&rx_mallocedPktQ_lock);
 
-    while (!queue_IsEmpty(&rx_mallocedPacketQueue)) {
-	mp = queue_First(&rx_mallocedPacketQueue, rx_mallocedPacket);
-	queue_Remove(mp);
+    while (!opr_queue_IsEmpty(&rx_mallocedPacketQueue)) {
+	mp = opr_queue_First(&rx_mallocedPacketQueue, struct rx_mallocedPacket, entry);
+	opr_queue_Remove(&mp->entry);
 	osi_Free(mp->addr, mp->size);
 	osi_Free(mp, sizeof(struct rx_mallocedPacket));
     }

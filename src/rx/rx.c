@@ -549,7 +549,7 @@ rx_InitHost(u_int host, u_int port)
     rx_nPackets = 0;	/* rx_nPackets is managed by rxi_MorePackets* */
 
 #ifdef AFS_DARWIN_ENV
-    queue_Init(&rx_mallocedPacketQueue);
+    opr_queue_Init(&rx_mallocedPacketQueue);
 #endif
 
     /* enforce a minimum number of allocated packets */

@@ -243,7 +243,7 @@ EXT afs_kmutex_t rx_freePktQ_lock;
  * memory used by those packets needs to be released.
  */
 #ifdef AFS_DARWIN_ENV
-EXT struct rx_queue rx_mallocedPacketQueue;
+EXT struct opr_queue rx_mallocedPacketQueue;
 #ifdef RX_ENABLE_LOCKS
 EXT afs_kmutex_t rx_mallocedPktQ_lock;
 #endif /* RX_ENABLE_LOCKS */
