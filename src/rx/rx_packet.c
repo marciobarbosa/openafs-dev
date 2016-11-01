@@ -811,7 +811,8 @@ rxi_FreeAllPackets(void)
     MUTEX_ENTER(&rx_mallocedPktQ_lock);
 
     while (!opr_queue_IsEmpty(&rx_mallocedPacketQueue)) {
-	mp = opr_queue_First(&rx_mallocedPacketQueue, struct rx_mallocedPacket, entry);
+	mp = opr_queue_First(&rx_mallocedPacketQueue,
+			     struct rx_mallocedPacket, entry);
 	opr_queue_Remove(&mp->entry);
 	osi_Free(mp->addr, mp->size);
 	osi_Free(mp, sizeof(struct rx_mallocedPacket));
