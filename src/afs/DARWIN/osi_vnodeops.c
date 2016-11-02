@@ -644,7 +644,7 @@ afs_vop_access(ap)
     if (code == 0 && (bits == (PRSFS_INSERT|PRSFS_DELETE)))
 	code = afs_AccessOK(tvc, PRSFS_INSERT, &treq, cmb);
 
-#ifdef AFS_DARWIN150_ENV
+#if defined(AFS_DARWIN150_ENV) || defined(AFS_DARWIN160_ENV)
     /* When removing a dir via Finder (as a normal user), DesktopServicesHelper
      * will check for PRSFS_LOOKUP on the dir (as root). Throwing an EACCES
      * error causes the operation to fail even when the normal user has access
