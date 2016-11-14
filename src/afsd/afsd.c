@@ -303,6 +303,7 @@ int afsd_debug = 0;		/*Are we printing debugging info? */
 static int afsd_CloseSynch = 0;	/*Are closes synchronous or not? */
 static int rxmaxmtu = 0;       /* Are we forcing a limit on the mtu? */
 static int rxmaxfrags = 0;      /* Are we forcing a limit on frags? */
+static int enable_dynroot_whitelist = 0;	/*!< use csdb as a whitelist */
 
 #ifdef AFS_SGI62_ENV
 #define AFSD_INO_T ino64_t
@@ -1911,6 +1912,10 @@ mainproc(struct cmd_syndesc *as, void *arock)
 	/* -rxmaxfrags */
 	rxmaxfrags = atoi(as->parms[38].items->data);
     }
+    if (as->parms[39].items) {
+	/* -dynroot_whitelist */
+	enable_dynroot_whitelist = 1;
+    }
 
     /* parse cacheinfo file if this is a diskcache */
     if (ParseCacheInfoFile()) {
@@ -2409,6 +2414,13 @@ afsd_run(void)
 	afsd_call_syscall(AFSOP_ROOTVOLUME, rootVolume);
     }
 
+    /* use csdb as a whitelist */
+    if (enable_dynroot_whitelist) {
+	if (afsd_verbose)
+	    printf("%s: Using csdb as a whitelist\n", rn);
+	afsd_call_syscall(AFSOP_WHITELIST, enable_dynroot_whitelist);
+    }
+
     /*
      * Pass the kernel the name of the workstation cache file holding the
      * volume information.
@@ -2590,6 +2602,8 @@ afsd_init(void)
     cmd_AddParm(ts, "-rxmaxfrags", CMD_SINGLE, CMD_OPTIONAL,
                 "Set the maximum number of UDP fragments Rx should send/receive"
                 " per Rx packet");
+    cmd_AddParm(ts, "-dynroot-whitelist", CMD_FLAG, CMD_OPTIONAL,
+		"Use csdb as a whitelist");
 }
 
 int

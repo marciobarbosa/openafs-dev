@@ -86,6 +86,8 @@ afs_int32 afs_rx_idledead_rep = AFS_IDLEDEADTIME_REP;
 
 static int afscall_set_rxpck_received = 0;
 
+int afs_dynroot_whitelist_enable = 0;	/*!< use csdb as a whitelist */
+
 /* This is code which needs to be called once when the first daemon enters
  * the client. A non-zero return means an error and AFS should not start.
  */
@@ -1300,6 +1302,9 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	rx_MyMaxSendSize = rx_maxReceiveSizeUser = rx_maxReceiveSize = parm2;
     } else if (parm == AFSOP_SET_RXMAXFRAGS) {
 	rxi_nSendFrags = rxi_nRecvFrags = parm2;
+    } else if (parm == AFSOP_WHITELIST) {
+	afs_dynroot_whitelist_enable = parm2;
+	code = 0;
     } else {
 	code = EINVAL;
     }

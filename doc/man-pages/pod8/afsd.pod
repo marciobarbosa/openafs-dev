@@ -33,6 +33,7 @@ B<afsd> [B<-afsdb>] [B<-backuptree>]
      [B<-disable-dynamic-vcaches>] 
      S<<< [B<-volumes> <I<number of volume entries>>] >>>
      [B<-waitclose>] [B<-rxmaxfrags> <I<max # of fragments>>]
+     [B<-dynroot-whitelist>]
 
 =for html
 </div>
@@ -741,6 +742,13 @@ Has no effect on the operation of the Cache Manager. The behavior it
 affected in previous versions of the Cache Manager, to perform synchronous
 writes to the File Server, is now the default behavior. To perform
 asynchronous writes in certain cases, use the B<fs storebehind> command.
+
+=item B<-dynroot-whitelist>
+
+Uses csdb as a whitelist. As a result, the cells that cannot be found
+in the whitelist will not be resolved by afsdb.
+
+Has no effect if B<-afsdb> is not enabled.
 
 =back
 

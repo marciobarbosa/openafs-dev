@@ -38,6 +38,8 @@ afs_rwlock_t afsdb_req_lock;	/* Serializes client requests */
 static char afsdb_handler_running;	/* Protected by GLOCK */
 static char afsdb_handler_shutdown;	/* Protected by GLOCK */
 
+extern int afs_dynroot_whitelist_enable;	/*!< use csdb as a whitelist */
+
 /* from cellconfig.h */
 #define MAXCELLCHARS    64
 static struct {
@@ -158,6 +160,10 @@ afs_GetCellHostsAFSDB(char *acellName)
 {
     AFS_ASSERT_GLOCK();
     if (!afsdb_handler_running)
+	return ENOENT;
+
+    /* if the whitelist does not have the cell in question, do not proceed */
+    if (afs_dynroot_whitelist_enable && !afs_CellOrAliasExists(acellName))
 	return ENOENT;
 
     ObtainWriteLock(&afsdb_client_lock, 685);
