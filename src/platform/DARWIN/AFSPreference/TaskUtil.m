@@ -42,13 +42,13 @@
 	NSString *result = nil;
 	int status = 0;
 	NSFileHandle *file = nil;
-	NSDictionary *environment =  [NSDictionary dictionaryWithObjectsAndKeys: @"$PATH:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin",@"PATH",nil];
+	NSDictionary *environment =  [NSDictionary dictionaryWithObjectsAndKeys: @"$PATH:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/opt/openafs/bin:/opt/openafs/sbin",@"PATH",nil];
 		
 	NSPipe *pipe = [NSPipe pipe];
 	NSTask *taskToRun  = [[NSTask alloc] init];
 	
 	[taskToRun setLaunchPath: taskName];
-	[taskToRun setArguments: args];
+    [taskToRun setArguments: args];
 	[taskToRun setEnvironment:environment];
 	[taskToRun setStandardOutput: pipe];
 	file = [pipe fileHandleForReading];
