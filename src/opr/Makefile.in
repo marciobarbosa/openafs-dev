@@ -1,0 +1,49 @@
+srcdir=@srcdir@
+include @TOP_OBJDIR@/src/config/Makefile.config
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+
+objects = dict.o 
+
+HEADERS = $(TOP_INCDIR)/afs/opr.h \
+	  $(TOP_INCDIR)/opr/jhash.h \
+	  $(TOP_INCDIR)/opr/queue.h \
+	  $(TOP_INCDIR)/opr/dict.h
+
+all: $(HEADERS) $(TOP_LIBDIR)/libopr.a
+
+libopr.a: $(objects)
+	-$(RM) -f $@
+	$(AR) crv $@ $(objects)
+	$(RANLIB) $@
+
+$(TOP_LIBDIR)/libopr.a: libopr.a
+	$(INSTALL_DATA) libopr.a $@
+
+$(TOP_INCDIR)/afs/opr.h: opr.h
+	$(INSTALL_DATA) $? $@
+
+$(TOP_INCDIR)/opr/jhash.h: jhash.h
+	$(INSTALL_DATA) $? $@
+
+$(TOP_INCDIR)/opr/queue.h: queue.h
+	$(INSTALL_DATA) $? $@
+
+$(TOP_INCDIR)/opr/dict.h: dict.h
+	$(INSTALL_DATA) $? $@
+
+clean:
+	rm -f $(objects) libopr.a
+
+install: libopr.a
+	$(INSTALL_DATA) libopr.a $(DESTDIR)$(libdir)/libopr.a
+	$(INSTALL) -d $(DESTDIR)$(includedir)/opr
+	$(INSTALL_DATA) ${srcdir}/queue.h $(DESTDIR)$(includedir)/opr/queue.h
+
+dest: libopr.a
+	$(INSTALL_DATA) libopr.a $(DEST)/lib/libopr.a
+	$(INSTALL) -d $(DEST)/include/opr
+	$(INSTALL_DATA) ${srcdir}/queue.h $(DEST)/include/opr/queue.h
+
+buildtools: $(HEADERS) $(TOP_LIBDIR)/libopr.a
+

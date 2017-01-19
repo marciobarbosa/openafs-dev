@@ -68,6 +68,7 @@ generated: force buildtools
 	+${COMPILE_PART1} vlserver ${COMPILE_GENERATED}
 	+${COMPILE_PART1} volser ${COMPILE_GENERATED}
 	+${COMPILE_PART1} config ${COMPILE_PART2A} generated_clean
+	+${COMPILE_PART1} opr ${COMPILE_PART2A} clean
 
 install: all install_dirs
 	$(MAKE) build COMPILE_PART2B=install
@@ -112,7 +113,7 @@ packages: dest
 		echo Not building packages for ${SYS_NAME} ;; \
 	esac
 
-${TOP_INCDIR}/afs ${TOP_INCDIR}/rx ${TOP_INCDIR}/des ${TOP_LIBDIR} ${TOP_JLIBDIR}:
+${TOP_INCDIR}/afs ${TOP_INCDIR}/rx ${TOP_INCDIR}/des ${TOP_INCDIR}/opr ${TOP_LIBDIR} ${TOP_JLIBDIR}:
 	mkdir -p $@
 
 install_dirs: force
@@ -138,7 +139,7 @@ dest_dirs: force
 	mkdir -p ${DEST}/root.server/etc
 	mkdir -p ${DEST}/root.server/usr/afs/bin
 
-prelude: ${TOP_INCDIR}/afs ${TOP_INCDIR}/rx ${TOP_INCDIR}/des ${TOP_LIBDIR}
+prelude: ${TOP_INCDIR}/afs ${TOP_INCDIR}/rx ${TOP_INCDIR}/des ${TOP_INCDIR}/opr ${TOP_LIBDIR}
 
 project: cmd comerr 
 
@@ -151,7 +152,10 @@ config: prelude
 procmgmt: config
 	+${COMPILE_PART1} procmgmt ${COMPILE_PART2}
 
-util: procmgmt des lwp_depinstall rx_depinstall
+opr: config
+	+${COMPILE_PART1} opr ${COMPILE_PART2}
+
+util: opr procmgmt des lwp_depinstall rx_depinstall
 	+${COMPILE_PART1} util ${COMPILE_PART2}
 
 libafscp: util afs volser vlserver rx auth fsint
@@ -711,6 +715,7 @@ clean2:
 	-${COMPILE_PART1} config ${COMPILE_CLEAN}
 	-${COMPILE_PART1} procmgmt ${COMPILE_CLEAN}
 	-${COMPILE_PART1} util ${COMPILE_CLEAN}
+	-${COMPILE_PART1} opr ${COMPILE_CLEAN}
 	-${COMPILE_PART1} libafscp ${COMPILE_CLEAN}
 	-${COMPILE_PART1} audit ${COMPILE_CLEAN}
 	-${COMPILE_PART1} comerr ${COMPILE_CLEAN}
@@ -880,6 +885,7 @@ distclean: clean
 	src/log/test/Makefile \
 	src/lwp/Makefile \
 	src/lwp/test/Makefile \
+	src/opr/Makefile \
 	src/packaging/Debian/changelog \
 	src/packaging/MacOS/OpenAFS-debug.Description.plist \
 	src/packaging/MacOS/OpenAFS-debug.Info.plist \
