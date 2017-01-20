@@ -25,6 +25,7 @@
 #ifndef AFS_NT40_ENV
 
 #include <opr/dict.h>
+#include <arpa/nameser.h>
 
 #define	HASH_SIZE_LOG2	6	/* 64 buckets */
 #define	MAX_SIZE	1024	/* maximum number of entries */

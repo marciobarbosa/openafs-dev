@@ -32,7 +32,6 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
-#include <arpa/nameser.h>
 #include <resolv.h>
 #include <time.h>
 #include <netdb.h>
