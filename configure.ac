@@ -261,7 +261,6 @@ src/xstat/Makefile \
 src/helper-splint.sh \
 tests/Makefile \
 tests/rpctestlib/Makefile \
-tests/opr/Makefile \
 tests/tap/Makefile \
 tests/util/Makefile,
 
