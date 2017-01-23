@@ -19,7 +19,7 @@ objects = assert.o base64.o casestrcpy.o config_file.o ktime.o volparse.o \
 	 hputil.o kreltime.o isathing.o get_krbrlm.o uuid.o serverLog.o \
 	 dirpath.o fileutil.o netutils.o flipbase64.o fstab.o \
 	 afs_atomlist.o afs_lhash.o snprintf.o strlcat.o strlcpy.o strnlen.o \
-	 pthread_glock.o daemon.o rxkstats.o ${REGEX_OBJ}
+	 pthread_glock.o daemon.o rxkstats.o hostresolv.o ${REGEX_OBJ}
 
 includes = \
 	${TOP_INCDIR}/afs/dirpath.h \
@@ -37,7 +37,9 @@ includes = \
 	${TOP_INCDIR}/afs/pthread_glock.h \
 	${TOP_INCDIR}/afs/afs_atomlist.h \
 	${TOP_INCDIR}/afs/afs_lhash.h \
-	${TOP_INCDIR}/afs/softsig.h
+	${TOP_INCDIR}/afs/softsig.h \
+	${TOP_INCDIR}/afs/opr.h \
+	${TOP_INCDIR}/opr/dict.h
 
 all: ${includes} \
 	${TOP_LIBDIR}/util.a \
@@ -176,6 +178,9 @@ get_krbrlm.o: ${srcdir}/get_krbrlm.c ${includes}
 uuid.o: ${srcdir}/uuid.c ${includes}
 	${CCOBJ} ${CFLAGS} -c ${srcdir}/uuid.c
 
+hostresolv.o: ${srcdir}/hostresolv.c ${includes}
+	${CCOBJ} ${CFLAGS} -c ${srcdir}/hostresolv.c
+
 sys.o: ${srcdir}/sys.c AFS_component_version_number.c ${includes}
 	${CCOBJ} ${CFLAGS} -c ${srcdir}/sys.c
 
@@ -290,4 +295,4 @@ check-splint:
 	    assert.c base64.c casestrcpy.c ktime.c volparse.c hostparse.c \
 	    hputil.c kreltime.c isathing.c get_krbrlm.c uuid.c serverLog.c \
 	    dirpath.c fileutil.c netutils.c flipbase64.c \
-	    afs_atomlist.c afs_lhash.c snprintf.c fstab.c
+	    afs_atomlist.c afs_lhash.c snprintf.c fstab.c hostresolv.c
