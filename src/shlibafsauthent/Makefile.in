@@ -82,7 +82,9 @@ UTILOBJS = \
 	fileutil.o \
 	uuid.o \
 	ktime.o \
-	volparse.o
+	hostresolv.o \
+	volparse.o \
+	${TOP_LIBDIR}/libopr.a
 
 RXKADOBJS = \
 	rxkad_errs.o @MAKE_KRB5@ ticket5_keytab.o
@@ -144,7 +146,7 @@ LIBOBJS = \
 
 LIBAFSAUTHENT = libafsauthent.${SHLIB_SUFFIX}.${LIBAFSAUTHENTMAJOR}.${LIBAFSAUTHENTMINOR}
 
-all: ${TOP_LIBDIR}/${LIBAFSAUTHENT} ${TOP_LIBDIR}/libafsauthent_pic.a
+all: ${TOP_LIBDIR}/${LIBAFSAUTHENT} ${TOP_LIBDIR}/libafsauthent_pic.a ${TOP_LIBDIR}/libopr.a
 
 ${TOP_LIBDIR}/${LIBAFSAUTHENT}: ${LIBAFSAUTHENT}
 	../config/shlib-install -d ${TOP_LIBDIR} \
@@ -302,6 +304,9 @@ ktime.o: ${UTIL}/ktime.c
 	${CCRULE}
 
 pthread_glock.o: ${UTIL}/pthread_glock.c
+	${CCRULE}
+
+hostresolv.o: ${UTIL}/hostresolv.c
 	${CCRULE}
 
 rxkad_errs.o: ${RXKAD}/rxkad_errs.c

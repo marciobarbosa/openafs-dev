@@ -1,5 +1,8 @@
 #ifndef OPENAFS_OPR_OPR_H
 #define OPENAFS_OPR_OPR_H 1
+
+#include <stdlib.h>
+
 /* macros */
 
 #define opr_containerof(ptr, structure, member) \
@@ -14,11 +17,14 @@ extern void opr_NTAbort(void);
 # define opr_abort() abort()
 #endif
 
-extern void opr_AssertionFailed(char *, int);
-extern void opr_AssertFailU(const char *, const char *, int);
+//extern void opr_AssertionFailed(const char *file, int line);
+//extern void opr_AssertFailU(const char *, const char *, int);
 
 #define opr_Assert(ex) \
-    do {if (!(ex)) opr_AssertionFailed(__FILE__, __LINE__);} while(0)
+    do {if (!(ex)) opr_abort();} while(0)
+
+#define opr_Verify(ex) \
+    do {if (!(ex)) opr_abort();} while(0)
 
 /* casestrcpy.c */
 #define lcstring opr_lcstring

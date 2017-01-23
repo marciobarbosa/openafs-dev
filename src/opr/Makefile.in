@@ -4,10 +4,12 @@ include @TOP_OBJDIR@/src/config/Makefile.config
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 
-objects = dict.o 
+objects = dict.o assert.o
 
 HEADERS = $(TOP_INCDIR)/afs/opr.h \
+	  $(TOP_INCDIR)/afs/opr_assert.h \
 	  $(TOP_INCDIR)/opr/jhash.h \
+	  $(TOP_INCDIR)/opr/lock.h \
 	  $(TOP_INCDIR)/opr/queue.h \
 	  $(TOP_INCDIR)/opr/dict.h
 
@@ -24,7 +26,13 @@ $(TOP_LIBDIR)/libopr.a: libopr.a
 $(TOP_INCDIR)/afs/opr.h: opr.h
 	$(INSTALL_DATA) $? $@
 
+$(TOP_INCDIR)/afs/opr_assert.h: opr_assert.h
+	$(INSTALL_DATA) $? $@
+
 $(TOP_INCDIR)/opr/jhash.h: jhash.h
+	$(INSTALL_DATA) $? $@
+
+$(TOP_INCDIR)/opr/lock.h: opr_lock.h
 	$(INSTALL_DATA) $? $@
 
 $(TOP_INCDIR)/opr/queue.h: queue.h

@@ -68,6 +68,7 @@ UTILOBJS = \
 	snprintf.o \
 	strlcat.o \
 	strlcpy.o \
+	hostresolv.o \
 	fileutil.o
 
 RXKADOBJS = \
@@ -232,6 +233,9 @@ fileutil.o: ${UTIL}/fileutil.c
 	${CCRULE}
 
 pthread_glock.o: ${UTIL}/pthread_glock.c
+	${CCRULE}
+
+hostresolv.o: ${UTIL}/hostresolv.c
 	${CCRULE}
 
 rxkad_errs.o: ${RXKAD}/rxkad_errs.c
