@@ -38,6 +38,7 @@ includes = \
 	${TOP_INCDIR}/afs/afs_atomlist.h \
 	${TOP_INCDIR}/afs/afs_lhash.h \
 	${TOP_INCDIR}/afs/softsig.h \
+	${TOP_INCDIR}/afs/hostresolv.h \
 	${TOP_INCDIR}/afs/opr.h \
 	${TOP_INCDIR}/opr/dict.h
 
@@ -97,6 +98,9 @@ ${TOP_INCDIR}/afs/afs_lhash.h: ${srcdir}/afs_lhash.h
 	${INSTALL_DATA} $? $@
 
 ${TOP_INCDIR}/afs/softsig.h: ${srcdir}/softsig.h
+	${INSTALL_DATA} $? $@
+
+${TOP_INCDIR}/afs/hostresolv.h: ${srcdir}/hostresolv.h
 	${INSTALL_DATA} $? $@
 
 ${TOP_LIBDIR}/util.a: util.a
@@ -238,6 +242,7 @@ install: dirpath.h util.a sys
 	${INSTALL_DATA} ${srcdir}/afs_assert.h ${DESTDIR}${includedir}/afs/afs_assert.h
 	${INSTALL_DATA} ${srcdir}/errors.h ${DESTDIR}${includedir}/afs/errors.h
 	${INSTALL_DATA} ${srcdir}/vice.h ${DESTDIR}${includedir}/afs/vice.h
+	${INSTALL_DATA} ${srcdir}/hostresolv.h ${DESTDIR}${includedir}/afs/hostresolv.h
 	${INSTALL_DATA} ${srcdir}/remote.h ${DESTDIR}${includedir}/afs/remote.h
 	${INSTALL_DATA} ${srcdir}/ktime.h ${DESTDIR}${includedir}/afs/ktime.h
 	${INSTALL_DATA} ${srcdir}/fileutil.h ${DESTDIR}${includedir}/afs/fileutil.h
@@ -262,6 +267,7 @@ dest: dirpath.h util.a sys
 	${INSTALL_DATA} ${srcdir}/afs_assert.h ${DEST}/include/afs/afs_assert.h
 	${INSTALL_DATA} ${srcdir}/errors.h ${DEST}/include/afs/errors.h
 	${INSTALL_DATA} ${srcdir}/vice.h ${DEST}/include/afs/vice.h
+	${INSTALL_DATA} ${srcdir}/hostresolv.h ${DEST}/include/afs/hostresolv.h
 	${INSTALL_DATA} ${srcdir}/remote.h ${DEST}/include/afs/remote.h
 	${INSTALL_DATA} ${srcdir}/ktime.h ${DEST}/include/afs/ktime.h
 	${INSTALL_DATA} ${srcdir}/fileutil.h ${DEST}/include/afs/fileutil.h

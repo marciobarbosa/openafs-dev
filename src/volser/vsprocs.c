@@ -62,7 +62,8 @@
 #include "volser_prototypes.h"
 #include "vsutils_prototypes.h"
 #include "lockprocs_prototypes.h"
-#include "../util/hostresolv.h"
+//#include "../util/hostresolv.h"
+#include <afs/hostresolv.h>
 
 struct ubik_client *cstruct;
 int verbose = 0, noresolve = 0;
