@@ -62,6 +62,7 @@
 #include "volser_prototypes.h"
 #include "vsutils_prototypes.h"
 #include "lockprocs_prototypes.h"
+#include "../util/hostresolv.h"
 
 struct ubik_client *cstruct;
 int verbose = 0, noresolve = 0;
@@ -562,7 +563,7 @@ SubEnumerateEntry(struct nvldbentry *entry)
     int i;
     char pname[10];
     int isMixed = 0;
-    char hoststr[16];
+    char hoststr[256];
 
 #ifdef notdef
     fprintf(STDOUT, "	readWriteID %-10u ", entry->volumeId[RWVOL]);
@@ -603,7 +604,9 @@ SubEnumerateEntry(struct nvldbentry *entry)
 	MapPartIdIntoName(entry->serverPartition[i], pname);
 	fprintf(STDOUT, "       server %s partition %s ",
 		noresolve ? afs_inet_ntoa_r(entry->serverNumber[i], hoststr) :
-                hostutil_GetNameByINet(entry->serverNumber[i]), pname);
+                util_gethostname(&entry->serverNumber[i],
+		    		 sizeof(entry->serverNumber[i]), AF_INET,
+				 hoststr, sizeof(hoststr)), pname);
 	if (entry->serverFlags[i] & ITSRWVOL)
 	    fprintf(STDOUT, "RW Site ");
 	else
