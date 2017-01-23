@@ -22,10 +22,16 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef AFS_NT40_ENV
+#ifdef AFS_NT40_ENV
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#else
 
 #include <opr/dict.h>
 #include <arpa/nameser.h>
+#include <arpa/nameser_compat.h>
 
 #define	HASH_SIZE_LOG2	6	/* 64 buckets */
 #define	MAX_SIZE	1024	/* maximum number of entries */
