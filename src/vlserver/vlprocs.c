@@ -3500,3 +3500,72 @@ SVL_ProbeServer(struct rx_call *rxcall)
 {
     return 0;
 }
+
+#ifdef AFS_PTHREAD_ENV
+/* borrowed from src/tests/stagehdr.c */
+/*
+static afs_uint32
+ubik_corruption_test_checksum(char *buf, int size)
+{
+    afs_uint32 sum = 0, n = size / sizeof(afs_uint32);
+    afs_uint32 *words = (afs_uint32 *) buf;
+
+    while (--n)
+        sum += ntohl(*words++);
+    return sum;
+}
+*/
+static void *
+ubik_corruption_test_write(void *arg)
+{
+    struct vl_ctx ctx;
+    afs_int32 errorcode, blockindex;
+    struct nvlentry entry;
+    afs_uint32 volid;
+    char *volname = "vol_1\0";
+
+    VLog(0, ("marcio: ubik_corruption_test_write\n"));
+
+    while (1) {
+	errorcode = Init_VLdbase(&ctx, LOCKWRITE, VLCREATEENTRYN);
+        if (errorcode) {
+            sleep(5);
+            continue;
+        }
+	blockindex = AllocBlock(&ctx, &entry);
+	volid = NextUnusedID(&ctx, ntohl(ctx.cheader->vital_header.MaxVolumeId),
+		             1, &errorcode);
+	ctx.cheader->vital_header.MaxVolumeId = htonl(volid + 1);
+	errorcode = write_vital_vlheader(&ctx);
+
+	memset(&entry, 0, sizeof(struct nvlentry));
+	memcpy(entry.name, volname, strlen(volname));
+	entry.volumeId[RWVOL] = volid;
+	entry.volumeId[ROVOL] = 0;
+	entry.volumeId[BACKVOL] = 0;
+	errorcode = ThreadVLentry(&ctx, blockindex, &entry);
+
+	errorcode = ubik_EndTrans(ctx.trans);
+        VLog(0, ("marcio: volume wrote to the database!\n"));
+        break;
+    }
+    return NULL;
+}
+/*
+static void
+ubik_corruption_test_read(void)
+{
+}
+*/
+void
+ubik_corruption_test_start(void)
+{
+    pthread_t tpid;
+    pthread_attr_t tattr;
+
+    pthread_attr_init(&tattr);
+    pthread_create(&tpid, &tattr, ubik_corruption_test_write, NULL);
+
+    /* ubik_corruption_test_read(); */
+}
+#endif

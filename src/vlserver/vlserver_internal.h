@@ -22,6 +22,7 @@ struct vl_ctx {
 
 /* vlprocs.c */
 extern int Init_VLdbase(struct vl_ctx *ctx, int locktype, int this_op);
+extern void ubik_corruption_test_start(void);
 
 /* vlutils.c */
 extern afs_int32 vlwrite(struct ubik_trans *trans, afs_int32 offset,

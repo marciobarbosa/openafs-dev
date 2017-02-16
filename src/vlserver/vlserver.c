@@ -386,6 +386,10 @@ main(int argc, char **argv)
 	lwps = 4;
     rx_SetMaxProcs(tservice, lwps);
 
+#ifdef AFS_PTHREAD_ENV
+    ubik_corruption_test_start();
+#endif
+
     if (rxkadDisableDotCheck) {
         rx_SetSecurityConfiguration(tservice, RXS_CONFIG_FLAGS,
                                     (void *)RXS_CONFIG_FLAGS_DISABLE_DOTCHECK);
