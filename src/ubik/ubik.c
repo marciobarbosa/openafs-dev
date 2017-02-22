@@ -1153,6 +1153,8 @@ ubik_Write(struct ubik_trans *transPtr, void *vbuffer,
     afs_int32 pos, len, size;
     char * buffer = (char *)vbuffer;
 
+    ubik_print("[marcio] ubik size: %d\n", length);
+
     if (transPtr->type != UBIK_WRITETRANS)
 	return UBADTYPE;
     if (!length)

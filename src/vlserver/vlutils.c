@@ -118,6 +118,7 @@ vlentrywrite(struct ubik_trans *trans, afs_int32 offset, void *buffer,
 	memcpy(nentry.serverNumber, nep->serverNumber, NMAXNSERVERS);
 	memcpy(nentry.serverPartition, nep->serverPartition, NMAXNSERVERS);
 	memcpy(nentry.serverFlags, nep->serverFlags, NMAXNSERVERS);
+	memcpy(nentry.pad, nep->pad, 10092);
 	bufp = (char *)&nentry;
     } else {
 	memset(&oentry, 0, sizeof(struct vlentry));

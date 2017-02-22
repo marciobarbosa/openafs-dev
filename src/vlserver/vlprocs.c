@@ -3521,10 +3521,12 @@ ubik_corruption_test_write(void *arg)
     struct vl_ctx ctx;
     afs_int32 errorcode, blockindex;
     struct nvlentry entry;
-    afs_uint32 volid;
+    afs_uint32 volid = -1;
     char *volname = "vol_1\0";
+    int index = 0;
 
-    VLog(0, ("marcio: ubik_corruption_test_write\n"));
+    VLog(0, ("marcio: vlentry size: %lu\n", sizeof(struct vlentry)));
+    VLog(0, ("marcio: nvlentry size: %lu\n", sizeof(struct nvlentry)));
 
     while (1) {
 	errorcode = Init_VLdbase(&ctx, LOCKWRITE, VLCREATEENTRYN);
@@ -3532,22 +3534,38 @@ ubik_corruption_test_write(void *arg)
             sleep(5);
             continue;
         }
+        blockindex = FindByID(&ctx, volid, -1, &entry, &errorcode);
+        if (blockindex != 0) {
+            errorcode = RemoveEntry(&ctx, blockindex, &entry);
+            if (errorcode) {
+                VLog(0, ("marcio: could not remove volume!\n"));
+            } else {
+                VLog(0, ("marcio: volume removed!\n"));
+            }
+            index = ~index;
+        }
 	blockindex = AllocBlock(&ctx, &entry);
 	volid = NextUnusedID(&ctx, ntohl(ctx.cheader->vital_header.MaxVolumeId),
 		             1, &errorcode);
 	ctx.cheader->vital_header.MaxVolumeId = htonl(volid + 1);
 	errorcode = write_vital_vlheader(&ctx);
 
-	memset(&entry, 0, sizeof(struct nvlentry));
+	memset(&entry, index, sizeof(struct nvlentry));
 	memcpy(entry.name, volname, strlen(volname));
-	entry.volumeId[RWVOL] = volid;
+	entry.volumeId[RWVOL] = 0;
 	entry.volumeId[ROVOL] = 0;
 	entry.volumeId[BACKVOL] = 0;
 	errorcode = ThreadVLentry(&ctx, blockindex, &entry);
 
+        if (errorcode) {
+            VLog(0, ("marcio: problem 1\n"));
+        }
 	errorcode = ubik_EndTrans(ctx.trans);
-        VLog(0, ("marcio: volume wrote to the database!\n"));
-        break;
+        if (errorcode) {
+            VLog(0, ("marcio: problem 2\n"));
+        }
+        VLog(0, ("marcio: volume wrote to the database! (%u)\n", volid));
+        sleep(5);
     }
     return NULL;
 }
