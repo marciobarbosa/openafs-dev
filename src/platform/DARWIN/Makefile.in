@@ -43,7 +43,10 @@ growlagent:
 
 afscell:
 	@case ${OSXSDK} in \
+	macosx10.[3-9] | macosx10.1[0-1]) \
+		xcodebuild -sdk ${OSXSDK} -project ${srcdir}/afscell/afscell.xcodeproj SYMROOT=`pwd`/afscell/build;; \
 	macosx* ) \
+		sed -i '' 's/ONLY_ACTIVE_ARCH = NO/ONLY_ACTIVE_ARCH = YES/' ./afscell/afscell.xcodeproj/project.pbxproj ; \
 		xcodebuild -sdk ${OSXSDK} -project ${srcdir}/afscell/afscell.xcodeproj SYMROOT=`pwd`/afscell/build;; \
 	* ) \
 		echo Not building afscell.bundle for ${OSXSDK} ;; \
