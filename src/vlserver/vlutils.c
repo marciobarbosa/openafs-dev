@@ -330,6 +330,7 @@ UpdateCache(struct ubik_trans *trans, void *rock)
     if (ubcode || vldbversion == 0) {
 	if (builddb) {
 	    VLog(0, ("Can't read VLDB header, re-initialising...\n"));
+            VLog(0, ("[marcio] recreating vldb header\n"));
 
 	    /* try to write a good header */
 	    memset(&rd_cheader, 0, sizeof(rd_cheader));

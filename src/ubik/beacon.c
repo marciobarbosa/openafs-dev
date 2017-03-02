@@ -315,6 +315,7 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 	    ubik_singleServer = 1;
 	if (nServers == 1 && !amIClone) {
 	    ubik_amSyncSite = 1;	/* let's start as sync site */
+            ubik_print("[marcio] i am the sync-site\n");
 	    syncSiteUntil = 0x7fffffff;	/* and be it quite a while */
 	}
     } else {
@@ -326,6 +327,7 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 	if (!ubik_amSyncSite)
 	    ubik_dprint("Ubik: I am the sync site - 1 server\n");
 	ubik_amSyncSite = 1;
+        ubik_print("[marcio] i am the sync-site\n");
 	syncSiteUntil = 0x7fffffff;	/* quite a while */
     }
     return 0;
@@ -504,6 +506,7 @@ ubeacon_Interact(void *dummy)
 	    if (!ubik_amSyncSite)
 		ubik_dprint("Ubik: I am the sync site\n");
 	    ubik_amSyncSite = 1;
+            ubik_print("[marcio] i am the sync-site\n");
 	    syncSiteUntil = oldestYesVote + SMALLTIME;
 #ifndef AFS_PTHREAD_ENV
 		/* I did not find a corresponding LWP_WaitProcess(&ubik_amSyncSite) --

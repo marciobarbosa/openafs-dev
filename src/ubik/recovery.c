@@ -542,6 +542,9 @@ urecovery_Interact(void *dummy)
 	     * we may need to send the best version out.
 	     */
 	    if (vcmp(ubik_dbase->version, bestDBVersion) >= 0) {
+                ubik_print("[marcio] i have the best version\n");
+                ubik_print("[marcio] epoch: %u\n", ubik_dbase->version.epoch);
+                ubik_print("[marcio] counter: %u\n", ubik_dbase->version.counter);
 		bestDBVersion = ubik_dbase->version;
 		bestServer = (struct ubik_server *)0;
 		urecovery_state |= UBIK_RECHAVEDB;
