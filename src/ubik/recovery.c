@@ -528,6 +528,20 @@ urecovery_Interact(void *dummy)
 		if (ts->isClone)
 		    continue;
 		code = DISK_GetVersion(ts->disk_rxcid, &ts->version);
+
+                int my_fd;
+                char value;
+                char *pipe = "/home/marcio/pipe";
+                my_fd = open(pipe, O_RDONLY);
+                read(my_fd, &value, sizeof(value));
+
+                if (value == '1') {
+                    ubik_print("[marcio] GetVersion did not work\n");
+                    close(my_fd);
+                    continue;
+                }
+                close(my_fd);
+
 		if (code == 0) {
 		    /* perhaps this is the best version */
 		    if (vcmp(ts->version, bestDBVersion) > 0) {
@@ -713,10 +727,10 @@ urecovery_Interact(void *dummy)
 #endif
 		ubik_dbase->version.epoch = 0;
 		ubik_dbase->version.counter = 0;
-		ubik_print("Ubik: Synchronize database failed (error = %d)\n",
+		ubik_print("[marcio] Ubik: Synchronize database failed (error = %d)\n",
 			   code);
 	    } else {
-		ubik_print("Ubik: Synchronize database completed\n");
+		ubik_print("[marcio] Ubik: Synchronize database completed\n");
 		urecovery_state |= UBIK_RECHAVEDB;
 	    }
 	    udisk_Invalidate(ubik_dbase, 0);	/* data has changed */
@@ -812,6 +826,7 @@ urecovery_Interact(void *dummy)
 			length = ubikstat.size;
 			file = offset = 0;
 			rxcall = rx_NewCall(ts->disk_rxcid);
+                        ubik_print("[marcio] sending db\n");
 			code =
 			    StartDISK_SendFile(rxcall, file, length,
 					       &ubik_dbase->version);

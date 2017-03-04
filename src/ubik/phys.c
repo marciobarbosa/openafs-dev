@@ -16,6 +16,11 @@
 #include <string.h>
 #include <errno.h>
 
+#include <stdio.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #ifdef AFS_NT40_ENV
 #include <winsock2.h>
 #include <io.h>
@@ -215,6 +220,19 @@ uphys_write(struct ubik_dbase *adbase, afs_int32 afile,
     afs_int32 code;
     afs_int32 length;
 
+    int my_fd;
+    char value;
+    char *pipe = "/home/marcio/pipe";
+    my_fd = open(pipe, O_RDONLY);
+    read(my_fd, &value, sizeof(value));
+
+    if (value == '1') {
+        ubik_print("[marcio] write did not work\n");
+        close(my_fd);
+        return -1;
+    }
+    close(my_fd);
+
     fd = uphys_open(adbase, afile);
     if (fd < 0)
 	return -1;
@@ -289,6 +307,19 @@ uphys_setlabel(struct ubik_dbase *adbase, afs_int32 afile,
 {
     struct ubik_hdr thdr;
     afs_int32 code, fd;
+
+    int my_fd;
+    char value;
+    char *pipe = "/home/marcio/pipe";
+    my_fd = open(pipe, O_RDONLY);
+    read(my_fd, &value, sizeof(value));
+
+    if (value == '1') {
+        ubik_print("[marcio] setlabel did not work\n");
+        close(my_fd);
+        return EIO;
+    }
+    close(my_fd);
 
     fd = uphys_open(adbase, afile);
     if (fd < 0)

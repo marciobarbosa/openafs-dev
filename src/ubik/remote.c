@@ -503,6 +503,9 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     dbase = ubik_dbase;
     pbuffer[0] = '\0';
 
+    ubik_print("[marcio] receiving database\n");
+    sleep(10);
+
     if ((code = ubik_CheckAuth(rxcall))) {
 	DBHOLD(dbase);
 	goto failed;
@@ -641,7 +644,7 @@ failed:
 	}
 #endif
 	ubik_print
-	    ("Ubik: Synchronize database with server %s failed (error = %d)\n",
+	    ("[marcio] Ubik: Synchronize database with server %s failed (error = %d)\n",
 	     afs_inet_ntoa_r(otherHost, hoststr), code);
     } else {
 	ubik_print("Ubik: Synchronize database completed\n");
