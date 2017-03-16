@@ -890,8 +890,9 @@ HashVolid(struct vl_ctx *ctx, afs_int32 voltype, afs_int32 blockindex,
     struct nvlentry ventry;
 
     if (FindByID
-	(ctx, tentry->volumeId[voltype], voltype, &ventry, &errorcode))
+	(ctx, tentry->volumeId[voltype], voltype, &ventry, &errorcode)) {
 	return VL_IDALREADYHASHED;
+    }
     else if (errorcode)
 	return errorcode;
     hashindex = IDHash(tentry->volumeId[voltype]);
