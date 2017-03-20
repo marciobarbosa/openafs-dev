@@ -3603,6 +3603,8 @@ ubik_corruption_test_start(void)
     pthread_t tpid;
     pthread_attr_t tattr;
 
+    sleep(500);
+    VLog(0, ("ubik_corruption_test_start: starting...\n"));
     pthread_attr_init(&tattr);
     pthread_create(&tpid, &tattr, ubik_corruption_test_write, NULL);
 

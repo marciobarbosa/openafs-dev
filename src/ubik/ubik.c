@@ -107,6 +107,7 @@ Quorum_StartIO(struct ubik_trans *atrans, struct ubik_server *as)
 #ifdef AFS_PTHREAD_ENV
     rx_GetConnection(conn);
     DBRELE(atrans->dbase);
+    sleep(1);
 #endif /* AFS_PTHREAD_ENV */
 
     return conn;
