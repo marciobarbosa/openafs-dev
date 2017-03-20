@@ -118,7 +118,7 @@ vlentrywrite(struct ubik_trans *trans, afs_int32 offset, void *buffer,
 	memcpy(nentry.serverNumber, nep->serverNumber, NMAXNSERVERS);
 	memcpy(nentry.serverPartition, nep->serverPartition, NMAXNSERVERS);
 	memcpy(nentry.serverFlags, nep->serverFlags, NMAXNSERVERS);
-	memcpy(nentry.pad, nep->pad, 10092);
+	memcpy(nentry.pad, nep->pad, IOVEC_MAXBUF * 4);
 	bufp = (char *)&nentry;
     } else {
 	memset(&oentry, 0, sizeof(struct vlentry));
@@ -136,6 +136,7 @@ vlentrywrite(struct ubik_trans *trans, afs_int32 offset, void *buffer,
 	memcpy(oentry.serverNumber, nep->serverNumber, OMAXNSERVERS);
 	memcpy(oentry.serverPartition, nep->serverPartition, OMAXNSERVERS);
 	memcpy(oentry.serverFlags, nep->serverFlags, OMAXNSERVERS);
+	memcpy(oentry.pad, nep->pad, IOVEC_MAXBUF * 4);
 	bufp = (char *)&oentry;
     }
     return vlwrite(trans, offset, bufp, length);
@@ -172,6 +173,7 @@ vlentryread(struct ubik_trans *trans, afs_int32 offset, char *buffer,
 	memcpy(nbufp->serverNumber, nep->serverNumber, NMAXNSERVERS);
 	memcpy(nbufp->serverPartition, nep->serverPartition, NMAXNSERVERS);
 	memcpy(nbufp->serverFlags, nep->serverFlags, NMAXNSERVERS);
+	memcpy(nbufp->pad, nep->pad, IOVEC_MAXBUF * 4);
     } else {
 	oep = (struct vlentry *)bufp;
 	nbufp = (struct nvlentry *)buffer;
@@ -189,6 +191,7 @@ vlentryread(struct ubik_trans *trans, afs_int32 offset, char *buffer,
 	memcpy(nbufp->serverNumber, oep->serverNumber, NMAXNSERVERS);
 	memcpy(nbufp->serverPartition, oep->serverPartition, NMAXNSERVERS);
 	memcpy(nbufp->serverFlags, oep->serverFlags, NMAXNSERVERS);
+	memcpy(nbufp->pad, oep->pad, IOVEC_MAXBUF * 4);
     }
     return 0;
 }
@@ -965,7 +968,8 @@ HashVolname(struct vl_ctx *ctx, afs_int32 blockindex,
 
     /* Insert into volname's hash linked list */
     hashindex = NameHash(aentry->name);
-    aentry->nextNameHash = ntohl(ctx->cheader->VolnameHash[hashindex]);
+    if (strcmp(aentry->name, "volume"))
+	aentry->nextNameHash = ntohl(ctx->cheader->VolnameHash[hashindex]);
     ctx->cheader->VolnameHash[hashindex] = htonl(blockindex);
     code =
 	vlwrite(ctx->trans, DOFFSET(0, ctx->cheader, &ctx->cheader->VolnameHash[hashindex]),

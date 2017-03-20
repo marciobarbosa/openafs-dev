@@ -31,6 +31,7 @@
 #include "vlserver_internal.h"
 #include "afs/audit.h"
 #ifndef AFS_NT40_ENV
+#include <fcntl.h>
 #include <unistd.h>
 #endif
 #ifdef HAVE_POSIX_REGEX		/* use POSIX regexp library */
@@ -3549,7 +3550,7 @@ ubik_corruption_test_write(void *arg)
 	}
 	ubik_EndTrans(ctx.trans);
       err:
-	sleep(5);
+	sleep(3);
     }
     return NULL;
 }
@@ -3562,16 +3563,17 @@ ubik_corruption_test_read(void)
     int errorcode, blockindex;
     char *volname = "volume";
     unsigned int cs, cs_1, cs_2;
+    int fd;
+
+    fd = open("/home/marcio/uct_output", O_CREAT | O_RDWR, 0600);
 
     memset(&entry, 0, sizeof(entry));
     strcpy(entry.name, volname);
     cs_1 = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
-    VLog(0, ("marcio: cs_1: %u\n", cs_1));
 
-    memset(&entry, 1, sizeof(entry));
+    memset(&entry, 0xff, sizeof(entry));
     strcpy(entry.name, volname);
     cs_2 = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
-    VLog(0, ("marcio: cs_2: %u\n", cs_2));
 
     while (1) {
 	if (Init_VLdbase(&ctx, LOCKREAD, VLGETENTRYBYNAME)) {
@@ -3583,13 +3585,15 @@ ubik_corruption_test_read(void)
 	    goto err;
 	}
 	cs = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
-        VLog(0, ("marcio: cs: %u\n", cs));
 	if (cs != cs_1 && cs != cs_2) {
 	    VLog(0, ("ubik_corruption_test: vldb is corrupted\n"));
+            write(fd, &entry, sizeof(entry));
+            ubik_EndTrans(ctx.trans);
+            break;
 	}
-        ubik_EndTrans(ctx.trans);
+	ubik_EndTrans(ctx.trans);
       err:
-	sleep(5);
+	sleep(2);
     }
 }
 
