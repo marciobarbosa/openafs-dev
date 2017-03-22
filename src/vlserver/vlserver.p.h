@@ -75,7 +75,7 @@ struct vlentry {
     u_char serverFlags[OMAXNSERVERS];	/* Server flags */
     char spares4;		/* XXX was RefCount XXX */
     char spares2[1];		/* for 32-bit alignment */
-    char pad[IOVEC_MAXBUF * 4];
+    char pad[1388];
 };
 
 struct nvlentry {
@@ -90,7 +90,7 @@ struct nvlentry {
     u_char serverNumber[NMAXNSERVERS];	/* Server # for each server that holds volume */
     u_char serverPartition[NMAXNSERVERS];	/* Server Partition number */
     u_char serverFlags[NMAXNSERVERS];	/* Server flags */
-    char pad[IOVEC_MAXBUF * 4];
+    char pad[1388];
 };
 
 typedef struct vlheader vlheader;

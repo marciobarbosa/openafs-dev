@@ -38,6 +38,9 @@
 #include <regex.h>
 #endif
 
+#include <time.h>
+#include <stdlib.h>
+
 extern int smallMem;
 extern int extent_mod;
 extern struct afsconf_dir *vldb_confdir;
@@ -3521,23 +3524,43 @@ ubik_corruption_test_write(void *arg)
 {
     struct vl_ctx ctx;
     struct nvlentry entry;
-    int index = 0;
+    int index1 = 0, index2 = 0;
     int errorcode, blockindex;
-    char *volname = "volume";
+    char *volname1 = "volume1";
+    char *volname2 = "volume2";
 
     while (1) {
 	if (Init_VLdbase(&ctx, LOCKWRITE, VLCREATEENTRYN)) {
 	    goto err;
 	}
-	blockindex = FindByName(&ctx, volname, &entry, &errorcode);
+	blockindex = FindByName(&ctx, volname1, &entry, &errorcode);
 
 	if (blockindex == 0) {
 	    blockindex = AllocBlock(&ctx, &entry);
 	} else {
-	    index = ~index;
+	    index1 = ~index1;
 	}
-	memset(&entry, index, sizeof(entry));
-	strcpy(entry.name, volname);
+	memset(&entry, index1, sizeof(entry));
+	strcpy(entry.name, volname1);
+	HashVolname(&ctx, blockindex, &entry);
+
+	if (write_vital_vlheader(&ctx)) {
+	    ubik_AbortTrans(ctx.trans);
+	    goto err;
+	}
+	if (vlentrywrite(ctx.trans, blockindex, &entry, sizeof(entry))) {
+	    ubik_AbortTrans(ctx.trans);
+	    goto err;
+	}
+	blockindex = FindByName(&ctx, volname2, &entry, &errorcode);
+
+	if (blockindex == 0) {
+	    blockindex = AllocBlock(&ctx, &entry);
+	} else {
+	    index2 = ~index2;
+	}
+	memset(&entry, index2, sizeof(entry));
+	strcpy(entry.name, volname2);
 	HashVolname(&ctx, blockindex, &entry);
 
 	if (write_vital_vlheader(&ctx)) {
@@ -3550,7 +3573,7 @@ ubik_corruption_test_write(void *arg)
 	}
 	ubik_EndTrans(ctx.trans);
       err:
-	sleep(3);
+	sleep(rand() % 10);
     }
     return NULL;
 }
@@ -3561,39 +3584,62 @@ ubik_corruption_test_read(void)
     struct vl_ctx ctx;
     struct nvlentry entry;
     int errorcode, blockindex;
-    char *volname = "volume";
-    unsigned int cs, cs_1, cs_2;
+    char *volname1 = "volume1";
+    char *volname2 = "volume2";
+    unsigned int cs, v1_cs_1, v1_cs_2;
+    unsigned int v2_cs_1, v2_cs_2;
     int fd;
 
     fd = open("/home/marcio/uct_output", O_CREAT | O_RDWR, 0600);
 
     memset(&entry, 0, sizeof(entry));
-    strcpy(entry.name, volname);
-    cs_1 = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
+    strcpy(entry.name, volname2);
+    v2_cs_1 = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
 
     memset(&entry, 0xff, sizeof(entry));
-    strcpy(entry.name, volname);
-    cs_2 = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
+    strcpy(entry.name, volname2);
+    v2_cs_2 = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
+
+    memset(&entry, 0, sizeof(entry));
+    strcpy(entry.name, volname1);
+    v1_cs_1 = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
+
+    memset(&entry, 0xff, sizeof(entry));
+    strcpy(entry.name, volname1);
+    v1_cs_2 = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
 
     while (1) {
 	if (Init_VLdbase(&ctx, LOCKREAD, VLGETENTRYBYNAME)) {
 	    goto err;
 	}
-	blockindex = FindByName(&ctx, volname, &entry, &errorcode);
+	blockindex = FindByName(&ctx, volname1, &entry, &errorcode);
 	if (!blockindex) {
 	    ubik_AbortTrans(ctx.trans);
 	    goto err;
 	}
 	cs = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
-	if (cs != cs_1 && cs != cs_2) {
-	    VLog(0, ("ubik_corruption_test: vldb is corrupted\n"));
-            write(fd, &entry, sizeof(entry));
-            ubik_EndTrans(ctx.trans);
-            break;
+	if (cs != v1_cs_1 && cs != v1_cs_2) {
+	    VLog(0, ("ubik_corruption_test: vldb is corrupted (volume1)\n"));
+	    write(fd, &entry, sizeof(entry));
+	    ubik_EndTrans(ctx.trans);
+	    break;
+	}
+	blockindex = FindByName(&ctx, volname2, &entry, &errorcode);
+	if (!blockindex) {
+	    ubik_AbortTrans(ctx.trans);
+	    goto err;
+	}
+	cs = ubik_corruption_test_checksum((void *)&entry, sizeof(entry));
+	if (cs != v2_cs_1 && cs != v2_cs_2) {
+	    VLog(0, ("ubik_corruption_test: vldb is corrupted (volume2)\n"));
+	    write(fd, &entry, sizeof(entry));
+	    ubik_EndTrans(ctx.trans);
+	    break;
 	}
 	ubik_EndTrans(ctx.trans);
       err:
-	sleep(2);
+	VLog(0, ("[marcio] vldb is okay\n"));
+	sleep(rand() % 10);
     }
 }
 
@@ -3603,7 +3649,8 @@ ubik_corruption_test_start(void)
     pthread_t tpid;
     pthread_attr_t tattr;
 
-    sleep(500);
+    sleep(300);
+    srand(time(NULL));
     VLog(0, ("ubik_corruption_test_start: starting...\n"));
     pthread_attr_init(&tattr);
     pthread_create(&tpid, &tattr, ubik_corruption_test_write, NULL);
