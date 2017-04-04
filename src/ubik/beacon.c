@@ -44,6 +44,7 @@
 /*! \name statics used to determine if we're the sync site */
 static afs_int32 syncSiteUntil = 0;	/*!< valid only if amSyncSite */
 int ubik_amSyncSite = 0;	/*!< flag telling if I'm sync site */
+int ubik_haveQuorum = 0;
 static int nServers;		/*!< total number of servers */
 static char amIMagic = 0;	/*!< is this host the magic host */
 char amIClone = 0;		/*!< is this a clone which doesn't vote */
@@ -130,6 +131,7 @@ ubeacon_AmSyncSite(void)
 	    if (ubik_amSyncSite)
 		ubik_dprint("Ubik: I am no longer the sync site\n");
 	    ubik_amSyncSite = 0;
+            ubik_haveQuorum = 0;
 	    rcode = 0;
 	} else {
 	    rcode = 1;		/* otherwise still have the required votes */
@@ -501,8 +503,11 @@ ubeacon_Interact(void *dummy)
 	/* now decide if we have enough votes to become sync site.
 	 * Note that we can still get enough votes even if we didn't for ourself. */
 	if (yesVotes > nServers) {	/* yesVotes is bumped by 2 or 3 for each site */
-	    if (!ubik_amSyncSite)
+	    if (!ubik_amSyncSite) {
 		ubik_dprint("Ubik: I am the sync site\n");
+            } else {
+                ubik_haveQuorum = 1;
+            }
 	    ubik_amSyncSite = 1;
 	    syncSiteUntil = oldestYesVote + SMALLTIME;
 #ifndef AFS_PTHREAD_ENV
@@ -514,6 +519,7 @@ ubeacon_Interact(void *dummy)
 	    if (ubik_amSyncSite)
 		ubik_dprint("Ubik: I am no longer the sync site\n");
 	    ubik_amSyncSite = 0;
+            ubik_haveQuorum = 0;
 	    urecovery_ResetState();	/* tell recovery we're no longer the sync site */
 	}
 

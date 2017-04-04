@@ -671,6 +671,11 @@ BeginTrans(struct ubik_dbase *dbase, afs_int32 transMode,
 	DBRELE(dbase);
 	return UNOQUORUM;
     }
+    if (transMode == UBIK_WRITETRANS && ubik_haveQuorum == 0) {
+        ubik_print("ubik_haveQuorum == 0\n");
+	DBRELE(dbase);
+	return UNOQUORUM;
+    }
     /* otherwise we have a quorum, use it */
 
     /* make sure that at most one write transaction occurs at any one time.  This
