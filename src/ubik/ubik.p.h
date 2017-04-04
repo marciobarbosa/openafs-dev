@@ -356,6 +356,7 @@ extern afs_int32 ubik_quorum;	/* min hosts in quorum */
 extern struct ubik_dbase *ubik_dbase;	/* the database handled by this server */
 extern afs_uint32 ubik_host[UBIK_MAX_INTERFACE_ADDR];	/* this host addr, in net order */
 extern int ubik_amSyncSite;	/* sleep on this waiting to be sync site */
+extern int ubik_haveQuorum;
 extern struct ubik_stats {	/* random stats */
     afs_int32 escapes;
 } ubik_stats;
