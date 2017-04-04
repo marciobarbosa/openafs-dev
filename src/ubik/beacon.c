@@ -317,6 +317,7 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 	    ubik_singleServer = 1;
 	if (nServers == 1 && !amIClone) {
 	    ubik_amSyncSite = 1;	/* let's start as sync site */
+            ubik_haveQuorum = 1;
 	    syncSiteUntil = 0x7fffffff;	/* and be it quite a while */
 	}
     } else {
@@ -328,6 +329,7 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 	if (!ubik_amSyncSite)
 	    ubik_dprint("Ubik: I am the sync site - 1 server\n");
 	ubik_amSyncSite = 1;
+        ubik_haveQuorum = 1;
 	syncSiteUntil = 0x7fffffff;	/* quite a while */
     }
     return 0;
