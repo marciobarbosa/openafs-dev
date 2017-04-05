@@ -362,6 +362,7 @@ struct beacon_data {
 #endif
     int ubik_amSyncSite;		/*!< flag telling if I'm sync site */
     afs_int32 syncSiteUntil;		/*!< valid only if amSyncSite */
+    int ubik_haveQuorum;		/*!< flag telling if remotes are aware we have quorum */
 };
 
 #define UBIK_BEACON_LOCK opr_mutex_enter(&beacon_globals.beacon_lock)
@@ -502,6 +503,7 @@ extern void ubeacon_InitSecurityClass(void);
 extern void ubeacon_ReinitServer(struct ubik_server *ts);
 extern void ubeacon_Debug(struct ubik_debug *aparm);
 extern int ubeacon_AmSyncSite(void);
+extern int ubeacon_HaveQuorum(void);
 extern int ubeacon_InitServerListByInfo(afs_uint32 ame,
 					struct afsconf_cell *info,
 					char clones[]);
