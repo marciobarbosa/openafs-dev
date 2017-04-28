@@ -371,6 +371,9 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 	if (nServers == 1 && !amIClone) {
 	    beacon_globals.ubik_amSyncSite = 1;	/* let's start as sync site */
 	    beacon_globals.syncSiteUntil = 0x7fffffff;	/* and be it quite a while */
+	    UBIK_VERSION_LOCK;
+	    version_globals.ubik_epochTime = FT_ApproxTime();
+	    UBIK_VERSION_UNLOCK;
 	}
     } else {
 	if (nServers == 1)	/* special case 1 server */
@@ -378,8 +381,12 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
     }
 
     if (ubik_singleServer) {
-	if (!beacon_globals.ubik_amSyncSite)
+	if (!beacon_globals.ubik_amSyncSite) {
 	    ubik_dprint("Ubik: I am the sync site - 1 server\n");
+	    UBIK_VERSION_LOCK;
+	    version_globals.ubik_epochTime = FT_ApproxTime();
+	    UBIK_VERSION_UNLOCK;
+	}
 	beacon_globals.ubik_amSyncSite = 1;
 	beacon_globals.syncSiteUntil = 0x7fffffff;	/* quite a while */
     }
@@ -577,8 +584,12 @@ ubeacon_Interact(void *dummy)
 	 * Note that we can still get enough votes even if we didn't for ourself. */
 	if (yesVotes > nServers) {	/* yesVotes is bumped by 2 or 3 for each site */
 	    UBIK_BEACON_LOCK;
-	    if (!beacon_globals.ubik_amSyncSite)
+	    if (!beacon_globals.ubik_amSyncSite) {
 		ubik_dprint("Ubik: I am the sync site\n");
+		UBIK_VERSION_LOCK;
+		version_globals.ubik_epochTime = FT_ApproxTime();
+		UBIK_VERSION_UNLOCK;
+	    }
 	    beacon_globals.ubik_amSyncSite = 1;
 	    beacon_globals.syncSiteUntil = oldestYesVote + SMALLTIME;
 #ifndef AFS_PTHREAD_ENV
