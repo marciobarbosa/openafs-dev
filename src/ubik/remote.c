@@ -743,7 +743,9 @@ SDISK_SetVersion(struct rx_call *rxcall, struct ubik_tid *atid,
     }
 
     /* Set the label if its version matches the sync-site's */
-    if (uvote_eq_dbVersion(*oldversionp)) {
+    if (uvote_eq_dbVersion(*oldversionp)
+	|| (uvote_eq_dbVersion(*newversionp)
+	    && !vcmp(ubik_dbase->version, *oldversionp))) {
 	UBIK_VERSION_LOCK;
 	code = (*ubik_dbase->setlabel) (ubik_dbase, 0, newversionp);
 	if (!code) {
