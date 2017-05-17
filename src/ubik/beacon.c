@@ -316,6 +316,9 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
 	if (nServers == 1 && !amIClone) {
 	    ubik_amSyncSite = 1;	/* let's start as sync site */
 	    syncSiteUntil = 0x7fffffff;	/* and be it quite a while */
+	    ObtainWriteLock(&ubik_epochTime_lock);
+	    ubik_epochTime = FT_ApproxTime();
+	    ReleaseWriteLock(&ubik_epochTime_lock);
 	}
     } else {
 	if (nServers == 1)	/* special case 1 server */
@@ -323,8 +326,12 @@ ubeacon_InitServerListCommon(afs_uint32 ame, struct afsconf_cell *info,
     }
 
     if (ubik_singleServer) {
-	if (!ubik_amSyncSite)
+	if (!ubik_amSyncSite) {
 	    ubik_dprint("Ubik: I am the sync site - 1 server\n");
+	    ObtainWriteLock(&ubik_epochTime_lock);
+	    ubik_epochTime = FT_ApproxTime();
+	    ReleaseWriteLock(&ubik_epochTime_lock);
+	}
 	ubik_amSyncSite = 1;
 	syncSiteUntil = 0x7fffffff;	/* quite a while */
     }
@@ -501,8 +508,12 @@ ubeacon_Interact(void *dummy)
 	/* now decide if we have enough votes to become sync site.
 	 * Note that we can still get enough votes even if we didn't for ourself. */
 	if (yesVotes > nServers) {	/* yesVotes is bumped by 2 or 3 for each site */
-	    if (!ubik_amSyncSite)
+	    if (!ubik_amSyncSite) {
 		ubik_dprint("Ubik: I am the sync site\n");
+		ObtainWriteLock(&ubik_epochTime_lock);
+		ubik_epochTime = FT_ApproxTime();
+		ReleaseWriteLock(&ubik_epochTime_lock);
+	    }
 	    ubik_amSyncSite = 1;
 	    syncSiteUntil = oldestYesVote + SMALLTIME;
 #ifndef AFS_PTHREAD_ENV

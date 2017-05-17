@@ -83,6 +83,7 @@ struct ubik_dbase *ubik_dbase = 0;
 struct ubik_stats ubik_stats;
 afs_uint32 ubik_host[UBIK_MAX_INTERFACE_ADDR];
 afs_int32 ubik_epochTime = 0;
+struct Lock ubik_epochTime_lock;
 afs_int32 urecovery_state = 0;
 int (*ubik_SRXSecurityProc) (void *, struct rx_securityClass **, afs_int32 *);
 void *ubik_SRXSecurityRock;
@@ -425,6 +426,7 @@ ubik_ServerInitCommon(afs_uint32 myHost, short myPort,
     Lock_Init(&tdb->versionLock);
 #endif
     Lock_Init(&tdb->cache_lock);
+    Lock_Init(&ubik_epochTime_lock);
     tdb->flags = 0;
     tdb->read = uphys_read;
     tdb->write = uphys_write;
@@ -709,7 +711,9 @@ BeginTrans(struct ubik_dbase *dbase, afs_int32 transMode,
 	}
     }
     /* label trans and dbase with new tid */
+    ObtainReadLock(&ubik_epochTime_lock);
     tt->tid.epoch = ubik_epochTime;
+    ReleaseReadLock(&ubik_epochTime_lock);
     /* bump by two, since tidCounter+1 means trans id'd by tidCounter has finished */
     tt->tid.counter = (dbase->tidCounter += 2);
 

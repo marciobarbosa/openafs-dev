@@ -360,6 +360,7 @@ extern struct ubik_stats {	/* random stats */
     afs_int32 escapes;
 } ubik_stats;
 extern afs_int32 ubik_epochTime;	/* time when this site started */
+extern struct Lock ubik_epochTime_lock;
 extern afs_int32 urecovery_state;	/* sync site recovery process state */
 extern struct ubik_trans *ubik_currentTrans;	/* current trans */
 extern struct ubik_version ubik_dbVersion;	/* sync site's dbase version */

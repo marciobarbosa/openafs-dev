@@ -879,13 +879,14 @@ udisk_commit(struct ubik_trans *atrans)
 	/* On the first write to the database. We update the versions */
 	if (ubeacon_AmSyncSite() && !(urecovery_state & UBIK_RECLABELDB)) {
 	    oldversion = dbase->version;
-	    newversion.epoch = FT_ApproxTime();;
+	    ObtainReadLock(&ubik_epochTime_lock);
+	    newversion.epoch = ubik_epochTime;
+	    ReleaseReadLock(&ubik_epochTime_lock);
 	    newversion.counter = 1;
 
 	    code = (*dbase->setlabel) (dbase, 0, &newversion);
 	    if (code)
 		return (code);
-	    ubik_epochTime = newversion.epoch;
 	    dbase->version = newversion;
 
 	    /* Ignore the error here. If the call fails, the site is
