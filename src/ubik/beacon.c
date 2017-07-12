@@ -432,6 +432,9 @@ ubeacon_Interact(void *dummy)
 	if (ubik_singleServer)
 	    continue;		/* special-case 1 server for speedy startup */
 
+	if (amIClone)
+	    continue;		/* if we cannot be the sync-site, do not ask for votes */
+
 	if (!uvote_ShouldIRun())
 	    continue;		/* if voter has heard from a better candidate than us, don't bother running */
 
