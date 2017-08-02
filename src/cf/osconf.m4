@@ -14,6 +14,8 @@ dnl debugging and optimization flag defaults
 dnl Note, these are all the defaults for if debug/optimize turned on, and
 dnl the arch cases below do override as needed
 KERN_DBG=-g
+KERN_CTFCONVERT=
+KERN_CTFMERGE=
 KERN_OPTMZ=-O
 DBG=-g
 OPTMZ=-O
@@ -597,11 +599,20 @@ case $AFS_SYSNAME in
 			AC_SUBST(DEBUG_FLAGS)
 		fi
 	;;
+	sun*)
+		KERN_CTFCONVERT="/opt/onbld/bin/$(uname -p)/ctfconvert -g -l libafs"
+		KERN_CTFMERGE="/opt/onbld/bin/$(uname -p)/ctfmerge -l libafs -o"
+	;;
 esac
 
 dnl Disable the default for debugging/optimization if not enabled
-if test "x$enable_debug_kernel" = "xno"; then
+if test "x$enable_debug_kernel" = "xno" -a "x$enable_ctf_kernel" = "xno"; then
   KERN_DBG=
+fi
+
+if test "x$enable_ctf_kernel" = "xno"; then
+  KERN_CTFCONVERT=
+  KERN_CTFMERGE=
 fi
 
 if test "x$enable_optimize_kernel" = "xno"; then
@@ -698,6 +709,8 @@ AC_SUBST(CP)
 AC_SUBST(DBG)
 AC_SUBST(FSINCLUDES)
 AC_SUBST(KERN_DBG)
+AC_SUBST(KERN_CTFCONVERT)
+AC_SUBST(KERN_CTFMERGE)
 AC_SUBST(KERN_OPTMZ)
 AC_SUBST(LD)
 AC_SUBST(LEX)

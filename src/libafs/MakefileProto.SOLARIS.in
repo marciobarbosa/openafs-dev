@@ -146,9 +146,19 @@ dest_libafs: $(LIBAFS) $(LIBAFSNONFS)
 
 ${LIBAFS}: $(AFSAOBJS) $(AFSNFSOBJS)
 	$(RM) -f $@
+	if [ "${KERN_CTFCONVERT}" ] ; then \
+	    for t in ${AFSAOBJS} ; do ${KERN_CTFCONVERT} $$t; done ; \
+	    for t in ${AFSNFSOBJS} ; do ${KERN_CTFCONVERT} $$t; done ; \
+	fi ;
 	$(LD) $(LDFLAGS) -o $@ $(AFSAOBJS) ${AFSNFSOBJS}
+	if [ "${KERN_CTFMERGE}" ] ; then $(KERN_CTFMERGE) $@ $(AFSAOBJS) ${AFSNFSOBJS} ; fi
 
 ${LIBAFSNONFS}:  $(AFSAOBJS) $(AFSNONFSOBJS)
 	$(RM) -f $@
+	if [ "${KERN_CTFCONVERT}" ] ; then \
+	    for t in ${AFSAOBJS} ; do ${KERN_CTFCONVERT} $$t; done ; \
+	    for t in ${AFSNONFSOBJS} ; do ${KERN_CTFCONVERT} $$t; done ; \
+	fi ;
 	$(LD) $(LDFLAGS) -o $@ $(AFSAOBJS) ${AFSNONFSOBJS}
+	if [ "${KERN_CTFMERGE}" ] ; then $(KERN_CTFMERGE) $@ $(AFSAOBJS) ${AFSNONFSOBJS} ; fi
 

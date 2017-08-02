@@ -218,6 +218,12 @@ AC_ARG_ENABLE([debug-kernel],
 	 (defaults to disabled)])],
     [],
     [enable_debug_kernel="no"])
+AC_ARG_ENABLE([ctf-kernel],
+    [AS_HELP_STRING([--enable-ctf-kernel],
+	[enable compilation of the kernel module with ctf debugging information
+	 (defaults to disabled)])],
+    [],
+    [enable_ctf_kernel="no"])
 AC_ARG_ENABLE([optimize-kernel],
     [AS_HELP_STRING([--disable-optimize-kernel],
 	[disable compilation of the kernel module with optimization (defaults

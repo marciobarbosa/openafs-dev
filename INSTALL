@@ -300,6 +300,12 @@ I  Other configure options
        by the option with debugging information.  If --enable-debug is
        given, also do not strip binaries when installing them.
 
+   --enable_ctf_kernel
+       Enable compilation of the kernel module with ctf debugging
+       information. At the moment, this option is only available on
+       Solaris. CTF tools are available in the onbld package (must be
+       installed).
+
    --enable-linux-d_splice_alias-extra-iput
        Work around a kernel memory leak present in a few Linux kernels.
        The only affected mainline kernels are 3.17 to 3.17.2, but this
