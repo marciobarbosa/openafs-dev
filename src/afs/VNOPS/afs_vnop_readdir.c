@@ -472,7 +472,7 @@ afs_readdir_move(struct DirEntry *de, struct vcache *vc, struct uio *auio,
     direntp->d_off = off;
 #endif
     direntp->d_reclen = rlen;
-    strcpy(direntp->d_name, de->name);
+    hs_strcpy(direntp->d_name, de->name);
     AFS_UIOMOVE((caddr_t) direntp, rlen, UIO_READ, auio, code);
     osi_FreeLargeSpace((char *)direntp);
 #else /* AFS_SUN5_ENV */
@@ -507,7 +507,7 @@ afs_readdir_move(struct DirEntry *de, struct vcache *vc, struct uio *auio,
 	dp->d_ino =  (Volume << 16) + ntohl(Vnode);
 	FIXUPSTUPIDINODE(dp->d_ino);
 	dp->d_reclen = rlen;
-	strcpy(dp->d_name, de->name);
+	hs_strcpy(dp->d_name, de->name);
 	AFS_UIOMOVE((char*) dp, sizeof(struct dirent), UIO_READ, auio, code);
 	pool_put(&ufs_direct_pool, dp);
     }

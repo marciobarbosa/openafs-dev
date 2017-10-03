@@ -157,9 +157,9 @@ afs_omount(struct mount *mp, char *path, caddr_t data, struct nameidata *ndp,
 	bcopy("/afs", mp->mnt_stat.f_mntonname, size = 4);
     memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
     memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
-    strcpy(mp->mnt_stat.f_mntfromname, "AFS");
+    hs_strcpy(mp->mnt_stat.f_mntfromname, "AFS");
     /* null terminated string "AFS" will fit, just leave it be. */
-    strcpy(mp->mnt_stat.f_fstypename, "afs");
+    hs_strcpy(mp->mnt_stat.f_fstypename, "afs");
     MNT_IUNLOCK(mp);
     AFS_GUNLOCK();
 #ifdef AFS_FBSD80_ENV

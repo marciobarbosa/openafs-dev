@@ -80,7 +80,7 @@ afs_mount(struct vfs *afsp, char *path, smountargs_t * data)
     afsp->vfs_bsize = 8192;
     afsp->vfs_fsid[0] = AFS_VFSMAGIC;	/* magic */
     afsp->vfs_fsid[1] = AFS_VFSFSID;
-    strcpy(afsp->vfs_name, "AFS");
+    hs_strcpy(afsp->vfs_name, "AFS");
     afsp->vfs_name[3] = '\0';
 
     strncpy(afs_mountpath, path, sizeof(afs_mountpath));

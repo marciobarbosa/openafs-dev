@@ -1546,4 +1546,10 @@ struct afssysa {
 extern int Afs_syscall(struct afssysa *uap, rval_t *rvp);
 #endif /* AFS_SUN5_ENV */
 
+static_inline char *
+hs_strcpy(char *a_dst, const char *a_src)
+{
+    return strncpy(a_dst, a_src, strlen(a_src));
+}
+
 #endif /* _AFS_H_ */

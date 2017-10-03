@@ -207,7 +207,7 @@ EvalMountData(char type, char *data, afs_uint32 states, afs_uint32 cellnum,
     if (!tvp && (prefetch == 2) && len < AFS_SMALLOCSIZ - 10) {
 	buf = (char *)osi_AllocSmallSpace(len + 10);
 
-	strcpy(buf, volnamep);
+	hs_strcpy(buf, volnamep);
 	afs_strcat(buf, ".readonly");
 
 	tvp = afs_GetVolumeByName(buf, mtptCell, 1, areq, WRITE_LOCK);
@@ -526,20 +526,20 @@ afs_getsysname(struct vrequest *areq, struct vcache *adp,
     *sysnamelist = afs_sysnamelist;
 
     if (!afs_nfsexporter)
-	strcpy(bufp, (*sysnamelist)[0]);
+	hs_strcpy(bufp, (*sysnamelist)[0]);
     else {
 	au = afs_GetUser(areq->uid, adp->f.fid.Cell, 0);
 	if (au->exporter) {
 	    error = EXP_SYSNAME(au->exporter, (char *)0, sysnamelist, num, 0);
 	    if (error) {
-		strcpy(bufp, "@sys");
+		hs_strcpy(bufp, "@sys");
 		afs_PutUser(au, 0);
 		return -1;
 	    } else {
-		strcpy(bufp, (*sysnamelist)[0]);
+		hs_strcpy(bufp, (*sysnamelist)[0]);
 	    }
 	} else
-	    strcpy(bufp, afs_sysname);
+	    hs_strcpy(bufp, afs_sysname);
 	afs_PutUser(au, 0);
     }
     return 0;
@@ -618,7 +618,7 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	if (++(state->index) >= num || !(*sysnamelist)[(unsigned int)state->index])
 	    return 0;		/* end of list */
     }
-    strcpy(state->name + state->offset, (*sysnamelist)[(unsigned int)state->index]);
+    hs_strcpy(state->name + state->offset, (*sysnamelist)[(unsigned int)state->index]);
     return 1;
 }
 
@@ -1671,7 +1671,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 
 	/*
 	 * check for, and handle "@sys" if it's there.  We should be able
-	 * to avoid the alloc and the strcpy with a little work, but it's
+	 * to avoid the alloc and the hs_strcpy with a little work, but it's
 	 * not pressing.  If there aren't any remote users (ie, via the 
 	 * NFS translator), we have a slightly easier job.
 	 * the faster way to do this is to check for *aname == '@' and if 

@@ -323,7 +323,7 @@ afs_statfs(OSI_VFS_ARG(afsp), abp, avp)
 	abp->f_ffree = abp->f_favail = AFS_VFS_FAKEFREE;
 
     abp->f_fsid = AFS_VFSMAGIC;	/* magic */
-    strcpy(abp->f_basetype, AFS_MOUNT_AFS);
+    hs_strcpy(abp->f_basetype, AFS_MOUNT_AFS);
     abp->f_flag = 0;
     abp->f_namemax = 256;
     return 0;
