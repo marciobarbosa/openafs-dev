@@ -1549,7 +1549,7 @@ extern int Afs_syscall(struct afssysa *uap, rval_t *rvp);
 static_inline char *
 hs_strcpy(char *a_dst, const char *a_src)
 {
-    return strncpy(a_dst, a_src, strlen(a_src));
+    return strlcpy(a_dst, a_src, strlen(a_src) + 1);
 }
 
 #endif /* _AFS_H_ */
