@@ -142,7 +142,7 @@ afs_strcat(char *s1, char *s2)
 
 #ifdef AFS_OBSD34_ENV
 char *
-afs_strcpy(char *s1, char *s2)
+afs_hs_strcpy(char *s1, char *s2)
 {
     char *os1;
 

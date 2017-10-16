@@ -156,7 +156,7 @@ Create(void *dir, char *entry, void *voidfid)
     ep->flag = FFIRST;
     ep->fid.vnode = htonl(vfid[1]);
     ep->fid.vunique = htonl(vfid[2]);
-    strcpy(ep->name, entry);
+    strncpy(ep->name, entry, 16);
     /* Now we just have to thread it on the hash table list. */
     dhp = (struct DirHeader *)DRead(dir, 0);
     if (!dhp) {
@@ -685,7 +685,7 @@ InverseLookup (void *dir, afs_uint32 vnode, afs_uint32 unique, char *name,
     if (strlen(entry->name) >= length)
 	code = E2BIG;
     else
-	strcpy(name, entry->name);
+	strncpy(name, entry->name, length);
     DRelease(entry, 0);
     return code;
 }
