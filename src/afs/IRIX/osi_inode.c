@@ -261,7 +261,7 @@ xfs_icreatename64(struct vfs *vfsp, int datap, int datalen,
 	code = gop_lookupname(name, AFS_UIOSYS, FOLLOW, &dvp);
 	if (!code) {
 	    /* Use old name format. */
-	    strcpy(path, name);
+	    hs_strcpy(path, name);
 	    name_version = AFS_XFS_NAME_VERS1;
 	}
     }
@@ -311,7 +311,7 @@ xfs_icreatename64(struct vfs *vfsp, int datap, int datalen,
     VN_RELE(dvp);
 
     /* Create the desired file. Use up to ten tries to create a unique name. */
-    (void)strcpy(name, path);
+    (void)hs_strcpy(name, path);
     (void)strcat(name, "/.");
     (void)strcat(name, int_to_base64(stmp2, params[2]));
     s = &name[strlen(name)];
@@ -579,7 +579,7 @@ xfs_iincdec64(struct vfs *vfsp, ino_t inode, int inode_p1, int amount)
 	    return code;
 	}
 
-	strcpy(path, ".");
+	hs_strcpy(path, ".");
 	strcat(path, int_to_base64(stmp1, attrs.at_param[2]));
 	strcat(path, ".");
 	strcat(path, int_to_base64(stmp1, attrs.at_tag));
@@ -602,11 +602,11 @@ xfs_iincdec64(struct vfs *vfsp, ino_t inode, int inode_p1, int amount)
 		    if (!code2) {
 			VN_RELE(dvp);
 			dvp = (vnode_t *) 0;
-			strcpy(path, ".");
+			hs_strcpy(path, ".");
 			if (attrs.at_name_version == AFS_XFS_NAME_VERS2)
-			    strcpy(path, AFS_INODE_DIR_NAME);
+			    hs_strcpy(path, AFS_INODE_DIR_NAME);
 			else
-			    strcpy(path, ".");
+			    hs_strcpy(path, ".");
 			int_to_base64(stmp1,
 				      (attrs.at_param[1] ==
 				       INODESPECIAL) ? attrs.

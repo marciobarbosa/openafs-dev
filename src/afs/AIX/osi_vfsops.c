@@ -180,8 +180,8 @@ afs_statfs(struct vfs *afsp, struct statfs *abp, struct ucred *credp)
     abp->f_vfsoff = abp->f_vfslen = abp->f_vfsvers = -1;
     abp->f_fsize = 4096;	/* fundamental filesystem block size */
     abp->f_fsid = afsp->vfs_fsid;
-    (void)strcpy(abp->f_fname, "/afs");
-    (void)strcpy(abp->f_fpack, "AFS");
+    (void)hs_strcpy(abp->f_fname, "/afs");
+    (void)hs_strcpy(abp->f_fpack, "AFS");
     abp->f_name_max = 256;
 
     AFS_VFSUNLOCK();

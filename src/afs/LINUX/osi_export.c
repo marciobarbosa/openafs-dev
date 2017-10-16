@@ -635,7 +635,7 @@ static int afs_export_get_name(struct dentry *parent, char *name,
 #endif
 	data.fid = vcp->f.fid;
 	if (VTOAFS(parent->d_inode) == afs_globalVp)
-	    strcpy(name, AFS_DYNROOT_MOUNTNAME);
+	    hs_strcpy(name, AFS_DYNROOT_MOUNTNAME);
 	else
 	    code = -ENOENT;
 	goto done;
@@ -693,7 +693,7 @@ static int afs_export_get_name(struct dentry *parent, char *name,
 	if (vcp) {
 	    ObtainReadLock(&vcp->lock);
 	    if (strlen(vcp->linkData + 1) <= NAME_MAX)
-		strcpy(name, vcp->linkData + 1);
+		hs_strcpy(name, vcp->linkData + 1);
 	    else
 		code = ENOENT;
 	    ReleaseReadLock(&vcp->lock);

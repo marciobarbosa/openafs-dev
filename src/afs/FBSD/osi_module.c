@@ -57,7 +57,7 @@ afs_module_handler(module_t mod, int what, void *arg)
 #ifdef AFS_FBSD53_ENV
 	afs_vfsconf.vfc_version = VFS_VERSION;
 #endif
-	strcpy(afs_vfsconf.vfc_name, "AFS");
+	hs_strcpy(afs_vfsconf.vfc_name, "AFS");
 	afs_vfsconf.vfc_vfsops = &afs_vfsops;
 	afs_vfsconf.vfc_typenum = -1;	/* set by vfs_register */
 	afs_vfsconf.vfc_flags = VFCF_NETWORK;

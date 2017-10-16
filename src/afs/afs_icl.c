@@ -752,7 +752,7 @@ afs_icl_CreateLogWithFlags(char *name, afs_int32 logSize, afs_uint32 flags,
 
     logp->refCount = 1;
     logp->name = osi_AllocSmallSpace(strlen(name) + 1);
-    strcpy(logp->name, name);
+    hs_strcpy(logp->name, name);
     LOCK_INIT(&logp->lock, "logp lock");
     logp->logSize = logSize;
     logp->datap = NULL;		/* don't allocate it until we need it */
@@ -1168,7 +1168,7 @@ afs_icl_CreateSetWithFlags(char *name, struct afs_icl_log *baseLogp,
      */
     ObtainWriteLock(&setp->lock, 199);
     setp->name = osi_AllocSmallSpace(strlen(name) + 1);
-    strcpy(setp->name, name);
+    hs_strcpy(setp->name, name);
     setp->nevents = ICL_DEFAULTEVENTS;
     setp->eventFlags = afs_osi_Alloc(ICL_DEFAULTEVENTS);
     osi_Assert(setp->eventFlags != NULL);
