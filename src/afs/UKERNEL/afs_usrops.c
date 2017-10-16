@@ -1307,7 +1307,7 @@ uafs_setMountDir(const char *dir)
 	} else {
 	    if (strcmp(tmp_mountDir, afs_mountDir) != 0) {
 		/* mount dir changed */
-		strcpy(afs_mountDir, tmp_mountDir);
+		hs_strcpy(afs_mountDir, tmp_mountDir);
 		afs_mountDirLen = strlen(afs_mountDir);
 	    }
 	}
@@ -1695,7 +1695,7 @@ uafs_LookupName(char *path, struct usr_vnode *parentVp,
      */
     tmpPath = afs_osi_Alloc(strlen(path) + 1);
     usr_assert(tmpPath != NULL);
-    strcpy(tmpPath, path);
+    hs_strcpy(tmpPath, path);
     VN_HOLD(vp);
     pathP = tmpPath;
     while (pathP != NULL && *pathP != '\0') {

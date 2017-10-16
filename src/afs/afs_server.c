@@ -655,7 +655,7 @@ CkSrv_SetTime(int nconns, struct rx_connection **rxconns,
 		    }
 		    afs_osi_SetTime(&tv);
 		    if (delta > 0) {
-			strcpy(msgbuf, "afs: setting clock back ");
+			hs_strcpy(msgbuf, "afs: setting clock back ");
 			if (delta > AFS_MAXCHANGEBACK) {
 			    afs_strcat(msgbuf,
 				       afs_cv2string(&tbuffer[CVBS],
@@ -676,7 +676,7 @@ CkSrv_SetTime(int nconns, struct rx_connection **rxconns,
 			    print_internet_address(msgbuf, sa, ").", 0, 0);
 			}
 		    } else {
-			strcpy(msgbuf, "afs: setting clock ahead ");
+			hs_strcpy(msgbuf, "afs: setting clock ahead ");
 			afs_strcat(msgbuf,
 				   afs_cv2string(&tbuffer[CVBS], -delta));
 			afs_strcat(msgbuf, " seconds (via ");

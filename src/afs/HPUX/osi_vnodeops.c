@@ -2118,7 +2118,7 @@ afs_readdir(vp, uiop, cred)
 	 (struct dirent *)((caddr_t) odp + odp->d_reclen)) {
 	odp->d_ino = idp->__d_ino;
 	odp->d_namlen = idp->__d_namlen;
-	(void)strcpy(odp->d_name, idp->__d_name);
+	(void)hs_strcpy(odp->d_name, idp->__d_name);
 	odp->d_reclen = reclen(odp);
 	if ((caddr_t) odp + odp->d_reclen > obufend)
 	    break;
@@ -2189,7 +2189,7 @@ afs_readdir3(vp, uiop, cred)
 	       sizeof odp->__d_off);
 	odp->__d_ino = idp->__d_ino;
 	odp->__d_namlen = idp->__d_namlen;
-	(void)strcpy(odp->__d_name, idp->__d_name);
+	(void)hs_strcpy(odp->__d_name, idp->__d_name);
 	odp->__d_reclen = reclen_dirent64(odp);
 	if ((caddr_t) odp + odp->__d_reclen > obufend)
 	    break;

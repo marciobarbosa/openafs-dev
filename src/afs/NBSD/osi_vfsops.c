@@ -268,9 +268,9 @@ afs_mount(struct mount *mp, const char *path, void *data,
 		    &size);
     bzero(mp->mnt_stat.f_mntonname + size, MNAMELEN - size);
     bzero(mp->mnt_stat.f_mntfromname, MNAMELEN);
-    strcpy(mp->mnt_stat.f_mntfromname, "AFS");
+    hs_strcpy(mp->mnt_stat.f_mntfromname, "AFS");
     /* null terminated string "AFS" will fit, just leave it be. */
-    strcpy(mp->mnt_stat.f_fstypename, AFS_MOUNT_AFS);
+    hs_strcpy(mp->mnt_stat.f_fstypename, AFS_MOUNT_AFS);
     AFS_GUNLOCK();
     (void)afs_statvfs(mp, &mp->mnt_stat, l);
 
