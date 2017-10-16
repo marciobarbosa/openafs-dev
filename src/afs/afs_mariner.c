@@ -90,12 +90,12 @@ afs_MarinerLog(char *astring, struct vcache *avc)
 #endif
     tp = buf = (char *)osi_AllocSmallSpace(AFS_SMALLOCSIZ);
 
-    strcpy(tp, astring);
+    hs_strcpy(tp, astring);
     tp += strlen(astring);
     if (avc) {
 	*tp++ = ' ';
 	tp1 = afs_GetMariner(avc);
-	strcpy(tp, tp1);
+	hs_strcpy(tp, tp1);
 	tp += strlen(tp1);
     }
     *tp++ = '\n';

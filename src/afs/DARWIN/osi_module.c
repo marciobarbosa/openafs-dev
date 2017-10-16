@@ -83,7 +83,7 @@ afs_modload(struct kmod_info *kmod_info, void *data)
     }
 #else
     memset(&afs_vfsconf, 0, sizeof(struct vfsconf));
-    strcpy(afs_vfsconf.vfc_name, "afs");
+    hs_strcpy(afs_vfsconf.vfc_name, "afs");
     afs_vfsconf.vfc_vfsops = &afs_vfsops;
     afs_vfsconf.vfc_typenum = maxvfsconf++;	/* oddly not VT_AFS */
     afs_vfsconf.vfc_flags = MNT_NODEV;
