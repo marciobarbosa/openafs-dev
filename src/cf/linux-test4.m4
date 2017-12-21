@@ -823,3 +823,15 @@ AC_DEFUN([LINUX_KERNEL_PAGEVEC_INIT_COLD_ARG], [
 		       [define if your pagevec_init receives cold parameter],
 		       [])
 ])
+
+AC_DEFUN([LINUX_KERNEL_PAGE_CACHE_ALLOC_COLD], [
+  AC_CHECK_LINUX_BUILD([whether page_cache_alloc_cold exists],
+		       [ac_cv_linux_func_page_cache_alloc_cold],
+		       [#include <linux/pagemap.h>],
+                       [
+                       struct page *page_cache_alloc_cold(struct address_space *);
+                       ],
+		       [KERNEL_PAGE_CACHE_ALLOC_COLD],
+		       [define if page_cache_alloc_cold exists],
+		       [])
+])
