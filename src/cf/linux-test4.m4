@@ -811,3 +811,15 @@ AC_DEFUN([LINUX_KERNEL_READ_OFFSET_IS_LAST], [
                        [define if your kernel_read has offset as the last argument],
                        [])
 ])
+
+AC_DEFUN([LINUX_KERNEL_PAGEVEC_INIT_COLD_ARG], [
+  AC_CHECK_LINUX_BUILD([whether pagevec_init receives cold parameter],
+		       [ac_cv_linux_func_pagevec_init_cold_arg],
+		       [#include <linux/pagevec.h>],
+                       [
+                       void pagevec_init(struct pagevec *, int);
+                       ],
+		       [KERNEL_PAGEVEC_INIT_COLD_ARG],
+		       [define if your pagevec_init receives cold parameter],
+		       [])
+])
