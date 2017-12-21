@@ -1205,6 +1205,7 @@ case $AFS_SYSNAME in *_linux* | *_umlinux*)
 		 LINUX_D_INVALIDATE_IS_VOID
 		 LINUX_KERNEL_READ_OFFSET_IS_LAST
 		 LINUX_KERNEL_PAGEVEC_INIT_COLD_ARG
+		 LINUX_KERNEL_PAGE_CACHE_ALLOC_COLD
 
 		 dnl If we are guaranteed that keyrings will work - that is
 		 dnl  a) The kernel has keyrings enabled
