@@ -319,6 +319,16 @@ AC_ARG_WITH([dot],
         [use graphviz dot to generate dependency graphs with doxygen (defaults to autodetect)]),
         [], [with_dot="maybe"])
 
+AC_ARG_WITH([ctf-tools],
+	AS_HELP_STRING([--with-ctf-tools],
+	[directory where the ctf tools can be found]),
+	[CTF_TOOLS="$withval"],
+	[CTF_TOOLS=/opt/onbld/bin/`uname -p`])
+
+AC_CHECK_PROG([CTFCONVERT], [ctfconvert], [yes], [no], [$CTF_TOOLS])
+AC_CHECK_PROG([CTFMERGE], [ctfmerge], [yes], [no], [$CTF_TOOLS])
+AS_IF([test "x$CTFCONVERT" = "xno" -o "x$CTFMERGE" = "xno"], [CTF_TOOLS=""])
+
 enable_login="no"
 
 dnl Check whether kindlegen exists.  If not, we'll suppress that part of the
@@ -2032,6 +2042,7 @@ AC_SUBST(HTML_XSL)
 AC_SUBST(XSLTPROC)
 AC_SUBST(DOCBOOK2PDF)
 AC_SUBST(DOCBOOK_STYLESHEETS)
+AC_SUBST(CTF_TOOLS)
 
 OPENAFS_FUSE
 OPENAFS_SWIG
