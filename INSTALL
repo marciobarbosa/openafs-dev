@@ -499,6 +499,13 @@ I  Other configure options
        xsltproc.  By default, the user's path is searched for those
        programs in that order, and the first one found is used.
 
+   --with-ctf-tools=DIR
+       Specifies the directory where the CTF tools can be found. These
+       tools create a reduced form of debug information that describes
+       types and function prototypes. At the moment, this option is only
+       available on Solaris (onbld package must be installed). Enabled
+       by default.
+
    There are also some environment variables that you can set to control
    aspects of the build.  They can be set either on the configure command
    line (preferred) or in the environment.

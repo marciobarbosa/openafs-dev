@@ -250,6 +250,12 @@ AC_ARG_WITH([dot],
         [use graphviz dot to generate dependency graphs with doxygen (defaults to autodetect)]),
         [], [with_dot="maybe"])
 
+AC_ARG_WITH([ctf-tools],
+        AS_HELP_STRING([--with-ctf-tools],
+        [directory where the ctf tools can be found]),
+        [CTF_TOOLS="$withval"],
+        [CTF_TOOLS="check"])
+
 enable_login="no"
 
 ])

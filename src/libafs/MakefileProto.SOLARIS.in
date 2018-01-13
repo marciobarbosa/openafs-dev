@@ -146,9 +146,23 @@ dest_libafs: $(LIBAFS) $(LIBAFSNONFS)
 
 ${LIBAFS}: $(AFSAOBJS) $(AFSNFSOBJS)
 	$(RM) -f $@
+	if test "x${CTFCONVERT}" != "x"; then \
+	    for t in ${AFSAOBJS} ; do ${CTFCONVERT} -g -l libafs $$t; done ; \
+	    for t in ${AFSNFSOBJS} ; do ${CTFCONVERT} -g -l libafs $$t; done ; \
+	fi
 	$(LD) $(LDFLAGS) -o $@ $(AFSAOBJS) ${AFSNFSOBJS}
+	if test "x${CTFMERGE}" != "x"; then \
+	    $(CTFMERGE) -g -l libafs -o $@ $(AFSAOBJS) ${AFSNFSOBJS} ; \
+	fi
 
 ${LIBAFSNONFS}:  $(AFSAOBJS) $(AFSNONFSOBJS)
 	$(RM) -f $@
+	if test "x${CTFCONVERT}" != "x"; then \
+	    for t in ${AFSAOBJS} ; do ${CTFCONVERT} -g -l libafs $$t; done ; \
+	    for t in ${AFSNONFSOBJS} ; do ${CTFCONVERT} -g -l libafs $$t; done ; \
+	fi
 	$(LD) $(LDFLAGS) -o $@ $(AFSAOBJS) ${AFSNONFSOBJS}
+	if test "x${CTFMERGE}" != "x"; then \
+	    $(CTFMERGE) -g -l libafs -o $@ $(AFSAOBJS) ${AFSNONFSOBJS} ; \
+	fi
 
