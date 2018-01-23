@@ -3337,4 +3337,15 @@ FreeZLCList(void)
 }
 #endif
 
+void
+namei_RemoveDirectories(afs_int32 vid)
+{
+    IHandle_t dirIH;
+    namei_t name;
+
+    dirIH.ih_vid = vid;
+    namei_HandleToVolDir(&name, &dirIH);
+    namei_RemoveDataDirectories(&name);
+}
+
 #endif /* AFS_NAMEI_ENV */

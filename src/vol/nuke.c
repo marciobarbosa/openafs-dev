@@ -205,6 +205,10 @@ nuke(char *aname, VolumeId avolid)
 
 	allInodes = NULL;
 
+#ifdef AFS_NAMEI_ENV
+	namei_RemoveDirectories(avolid);
+#endif
+
 	/* at this point, we should try to remove the volume header file itself.
 	 * the volume header file is the file named VNNNNN.vol in the UFS file
 	 * system, and is a normal file.  As such, it is not stamped with the
