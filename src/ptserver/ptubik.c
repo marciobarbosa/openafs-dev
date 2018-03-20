@@ -73,13 +73,6 @@ ubik_EndTrans(struct ubik_trans *transPtr)
 }
 
 int
-ubik_Tell(struct ubik_trans *transPtr, afs_int32 * fileid,
-          afs_int32 * position)
-{
-    return (0);
-}
-
-int
 ubik_Truncate(struct ubik_trans *transPtr, afs_int32 length)
 {
     return (0);

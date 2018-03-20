@@ -1154,23 +1154,6 @@ ubik_Seek(struct ubik_trans *transPtr, afs_int32 fileid,
 }
 
 /*!
- * \brief This call returns the file pointer associated with the specified
- * transaction in \p fileid and \p position.
- */
-int
-ubik_Tell(struct ubik_trans *transPtr, afs_int32 * fileid,
-	  afs_int32 * position)
-{
-    if (!trans_is_creator(transPtr->cid)) {
-	return UIOERROR;
-    }
-
-    *fileid = transPtr->seekFile;
-    *position = transPtr->seekPos;
-    return 0;
-}
-
-/*!
  * \brief This sets the file size for the currently-selected file to \p length
  * bytes, if length is less than the file's current size.
  */
