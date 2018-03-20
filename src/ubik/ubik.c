@@ -1144,22 +1144,13 @@ int
 ubik_Seek(struct ubik_trans *transPtr, afs_int32 fileid,
 	  afs_int32 position)
 {
-    afs_int32 code;
-
     if (!trans_is_creator(transPtr->cid)) {
 	return UIOERROR;
     }
 
-    DBHOLD(transPtr->dbase);
-    if (!urecovery_AllBetter(transPtr->dbase, transPtr->flags & TRREADANY)) {
-	code = UNOQUORUM;
-    } else {
-	transPtr->seekFile = fileid;
-	transPtr->seekPos = position;
-	code = 0;
-    }
-    DBRELE(transPtr->dbase);
-    return code;
+    transPtr->seekFile = fileid;
+    transPtr->seekPos = position;
+    return 0;
 }
 
 /*!
