@@ -976,11 +976,6 @@ ubik_Read(struct ubik_trans *transPtr, void *buffer,
 
     /* reads are easy to do: handle locally */
     DBHOLD(transPtr->dbase);
-    if (!urecovery_AllBetter(transPtr->dbase, transPtr->flags & TRREADANY)) {
-	DBRELE(transPtr->dbase);
-	return UNOQUORUM;
-    }
-
     code =
 	udisk_read(transPtr, transPtr->seekFile, buffer, transPtr->seekPos,
 		   length);
