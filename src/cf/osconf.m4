@@ -1,4 +1,13 @@
 
+AC_DEFUN([OPENAFS_MISSING], [ \
+echo ; \
+echo -------------------------------------------------------------- ; \
+echo NOTE: $1 was not found on your system. ; \
+echo Check the prerequisites for building / installing this package. ; \
+echo -------------------------------------------------------------- ; \
+echo ; \
+exit 127 ;])
+
 AC_DEFUN([OPENAFS_OSCONF], [
 
 dnl defaults, override in case below as needed
@@ -25,15 +34,19 @@ PAM_OPTMZ=
 
 dnl standard programs
 AC_PROG_RANLIB
-AC_CHECK_PROGS(AS, as, [${am_missing_run}as])
-AC_CHECK_PROGS(AR, ar, [${am_missing_run}ar])
-AC_CHECK_PROGS(MV, mv, [${am_missing_run}mv])
-AC_CHECK_PROGS(RM, rm, [${am_missing_run}rm])
-AC_CHECK_PROGS(LD, ld, [${am_missing_run}ld])
-AC_CHECK_PROGS(CP, cp, [${am_missing_run}cp])
-AC_CHECK_PROGS(STRIP, strip, [${am_missing_run}strip])
-AC_CHECK_PROGS(LORDER, lorder, [${am_missing_run}lorder])
-AC_CHECK_PROGS(GENCAT, gencat, [${am_missing_run}gencat])
+AC_CHECK_PROGS(AS, as, [OPENAFS_MISSING(as)])
+AC_CHECK_PROGS(AR, ar, [OPENAFS_MISSING(ar)])
+dnl if ar is not found, libtool.m4 sets AR to false
+AS_IF([test "x$AR" = "xfalse"], [AR="OPENAFS_MISSING(ar)"])
+AC_CHECK_PROGS(MV, mv, [OPENAFS_MISSING(mv)])
+AC_CHECK_PROGS(RM, rm, [OPENAFS_MISSING(rm)])
+AC_CHECK_PROGS(LD, ld, [OPENAFS_MISSING(ld)])
+AC_CHECK_PROGS(CP, cp, [OPENAFS_MISSING(cp)])
+AC_CHECK_PROGS(STRIP, strip, [OPENAFS_MISSING(strip)])
+dnl if strip is not found, libtool.m4 sets STRIP to :
+AS_IF([test "x$STRIP" = "x:"], [STRIP="OPENAFS_MISSING(strip)"])
+AC_CHECK_PROGS(LORDER, lorder, [OPENAFS_MISSING(lorder)])
+AC_CHECK_PROGS(GENCAT, gencat, [OPENAFS_MISSING(gencat)])
 
 dnl TODO - need to disable STRIP if we are doing debugging in any user space code
 
