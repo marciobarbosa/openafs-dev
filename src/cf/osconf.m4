@@ -25,14 +25,25 @@ PAM_OPTMZ=
 
 dnl standard programs
 AC_PROG_RANLIB
-AC_CHECK_PROGS(AS, as, [${am_missing_run}as])
-AC_CHECK_PROGS(AR, ar, [${am_missing_run}ar])
-AC_CHECK_PROGS(MV, mv, [${am_missing_run}mv])
-AC_CHECK_PROGS(RM, rm, [${am_missing_run}rm])
-AC_CHECK_PROGS(LD, ld, [${am_missing_run}ld])
-AC_CHECK_PROGS(CP, cp, [${am_missing_run}cp])
-AC_CHECK_PROGS(STRIP, strip, [${am_missing_run}strip])
-AC_CHECK_PROGS(GENCAT, gencat, [${am_missing_run}gencat])
+AC_CHECK_PROGS(AS, as, [no])
+AC_CHECK_PROGS(AR, ar, [no])
+AC_CHECK_PROGS(MV, mv, [no])
+AC_CHECK_PROGS(RM, rm, [no])
+AC_CHECK_PROGS(LD, ld, [no])
+AC_CHECK_PROGS(CP, cp, [no])
+AC_CHECK_PROGS(STRIP, strip, [no])
+AC_CHECK_PROGS(GENCAT, gencat, [no])
+
+AS_IF([test "x$AS" = "xno"], [AC_ERROR("as not found")])
+dnl if ar is not present, libtool.m4 sets AR to false
+AS_IF([test "x$AR" = "xno" -o "x$AR" = "xfalse"], [AC_ERROR("ar not found")])
+AS_IF([test "x$MV" = "xno"], [AC_ERROR("mv not found")])
+AS_IF([test "x$RM" = "xno"], [AC_ERROR("rm not found")])
+AS_IF([test "x$LD" = "xno"], [AC_ERROR("ld not found")])
+AS_IF([test "x$CP" = "xno"], [AC_ERROR("cp not found")])
+dnl if strip is not present, libtool.m4 sets STRIP to :
+AS_IF([test "x$STRIP" = "xno" -o "x$STRIP" = "x:"], [AC_ERROR("strip not found")])
+AS_IF([test "x$GENCAT" = "xno"], [AC_ERROR("gencat not found")])
 
 dnl TODO - need to disable STRIP if we are doing debugging in any user space code
 
