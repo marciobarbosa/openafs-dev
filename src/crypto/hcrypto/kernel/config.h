@@ -114,3 +114,7 @@ static_inline int gettimeofday(struct timeval *tp, void *tzp)
  */
 # define double void*
 #endif
+
+#if defined(AFS_DARWIN_ENV) && !defined(UKERNEL)
+# undef HAVE_ARC4RANDOM
+#endif
