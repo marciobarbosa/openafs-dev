@@ -102,3 +102,7 @@ static_inline int gettimeofday(struct timeval *tp, void *tzp)
 /* workaround to allow --disable-optimize-kernel on Solaris */
 #define double int
 #endif
+
+#if defined(AFS_DARWIN_ENV) && !defined(UKERNEL)
+# undef HAVE_ARC4RANDOM
+#endif
