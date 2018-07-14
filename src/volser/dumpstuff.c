@@ -1247,6 +1247,7 @@ RestoreVolume(struct rx_call *call, Volume * avp, int incremental,
     int s1 = 0, s2 = 0, delo = 0, tdelo;
     int tag;
     VolumeDiskData saved_header;
+    afs_uint32 uptime, crtime;
 
     iod_Init(iodp, call);
 
@@ -1334,6 +1335,8 @@ RestoreVolume(struct rx_call *call, Volume * avp, int incremental,
 	 * prevent it from getting overwritten. */
 	vol.needsSalvaged = V_needsSalvaged(vp);
     }
+    crtime = V_creationDate(vp);
+    uptime = V_updateDate(vp);
     CopyVolumeHeader(&vol, &V_disk(vp));
     V_destroyMe(vp) = 0;
     VUpdateVolume(&vupdate, vp);
@@ -1341,6 +1344,13 @@ RestoreVolume(struct rx_call *call, Volume * avp, int incremental,
 	Log("1 Volser: RestoreVolume: Unable to rewrite volume header; restore aborted\n");
 	error = VOLSERREAD_DUMPERROR;
 	goto out;
+    } else {
+	/* if the volume was not a new empty volume and the restored dump was
+	 * older than the volume in question */
+	if ((crtime != uptime) && (uptime > V_updateDate(vp))) {
+	    Log("1 Volser: RestoreVolume: %s downgraded from %u to %u (updateDate)\n",
+		V_name(vp), uptime, V_updateDate(vp));
+	}
     }
   out:
     /* Free the malloced space above */
