@@ -181,6 +181,7 @@ display.lo: $(INCLS)
 ptuser.lo: $(LINCLS)
 
 liboafs_prot.la: liboafs_prot.la.sym $(LT_objs) $(LT_deps)
+	$(RUN_CTFCONVERT) afs "${DBG}" ${LT_objs}
 	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs)
 
 libprot_pic.la: $(LT_objs)

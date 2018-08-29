@@ -67,6 +67,7 @@ libcmd_pic.la: $(LT_objs)
 	$(LT_LDLIB_pic) $(LT_objs)
 
 liboafs_cmd.la: $(LT_objs) $(LT_deps)
+	$(RUN_CTFCONVERT) afs "${DBG}" ${LT_objs}
 	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs)
 
 AFS_component_version_number64.o: AFS_component_version_number.c

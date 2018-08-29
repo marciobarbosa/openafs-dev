@@ -33,6 +33,7 @@ libaudit.a: $(LT_objs)
 	$(LT_LDLIB_lwp) $(LT_objs)
 
 liboafs_audit.la: liboafs_audit.la.sym $(LT_objs) $(LT_deps)
+	$(RUN_CTFCONVERT) afs "${DBG}" ${LT_objs}
 	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs)
 
 libaudit_pic.la: $(LT_objs)

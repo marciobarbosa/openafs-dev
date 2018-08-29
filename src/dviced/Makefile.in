@@ -138,8 +138,10 @@ state_analyzer.o: ${VICED}/state_analyzer.c
 	$(AFS_CCRULE) $(VICED)/state_analyzer.c
 
 dafileserver: ${objects} ${LIBS}
+	$(RUN_CTFCONVERT) afs "${DBG}" ${objects}
 	$(LT_LDRULE_static) ${objects} \
 		${LIBS} $(LIB_hcrypto) $(LIB_roken) ${MT_LIBS}
+	$(RUN_CTFMERGE) afs "${DBG}" $@ ${objects} ${LIBS}
 
 state_analyzer: ${SDBGOBJS}
 	$(LT_LDRULE_static) ${SDBGOBJS} $(LIB_roken) ${MT_LIBS}

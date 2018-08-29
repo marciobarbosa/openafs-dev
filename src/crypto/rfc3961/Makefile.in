@@ -81,6 +81,7 @@ store-int.lo: ${UPSTREAM}/krb5/store-int.c ${HEADERS}
 	$(LTLWP_CCRULE) ${UPSTREAM}/krb5/store-int.c
 
 liboafs_rfc3961.la: liboafs_rfc3961.la.sym $(LT_objs) $(LT_deps)
+	$(RUN_CTFCONVERT) afs "${DBG}" ${LT_objs}
 	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs) $(MT_LIBS)
 
 librfc3961_pic.la: $(LT_objs)

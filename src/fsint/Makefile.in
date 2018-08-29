@@ -27,6 +27,7 @@ all: \
 	libfsint_pic.la
 
 liboafs_fsint.la: liboafs_fsint.la.sym $(LT_objs) $(LT_deps)
+	$(RUN_CTFCONVERT) afs "${DBG}" ${LT_objs}
 	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs)
 
 libfsint_pic.la: $(LT_objs)

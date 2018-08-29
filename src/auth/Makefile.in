@@ -99,6 +99,7 @@ libauth.krb.a: $(KRB_objs)
 	$(LT_LDLIB_lwp) $(KRB_objs)
 
 liboafs_auth.la: liboafs_auth.la.sym $(LT_objs) $(LT_deps)
+	$(RUN_CTFCONVERT) afs "${DBG}" ${LT_objs}
 	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs)
 
 libauth_pic.la: $(LT_objs)

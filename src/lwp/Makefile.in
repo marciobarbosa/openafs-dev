@@ -48,6 +48,7 @@ liblwp.a: ${LIBOBJS} $(LT_objs)
 	$(RANLIB) $@
 
 liboafs_lwpcompat.la: liboafs_lwpcompat.la.sym $(LT_objs) $(LT_deps)
+	$(RUN_CTFCONVERT) afs "${DBG}" ${LT_objs}
 	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs)
 
 liblwpcompat_pic.la: $(LT_objs)

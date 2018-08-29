@@ -151,6 +151,7 @@ utst_int.cs.o: utst_int.cs.c ${INCLS} utst_int.h
 utst_int.xdr.o: utst_int.xdr.c ${INCLS} utst_int.h
 
 liboafs_ubik.la: liboafs_ubik.la.sym $(LT_objs) $(LT_deps)
+	$(RUN_CTFCONVERT) afs "${DBG}" ${LT_objs}
 	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs)
 
 libauthent_ubik.la: $(LT_authent_objs)

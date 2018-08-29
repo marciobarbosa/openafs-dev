@@ -127,8 +127,10 @@ afsint.ss.o: ../fsint/afsint.ss.c
 	$(AFS_CCRULE) ../fsint/afsint.ss.c
 
 fileserver: ${objects} ${LIBS}
+	$(RUN_CTFCONVERT) afs "${DBG}" ${objects}
 	$(LT_LDRULE_static) ${objects} \
 		${LIBS} $(LIB_hcrypto) $(LIB_roken) ${MT_LIBS}
+	$(RUN_CTFMERGE) afs "${DBG}" $@ ${objects} ${LIBS}
 
 install: fileserver
 	${INSTALL} -d ${DESTDIR}${afssrvlibexecdir}
