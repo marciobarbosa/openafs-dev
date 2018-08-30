@@ -323,6 +323,7 @@ AFS_LDRULE_NOQ =$(RUN_LD_NOQ) $(CC) $(AFS_LDFLAGS) $(AFS_CFLAGS) $(LDFLAGS_$(@))
 RUN_CTFCONVERT=@RUN_CTFCONVERT() { \
     CTFLABEL=$$1 ; \
     CTFDBG=$$2 ; \
+    CTFDIR="\.libs\/" ; \
     shift ; shift ; \
     if test "x$${CTFDBG}" = "x" ; then exit 0; fi; \
     if test "x${CTFCONVERT}" = "x" ; then exit 0; fi; \
@@ -331,14 +332,28 @@ RUN_CTFCONVERT=@RUN_CTFCONVERT() { \
         exit 1; \
     fi; \
     for t in $$@ ; do \
-        echo "${CTFCONVERT} -g -l $${CTFLABEL} $$t"; \
-        ${CTFCONVERT} -g -l $${CTFLABEL} $$t; \
+        CTFEXT=$$(echo $$t | sed "s/.*\.//") ; \
+        if test "x$${CTFEXT}" = "xlo" ; then \
+            CTFTMP=$$(echo $$t | sed "s/.*\///") ; \
+            CTFLIB=$$(echo $${CTFTMP} | sed "s/\.$${CTFEXT}/.o/") ; \
+            CTFLIBPIC=$$(echo $$t | sed "s/$${CTFTMP}/$${CTFDIR}$${CTFLIB}/") ; \
+            CTFLIB=$$(echo $$t | sed "s/$${CTFTMP}/$${CTFLIB}/") ; \
+            echo "${CTFCONVERT} -g -l $${CTFLABEL} $${CTFLIBPIC}"; \
+            ${CTFCONVERT} -g -l $${CTFLABEL} $${CTFLIBPIC}; \
+            echo "${CTFCONVERT} -g -l $${CTFLABEL} $${CTFLIB}"; \
+            ${CTFCONVERT} -g -l $${CTFLABEL} $${CTFLIB}; \
+        else \
+            echo "${CTFCONVERT} -g -l $${CTFLABEL} $$t"; \
+            ${CTFCONVERT} -g -l $${CTFLABEL} $$t; \
+        fi ; \
     done ; \
 } ; RUN_CTFCONVERT
 
 RUN_CTFMERGE=@RUN_CTFMERGE () { \
     CTFLABEL=$$1 ; \
     CTFDBG=$$2 ; \
+    CTFLIBS= ; \
+    CTFDIR="\.libs\/" ; \
     shift ; shift ; \
     if test "x$${CTFDBG}" = "x" ; then exit 0; fi; \
     if test "x${CTFMERGE}" = "x" ; then exit 0; fi; \
@@ -346,7 +361,18 @@ RUN_CTFMERGE=@RUN_CTFMERGE () { \
         echo "refusing to run ctfmerge; missing ctfconvert"; \
         exit 1; \
     fi; \
-    echo "$(CTFMERGE) -g -l $${CTFLABEL} -o $$@"; \
-    $(CTFMERGE) -g -l $${CTFLABEL} -o $$@; \
+    for t in $$@ ; do \
+        CTFEXT=$$(echo $$t | sed "s/.*\.//") ; \
+        if test "x$${CTFEXT}" = "xla" ; then \
+            CTFTMP=$$(echo $$t | sed "s/.*\///") ; \
+            CTFLIB=$$(echo $${CTFTMP} | sed "s/\.$${CTFEXT}/.a/") ; \
+            CTFLIB=$$(echo $$t | sed "s/$${CTFTMP}/$${CTFDIR}$${CTFLIB}/") ; \
+            CTFLIBS+="$${CTFLIB} " ; \
+        else \
+            CTFLIBS+="$$t " ; \
+        fi ; \
+    done ; \
+    echo "$(CTFMERGE) -g -l $${CTFLABEL} -o $${CTFLIBS}"; \
+    $(CTFMERGE) -g -l $${CTFLABEL} -o $${CTFLIBS}; \
 } ; RUN_CTFMERGE
 
