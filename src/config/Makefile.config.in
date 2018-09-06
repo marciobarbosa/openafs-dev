@@ -324,15 +324,28 @@ RUN_CTFCONVERT=@RUN_CTFCONVERT() { \
     CTFLABEL=$$1 ; \
     CTFDBG=$$2 ; \
     shift ; shift ; \
-    if test "x$${CTFDBG}" = "x" ; then exit 0; fi; \
-    if test "x${CTFCONVERT}" = "x" ; then exit 0; fi; \
+    if test "x$${CTFDBG}" = "x" ; then exit 0 ; fi ; \
+    if test "x${CTFCONVERT}" = "x" ; then exit 0 ; fi ; \
     if test "x${CTFMERGE}" = "x" ; then \
-        echo "refusing to run ctfconvert; missing ctfmerge"; \
-        exit 1; \
-    fi; \
+        echo "refusing to run ctfconvert; missing ctfmerge" ; \
+        exit 1 ; \
+    fi ; \
     for t in $$@ ; do \
-        echo "${CTFCONVERT} -g -l $${CTFLABEL} $$t"; \
-        ${CTFCONVERT} -g -l $${CTFLABEL} $$t; \
+        case $$t in \
+        *.lo) \
+            dir=$$(dirname $$t) ; \
+            base=$$(basename $$t .lo) ; \
+            obj="$${dir}/.libs/$${base}".o ; \
+            nonpic_obj="$${dir}/$${base}".o ; \
+            echo "${CTFCONVERT} -g -l $${CTFLABEL} $${nonpic_obj}" ; \
+            ${CTFCONVERT} -g -l $${CTFLABEL} $${nonpic_obj} \
+            ;; \
+        *) \
+            obj="$$t" \
+            ;; \
+        esac ; \
+        echo "${CTFCONVERT} -g -l $${CTFLABEL} $${obj}" ; \
+        ${CTFCONVERT} -g -l $${CTFLABEL} $${obj} ; \
     done ; \
 } ; RUN_CTFCONVERT
 
@@ -340,13 +353,27 @@ RUN_CTFMERGE=@RUN_CTFMERGE () { \
     CTFLABEL=$$1 ; \
     CTFDBG=$$2 ; \
     shift ; shift ; \
-    if test "x$${CTFDBG}" = "x" ; then exit 0; fi; \
-    if test "x${CTFMERGE}" = "x" ; then exit 0; fi; \
+    if test "x$${CTFDBG}" = "x" ; then exit 0 ; fi ; \
+    if test "x${CTFMERGE}" = "x" ; then exit 0 ; fi ; \
     if test "x${CTFCONVERT}" = "x" ; then \
-        echo "refusing to run ctfmerge; missing ctfconvert"; \
-        exit 1; \
-    fi; \
-    echo "$(CTFMERGE) -g -l $${CTFLABEL} -o $$@"; \
-    $(CTFMERGE) -g -l $${CTFLABEL} -o $$@; \
+        echo "refusing to run ctfmerge; missing ctfconvert" ; \
+        exit 1 ; \
+    fi ; \
+    merge_libs= ; \
+    for t in $$@ ; do \
+        case $$t in \
+        *.la) \
+            dir=$$(dirname $$t) ; \
+            base=$$(basename $$t .la) ; \
+            lib="$${dir}/.libs/$${base}".a \
+            ;; \
+        *) \
+            lib="$$t" \
+            ;; \
+        esac ; \
+        merge_libs="$${merge_libs} $${lib}" ; \
+    done ; \
+    echo "$(CTFMERGE) -g -l $${CTFLABEL} -o $${merge_libs}" ; \
+    $(CTFMERGE) -g -l $${CTFLABEL} -o $${merge_libs} ; \
 } ; RUN_CTFMERGE
 
