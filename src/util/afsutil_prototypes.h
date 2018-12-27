@@ -65,6 +65,10 @@ extern afs_uint32 extractAddr(char *line, int maxSize);
 extern char *afs_inet_ntoa_r(afs_uint32 addr, char *buf);
 extern char *gettmpdir(void);
 
+/* hostresolv.c */
+extern char *util_gethostname(void *addr, size_t addrlen, int af,
+			      char *buffer, size_t len);
+
 /* hputil.c */
 #ifdef AFS_HPUX_ENV
 #ifndef AFS_HPUX102_ENV
