@@ -546,7 +546,6 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	goto failed_locked;
     }
     pass = 0;
-    memcpy(&ubik_dbase->version, &tversion, sizeof(struct ubik_version));
     UBIK_VERSION_UNLOCK;
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
