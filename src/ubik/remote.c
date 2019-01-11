@@ -55,6 +55,10 @@ SDISK_Begin(struct rx_call *rxcall, struct ubik_tid *atid)
 	return code;
     }
     DBHOLD(ubik_dbase);
+    if (ubik_dbase->flags & (DBSENDING | DBRECEIVING)) {
+	code = USYNC;
+	goto out;
+    }
     if (urecovery_AllBetter(ubik_dbase, 0) == 0) {
 	code = UNOQUORUM;
 	goto out;
@@ -400,6 +404,7 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
     struct rx_connection *tconn;
     afs_uint32 otherHost = 0;
     char hoststr[16];
+    int db_locked;
 
     if ((code = ubik_CheckAuth(rxcall))) {
 	return code;
@@ -414,6 +419,7 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 
     dbase = ubik_dbase;
     DBHOLD(dbase);
+    db_locked = 1;
     code = (*dbase->stat) (dbase, file, &ubikstat);
     if (code < 0) {
 	ViceLog(0, ("database stat() error:%d\n", code));
@@ -428,6 +434,9 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 	goto failed;
     }
     offset = 0;
+
+    db_locked = set_transfer_state(ubik_dbase, DBSENDING);
+
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
 	code = (*dbase->read) (dbase, file, tbuffer, offset, tlen);
@@ -445,11 +454,15 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 	length -= tlen;
 	offset += tlen;
     }
+
+    db_locked = clear_transfer_state(ubik_dbase, DBSENDING, db_locked);
+
     code = (*dbase->getlabel) (dbase, file, version);	/* return the dbase, too */
     if (code)
 	ViceLog(0, ("getlabel error=%d\n", code));
 
  failed:
+    db_locked = clear_transfer_state(ubik_dbase, DBSENDING, db_locked);
     DBRELE(dbase);
     if (code) {
 	ViceLog(0,
@@ -484,6 +497,7 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     int fd = -1;
     afs_int32 epoch = 0;
     afs_int32 pass;
+    int db_locked;
 
     /* send the file back to the requester */
 
@@ -527,6 +541,7 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	       afs_inet_ntoa_r(otherHost, hoststr)));
 
     offset = 0;
+    db_locked = 1;
     UBIK_VERSION_LOCK;
     epoch = tversion.epoch = 0;		/* start off by labelling in-transit db as invalid */
     (*dbase->setlabel) (dbase, file, &tversion);	/* setlabel does sync */
@@ -547,6 +562,9 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     }
     pass = 0;
     UBIK_VERSION_UNLOCK;
+
+    db_locked = set_transfer_state(ubik_dbase, DBRECEIVING);
+
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
 #if !defined(AFS_PTHREAD_ENV)
@@ -576,6 +594,8 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	ViceLog(0, ("close failed error=%d\n", code));
 	goto failed;
     }
+
+    db_locked = clear_transfer_state(ubik_dbase, DBRECEIVING, db_locked);
 
     /* sync data first, then write label and resync (resync done by setlabel call).
      * This way, good label is only on good database. */
@@ -609,6 +629,7 @@ failed_locked:
     UBIK_VERSION_UNLOCK;
 
 failed:
+    db_locked = clear_transfer_state(ubik_dbase, DBRECEIVING, db_locked);
     if (code) {
 	if (pbuffer[0] != '\0')
 	    unlink(pbuffer);

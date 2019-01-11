@@ -459,6 +459,7 @@ urecovery_Interact(void *dummy)
     char pbuffer[1028];
     int fd = -1;
     afs_int32 pass;
+    int db_locked;
 
     afs_pthread_setname_self("recovery");
 
@@ -599,6 +600,7 @@ urecovery_Interact(void *dummy)
 	    /* Rx code to do the Bulk fetch */
 	    file = 0;
 	    offset = 0;
+	    db_locked = 1;
 	    UBIK_ADDR_LOCK;
 	    rxcall = rx_NewCall(bestServer->disk_rxcid);
 
@@ -629,6 +631,9 @@ urecovery_Interact(void *dummy)
 		ViceLog(0, ("setlabel io error=%d\n", code));
 		goto FetchEndCall;
 	    }
+
+	    db_locked = set_transfer_state(ubik_dbase, DBRECEIVING);
+
 	    snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
 		     ubik_dbase->pathName, (file<0)?"SYS":"",
 		     (file<0)?-file:file);
@@ -673,6 +678,9 @@ urecovery_Interact(void *dummy)
 	    code = EndDISK_GetFile(rxcall, &tversion);
 	  FetchEndCall:
 	    code = rx_EndCall(rxcall, code);
+
+	    db_locked = clear_transfer_state(ubik_dbase, DBRECEIVING, db_locked);
+
 	    if (!code) {
 		/* we got a new file, set up its header */
 		urecovery_state |= UBIK_RECHAVEDB;
@@ -762,6 +770,7 @@ urecovery_Interact(void *dummy)
 	if (!(urecovery_state & UBIK_RECSENTDB)) {
 	    /* now propagate out new version to everyone else */
 	    dbok = 1;		/* start off assuming they all worked */
+	    db_locked = 1;
 
 	    /*
 	     * Check if a write transaction is in progress. We can't send the
@@ -833,6 +842,9 @@ urecovery_Interact(void *dummy)
 					code));
 			    goto StoreEndCall;
 			}
+
+			db_locked = set_transfer_state(ubik_dbase, DBSENDING);
+
 			while (length > 0) {
 			    tlen =
 				(length >
@@ -857,6 +869,8 @@ urecovery_Interact(void *dummy)
 			code = EndDISK_SendFile(rxcall);
 		      StoreEndCall:
 			code = rx_EndCall(rxcall, code);
+
+			db_locked = clear_transfer_state(ubik_dbase, DBSENDING, db_locked);
 		    }
 
 		    if (code == 0) {

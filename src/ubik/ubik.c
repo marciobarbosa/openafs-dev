@@ -618,7 +618,7 @@ BeginTrans(struct ubik_dbase *dbase, afs_int32 transMode,
      * don't know how to restore one without possibly picking up some data from the other. */
     if (transMode == UBIK_WRITETRANS) {
 	/* if we're writing already, wait */
-	while (dbase->flags & DBWRITING) {
+	while (dbase->flags & (DBWRITING | DBSENDING | DBRECEIVING)) {
 #ifdef AFS_PTHREAD_ENV
 	    opr_cv_wait(&dbase->flags_cond, &dbase->versionLock);
 #else

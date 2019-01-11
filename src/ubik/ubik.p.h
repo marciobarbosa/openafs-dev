@@ -231,6 +231,8 @@ extern int (*ubik_SyncWriterCacheProc) (void);
 
 /*! \name ubik_dbase flags */
 #define	DBWRITING	    1	/*!< are any write trans. in progress */
+#define	DBSENDING	    2	/*!< sending db to someone */
+#define	DBRECEIVING	    4	/*!< receiving db from someone */
 /*\}*/
 
 /*!\name ubik trans flags */
@@ -530,6 +532,31 @@ extern int uvote_eq_dbVersion(struct ubik_version);
 extern int uvote_HaveSyncAndVersion(struct ubik_version);
 /*\}*/
 
+static_inline int
+set_transfer_state(struct ubik_dbase *dbase, int state)
+{
+    dbase->flags |= state;
+    if (!(dbase->flags & (DBWRITING | DBSENDING | DBRECEIVING))) {
+	DBRELE(dbase);
+	return 0;
+    }
+    return 1;
+}
+
+static_inline int
+clear_transfer_state(struct ubik_dbase *dbase, int state, int locked)
+{
+    if (!locked) {
+	DBHOLD(dbase);
+    }
+    dbase->flags &= ~state;
+#ifdef AFS_PTHREAD_ENV
+    opr_cv_broadcast(&dbase->flags_cond);
+#else
+    LWP_NoYieldSignal(&dbase->flags);
+#endif
+    return 1;
+}
 #endif /* UBIK_INTERNALS */
 
 extern afs_int32 ubik_nBuffers;
@@ -635,5 +662,4 @@ extern afs_int32 ugen_ClientInit(int noAuthFlag, const char *confDir,
 				 afs_int32 maxservers, char *serviceid,
 				 afs_int32 deadtime, afs_uint32 server,
 				 afs_uint32 port, afs_int32 usrvid);
-
 #endif /* UBIK_H */
