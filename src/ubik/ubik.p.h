@@ -231,6 +231,8 @@ extern int (*ubik_SyncWriterCacheProc) (void);
 
 /*! \name ubik_dbase flags */
 #define	DBWRITING	    1	/*!< are any write trans. in progress */
+#define	DBSENDING	    2	/*!< sending db to someone */
+#define	DBRECEIVING	    4	/*!< receiving db from someone */
 /*\}*/
 
 /*!\name ubik trans flags */
@@ -530,6 +532,48 @@ extern int uvote_eq_dbVersion(struct ubik_version);
 extern int uvote_HaveSyncAndVersion(struct ubik_version);
 /*\}*/
 
+static_inline int
+set_transfer_state(struct ubik_dbase *dbase, int state)
+{
+    dbase->flags |= state;
+    if (!(dbase->flags & DBWRITING)) {
+	DBRELE(dbase);
+	return 0;
+    }
+    return 1;
+}
+
+static_inline int
+clear_transfer_state(struct ubik_dbase *dbase, int state, int locked)
+{
+    if (!locked) {
+	DBHOLD(dbase);
+    }
+    if (state == DBRECEIVING) {
+	urecovery_AbortAll(dbase);
+    }
+    dbase->flags &= ~state;
+#ifdef AFS_PTHREAD_ENV
+    opr_cv_broadcast(&dbase->flags_cond);
+#else
+    LWP_NoYieldSignal(&dbase->flags);
+#endif
+    return 1;
+}
+
+static_inline void
+wait_transfer_state(struct ubik_dbase *dbase, int state)
+{
+    while (dbase->flags & state) {
+#ifdef AFS_PTHREAD_ENV
+	opr_cv_wait(&dbase->flags_cond, &dbase->versionLock);
+#else
+	DBRELE(dbase);
+	LWP_WaitProcess(&dbase->flags);
+	DBHOLD(dbase);
+#endif
+    }
+}
 #endif /* UBIK_INTERNALS */
 
 extern afs_int32 ubik_nBuffers;

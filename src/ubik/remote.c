@@ -55,6 +55,10 @@ SDISK_Begin(struct rx_call *rxcall, struct ubik_tid *atid)
 	return code;
     }
     DBHOLD(ubik_dbase);
+
+    /* check if we are sending / receiving the database. if so, wait. */
+    wait_transfer_state(ubik_dbase, (DBSENDING | DBRECEIVING));
+
     if (urecovery_AllBetter(ubik_dbase, 0) == 0) {
 	code = UNOQUORUM;
 	goto out;
@@ -400,6 +404,7 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
     struct rx_connection *tconn;
     afs_uint32 otherHost = 0;
     char hoststr[16];
+    int db_locked;
 
     if ((code = ubik_CheckAuth(rxcall))) {
 	return code;
@@ -414,6 +419,11 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 
     dbase = ubik_dbase;
     DBHOLD(dbase);
+
+    /* check if we are sending / receiving the database. if so, wait. */
+    wait_transfer_state(dbase, (DBSENDING | DBRECEIVING));
+    db_locked = 1;
+
     code = (*dbase->stat) (dbase, file, &ubikstat);
     if (code < 0) {
 	ViceLog(0, ("database stat() error:%d\n", code));
@@ -428,23 +438,31 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 	goto failed;
     }
     offset = 0;
+
+    db_locked = set_transfer_state(dbase, DBSENDING);
+
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
 	code = (*dbase->read) (dbase, file, tbuffer, offset, tlen);
 	if (code != tlen) {
 	    ViceLog(0, ("read failed error=%d\n", code));
 	    code = UIOERROR;
+	    clear_transfer_state(ubik_dbase, DBSENDING, db_locked);
 	    goto failed;
 	}
 	code = rx_Write(rxcall, tbuffer, tlen);
 	if (code != tlen) {
 	    ViceLog(0, ("Rx-write data error=%d\n", code));
 	    code = BULK_ERROR;
+	    clear_transfer_state(ubik_dbase, DBSENDING, db_locked);
 	    goto failed;
 	}
 	length -= tlen;
 	offset += tlen;
     }
+
+    db_locked = clear_transfer_state(dbase, DBSENDING, db_locked);
+
     code = (*dbase->getlabel) (dbase, file, version);	/* return the dbase, too */
     if (code)
 	ViceLog(0, ("getlabel error=%d\n", code));
@@ -520,6 +538,8 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 
     DBHOLD(dbase);
 
+    /* check if we are sending / receiving the database. if so, wait. */
+    wait_transfer_state(dbase, (DBSENDING | DBRECEIVING));
     /* abort any active trans that may scribble over the database */
     urecovery_AbortAll(dbase);
 
@@ -547,6 +567,10 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     }
     pass = 0;
     UBIK_VERSION_UNLOCK;
+
+    /* transactions were aborted */
+    set_transfer_state(ubik_dbase, DBRECEIVING);
+
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
 #if !defined(AFS_PTHREAD_ENV)
@@ -558,6 +582,7 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	    ViceLog(0, ("Rx-read length error=%d\n", code));
 	    code = BULK_ERROR;
 	    close(fd);
+	    clear_transfer_state(ubik_dbase, DBRECEIVING, 0);
 	    goto failed;
 	}
 	code = write(fd, tbuffer, tlen);
@@ -566,6 +591,7 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	    ViceLog(0, ("write failed tlen=%d, error=%d\n", tlen, code));
 	    code = UIOERROR;
 	    close(fd);
+	    clear_transfer_state(ubik_dbase, DBRECEIVING, 0);
 	    goto failed;
 	}
 	offset += tlen;
@@ -574,8 +600,11 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     code = close(fd);
     if (code) {
 	ViceLog(0, ("close failed error=%d\n", code));
+	clear_transfer_state(ubik_dbase, DBRECEIVING, 0);
 	goto failed;
     }
+
+    clear_transfer_state(ubik_dbase, DBRECEIVING, 0);
 
     /* sync data first, then write label and resync (resync done by setlabel call).
      * This way, good label is only on good database. */

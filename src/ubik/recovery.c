@@ -555,6 +555,11 @@ urecovery_Interact(void *dummy)
 
 	    DBHOLD(ubik_dbase);
 
+	    /* check if we are sending / receiving the database. if so, wait.
+	     * we should not be sending / receiving a database here but check
+	     * to be safe. */
+	    wait_transfer_state(ubik_dbase, (DBSENDING | DBRECEIVING));
+
             if (okcalls + 1 >= ubik_quorum) {
                 /* If we've asked a majority of sites about their db version,
                  * then we can say with confidence that we've found the best db
@@ -629,6 +634,9 @@ urecovery_Interact(void *dummy)
 		ViceLog(0, ("setlabel io error=%d\n", code));
 		goto FetchEndCall;
 	    }
+
+	    set_transfer_state(ubik_dbase, DBRECEIVING);
+
 	    snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
 		     ubik_dbase->pathName, (file<0)?"SYS":"",
 		     (file<0)?-file:file);
@@ -673,6 +681,9 @@ urecovery_Interact(void *dummy)
 	    code = EndDISK_GetFile(rxcall, &tversion);
 	  FetchEndCall:
 	    code = rx_EndCall(rxcall, code);
+
+	    clear_transfer_state(ubik_dbase, DBRECEIVING, 0);
+
 	    if (!code) {
 		/* we got a new file, set up its header */
 		urecovery_state |= UBIK_RECHAVEDB;
@@ -792,6 +803,11 @@ urecovery_Interact(void *dummy)
 		}
 	    }
 
+	    /* check if we are sending / receiving the database. if so, wait.
+	     * we should not be sending / receiving a database here but check
+	     * to be safe. */
+	    wait_transfer_state(ubik_dbase, (DBSENDING | DBRECEIVING));
+
 	    for (ts = ubik_servers; ts; ts = ts->next) {
 		UBIK_ADDR_LOCK;
 		inAddr.s_addr = ts->addr[0];
@@ -833,6 +849,9 @@ urecovery_Interact(void *dummy)
 					code));
 			    goto StoreEndCall;
 			}
+
+			set_transfer_state(ubik_dbase, DBSENDING);
+
 			while (length > 0) {
 			    tlen =
 				(length >
@@ -857,6 +876,7 @@ urecovery_Interact(void *dummy)
 			code = EndDISK_SendFile(rxcall);
 		      StoreEndCall:
 			code = rx_EndCall(rxcall, code);
+			clear_transfer_state(ubik_dbase, DBSENDING, 0);
 		    }
 
 		    if (code == 0) {

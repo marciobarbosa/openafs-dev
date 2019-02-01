@@ -617,8 +617,8 @@ BeginTrans(struct ubik_dbase *dbase, afs_int32 transMode,
      * we can't even handle two non-conflicting writes, since our log and recovery modules
      * don't know how to restore one without possibly picking up some data from the other. */
     if (transMode == UBIK_WRITETRANS) {
-	/* if we're writing already, wait */
-	while (dbase->flags & DBWRITING) {
+	/* if we're writing, sending, or receiving, wait */
+	while (dbase->flags & (DBWRITING | DBSENDING | DBRECEIVING)) {
 #ifdef AFS_PTHREAD_ENV
 	    opr_cv_wait(&dbase->flags_cond, &dbase->versionLock);
 #else
