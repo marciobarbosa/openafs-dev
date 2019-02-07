@@ -231,6 +231,8 @@ extern int (*ubik_SyncWriterCacheProc) (void);
 
 /*! \name ubik_dbase flags */
 #define	DBWRITING	    1	/*!< are any write trans. in progress */
+#define	DBSENDING	    2	/*!< sending db to someone */
+#define	DBRECEIVING	    4	/*!< receiving db from someone */
 /*\}*/
 
 /*!\name ubik trans flags */
@@ -530,6 +532,85 @@ extern int uvote_eq_dbVersion(struct ubik_version);
 extern int uvote_HaveSyncAndVersion(struct ubik_version);
 /*\}*/
 
+/**
+ * Add a new state to the database.
+ *
+ * @param[in]  dbase  database
+ * @param[in]  state  new state(s)
+ *
+ * @pre        database lock held
+ * @post       database lock can be dropped
+ *
+ * @return lock status
+ *    @retval 0  lock dropped
+ *    @retval 1  lock not dropped
+ */
+static_inline int
+set_transfer_state(struct ubik_dbase *dbase, int state)
+{
+    dbase->flags |= state;
+    if (!(dbase->flags & DBWRITING)) {
+	DBRELE(dbase);
+	return 0;
+    }
+    return 1;
+}
+
+/**
+ * Clear a specific state from the database.
+ *
+ * @param[in]  dbase   database
+ * @param[in]  state   state(s) to be cleared
+ * @param[in]  locked  true if db is locked
+ *
+ * @post       database lock held
+ *
+ * @return lock status
+ *    @retval 1  lock held
+ */
+static_inline int
+clear_transfer_state(struct ubik_dbase *dbase, int state, int locked)
+{
+    if (!locked) {
+	DBHOLD(dbase);
+    }
+    if (state == DBRECEIVING) {
+	/* at this point, we have the guarantee that we do not have any write
+	 * transaction. however, we cannot assume the same for reads. as a
+	 * result, we have to make sure that we do not have any read transaction
+	 * before we replace our local database. */
+	urecovery_AbortAll(dbase);
+    }
+    dbase->flags &= ~state;
+#ifdef AFS_PTHREAD_ENV
+    opr_cv_broadcast(&dbase->flags_cond);
+#else
+    LWP_NoYieldSignal(&dbase->flags);
+#endif
+    return 1;
+}
+
+/**
+ * Wait for the end of one or more states.
+ *
+ * @param[in]  dbase   database
+ * @param[in]  state   state(s) we will wait for
+ *
+ * @return none
+ */
+static_inline void
+wait_transfer_state(struct ubik_dbase *dbase, int state)
+{
+    while (dbase->flags & state) {
+#ifdef AFS_PTHREAD_ENV
+	opr_cv_wait(&dbase->flags_cond, &dbase->versionLock);
+#else
+	DBRELE(dbase);
+	LWP_WaitProcess(&dbase->flags);
+	DBHOLD(dbase);
+#endif
+    }
+}
 #endif /* UBIK_INTERNALS */
 
 extern afs_int32 ubik_nBuffers;

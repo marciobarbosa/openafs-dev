@@ -555,6 +555,13 @@ urecovery_Interact(void *dummy)
 
 	    DBHOLD(ubik_dbase);
 
+	    /* check if we are sending / receiving the database. if so, wait.
+	     * we should not be sending / receiving a database here but if we
+	     * are we will block. this emulates the original behavior where we
+	     * would be blocked by the database lock.
+	     */
+	    wait_transfer_state(ubik_dbase, (DBSENDING | DBRECEIVING));
+
             if (okcalls + 1 >= ubik_quorum) {
                 /* If we've asked a majority of sites about their db version,
                  * then we can say with confidence that we've found the best db
@@ -606,6 +613,13 @@ urecovery_Interact(void *dummy)
 			"from server %s begin\n",
 		       afs_inet_ntoa_r(bestServer->addr[0], hoststr)));
 	    UBIK_ADDR_UNLOCK;
+
+	    /* at this point, we know that we do not have any read or write
+	     * transaction (they were aborted). we also have the guarantee that
+	     * we are not sending or receiving a database. with that being said,
+	     * there is no reason to check the return value of this function.
+	     * (we know that the database lock will be dropped) */
+	    set_transfer_state(ubik_dbase, DBRECEIVING);
 
 	    code = StartDISK_GetFile(rxcall, file);
 	    if (code) {
@@ -664,6 +678,9 @@ urecovery_Interact(void *dummy)
 	    code = EndDISK_GetFile(rxcall, &tversion);
 	  FetchEndCall:
 	    code = rx_EndCall(rxcall, code);
+
+	    clear_transfer_state(ubik_dbase, DBRECEIVING, 0);
+
 	    if (!code) {
 		/* we got a new file, set up its header */
 		urecovery_state |= UBIK_RECHAVEDB;
@@ -783,6 +800,13 @@ urecovery_Interact(void *dummy)
 		}
 	    }
 
+	    /* check if we are sending / receiving the database. if so, wait.
+	     * we should not be sending / receiving a database here but if we
+	     * are we will block. this emulates the original behavior where we
+	     * would be blocked by the database lock.
+	     */
+	    wait_transfer_state(ubik_dbase, (DBSENDING | DBRECEIVING));
+
 	    for (ts = ubik_servers; ts; ts = ts->next) {
 		UBIK_ADDR_LOCK;
 		inAddr.s_addr = ts->addr[0];
@@ -816,6 +840,14 @@ urecovery_Interact(void *dummy)
 			UBIK_ADDR_LOCK;
 			rxcall = rx_NewCall(ts->disk_rxcid);
 			UBIK_ADDR_UNLOCK;
+
+			/* at this point, we know that we do not have any write
+			 * transaction. we also have the guarantee that we are
+			 * not sending or receiving a database. with that being
+			 * said, there is no reason to check the return value of
+			 * this function. */
+			set_transfer_state(ubik_dbase, DBSENDING);
+
 			code =
 			    StartDISK_SendFile(rxcall, file, length,
 					       &ubik_dbase->version);
@@ -824,6 +856,7 @@ urecovery_Interact(void *dummy)
 					code));
 			    goto StoreEndCall;
 			}
+
 			while (length > 0) {
 			    tlen =
 				(length >
@@ -848,6 +881,7 @@ urecovery_Interact(void *dummy)
 			code = EndDISK_SendFile(rxcall);
 		      StoreEndCall:
 			code = rx_EndCall(rxcall, code);
+			clear_transfer_state(ubik_dbase, DBSENDING, 0);
 		    }
 
 		    if (code == 0) {
