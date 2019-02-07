@@ -473,7 +473,6 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     struct ubik_dbase *dbase = NULL;
     char tbuffer[1024];
     afs_int32 offset;
-    struct ubik_version tversion;
     int tlen;
     struct rx_peer *tpeer;
     struct rx_connection *tconn;
@@ -482,7 +481,6 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     char hoststr[16];
     char pbuffer[1028];
     int fd = -1;
-    afs_int32 epoch = 0;
     afs_int32 pass;
 
     /* send the file back to the requester */
@@ -527,9 +525,6 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	       afs_inet_ntoa_r(otherHost, hoststr)));
 
     offset = 0;
-    UBIK_VERSION_LOCK;
-    epoch = tversion.epoch = 0;		/* start off by labelling in-transit db as invalid */
-    (*dbase->setlabel) (dbase, file, &tversion);	/* setlabel does sync */
     snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
 	     ubik_dbase->pathName, (file<0)?"SYS":"",
 	     (file<0)?-file:file);
@@ -537,17 +532,15 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     if (fd < 0) {
 	code = errno;
 	ViceLog(0, ("Open error=%d\n", code));
-	goto failed_locked;
+	goto failed;
     }
     code = lseek(fd, HDRSIZE, 0);
     if (code != HDRSIZE) {
 	ViceLog(0, ("lseek error=%d\n", code));
 	close(fd);
-	goto failed_locked;
+	goto failed;
     }
     pass = 0;
-    memcpy(&ubik_dbase->version, &tversion, sizeof(struct ubik_version));
-    UBIK_VERSION_UNLOCK;
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
 #if !defined(AFS_PTHREAD_ENV)
@@ -606,7 +599,6 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     memcpy(&ubik_dbase->version, avers, sizeof(struct ubik_version));
     udisk_Invalidate(dbase, file);	/* new dbase, flush disk buffers */
 
-failed_locked:
     UBIK_VERSION_UNLOCK;
 
 failed:
@@ -614,13 +606,6 @@ failed:
 	if (pbuffer[0] != '\0')
 	    unlink(pbuffer);
 
-	/* Failed to sync. Allow reads again for now. */
-	if (dbase != NULL) {
-	    UBIK_VERSION_LOCK;
-	    tversion.epoch = epoch;
-	    (*dbase->setlabel) (dbase, file, &tversion);
-	    UBIK_VERSION_UNLOCK;
-	}
 	ViceLog(0,
 	    ("Ubik: Synchronize database: receive (via SendFile) from "
 	     "server %s failed (error = %d)\n",

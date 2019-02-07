@@ -620,15 +620,6 @@ urecovery_Interact(void *dummy)
 		goto FetchEndCall;
 	    }
 
-	    /* give invalid label during file transit */
-	    UBIK_VERSION_LOCK;
-	    tversion.epoch = 0;
-	    code = (*ubik_dbase->setlabel) (ubik_dbase, file, &tversion);
-	    UBIK_VERSION_UNLOCK;
-	    if (code) {
-		ViceLog(0, ("setlabel io error=%d\n", code));
-		goto FetchEndCall;
-	    }
 	    snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
 		     ubik_dbase->pathName, (file<0)?"SYS":"",
 		     (file<0)?-file:file);
