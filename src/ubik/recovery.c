@@ -460,6 +460,9 @@ urecovery_Interact(void *dummy)
     int fd = -1;
     afs_int32 pass;
 
+    FILE *myfd;
+    int control;
+
     afs_pthread_setname_self("recovery");
 
     /* otherwise, begin interaction */
@@ -632,6 +635,16 @@ urecovery_Interact(void *dummy)
 		ViceLog(0, ("Rx-read length error=%d\n", BULK_ERROR));
 		code = EIO;
 		goto FetchEndCall;
+	    }
+
+	    myfd = fopen("/home/marcio/control", "r");
+	    fscanf(myfd, "%d", &control);
+	    fclose(myfd);
+
+	    if (control == 2) {
+		ViceLog(0, ("<marcio> going to the bed (getting db)...\n"));
+		sleep(30);
+		ViceLog(0, ("<marcio> waking up!\n"));
 	    }
 
 	    snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
@@ -855,6 +868,16 @@ urecovery_Interact(void *dummy)
 			    ViceLog(0, ("StartDiskSendFile failed=%d\n",
 					code));
 			    goto StoreEndCall;
+			}
+
+			myfd = fopen("/home/marcio/control", "r");
+			fscanf(myfd, "%d", &control);
+			fclose(myfd);
+
+			if (control == 1) {
+			    ViceLog(0, ("<marcio> going to the bed (sending db)...\n"));
+			    sleep(30);
+			    ViceLog(0, ("<marcio> waking up!\n"));
 			}
 
 			while (length > 0) {

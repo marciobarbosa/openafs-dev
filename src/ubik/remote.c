@@ -406,6 +406,9 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
     char hoststr[16];
     int db_locked;
 
+    FILE *fd;
+    int control;
+
     if ((code = ubik_CheckAuth(rxcall))) {
 	return code;
     }
@@ -444,6 +447,16 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
      * to avoid unexpected consequences, only drop the lock if we do not have
      * any write transaction. this emulates the original behavior. */
     db_locked = set_transfer_state(dbase, DBSENDING);
+
+    fd = fopen("/home/marcio/control", "r");
+    fscanf(fd, "%d", &control);
+    fclose(fd);
+
+    if (control == 2) {
+	ViceLog(0, ("<marcio> going to the bed... (receiving db remotely)"));
+	sleep(30);
+	ViceLog(0, ("<marcio> waking up!"));
+    }
 
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
@@ -504,6 +517,9 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     char pbuffer[1028];
     int fd = -1;
     afs_int32 pass;
+
+    FILE *myfd;
+    int control;
 
     /* send the file back to the requester */
 
@@ -573,6 +589,16 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	goto failed;
     }
     pass = 0;
+
+    myfd = fopen("/home/marcio/control", "r");
+    fscanf(myfd, "%d", &control);
+    fclose(myfd);
+
+    if (control == 1) {
+	ViceLog(0, ("<marcio> going to the bed... (receiving db remotely)"));
+	sleep(30);
+	ViceLog(0, ("<marcio> waking up!"));
+    }
 
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
