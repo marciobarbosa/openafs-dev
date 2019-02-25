@@ -584,8 +584,17 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
 	     ubik_dbase->pathName, (file<0)?"SYS":"", (file<0)?-file:file);
 #endif
-    if (!code)
+    if (!code) {
 	code = rename(pbuffer, tbuffer);
+	if (code) {
+	    unlink(tbuffer);
+	    UBIK_VERSION_LOCK;
+	    ubik_dbase->version.epoch = 0;
+	    ubik_dbase->version.counter = 0;
+	    UBIK_VERSION_UNLOCK;
+	    goto failed;
+	}
+    }
     UBIK_VERSION_LOCK;
     if (!code) {
 	(*ubik_dbase->open) (ubik_dbase, file);
