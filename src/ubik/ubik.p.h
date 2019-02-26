@@ -231,6 +231,8 @@ extern int (*ubik_SyncWriterCacheProc) (void);
 
 /*! \name ubik_dbase flags */
 #define	DBWRITING	    1	/*!< are any write trans. in progress */
+#define	DBSENDING	    2	/*!< sending db to someone */
+#define	DBRECEIVING	    4	/*!< receiving db from someone */
 /*\}*/
 
 /*!\name ubik trans flags */
@@ -530,6 +532,76 @@ extern int uvote_eq_dbVersion(struct ubik_version);
 extern int uvote_HaveSyncAndVersion(struct ubik_version);
 /*\}*/
 
+/**
+ * Add new flag(s) to the database
+ *
+ * @param[in]  dbase  database
+ * @param[in]  flags  new flag(s)
+ *
+ * @pre        database lock held
+ * @post       database lock dropped
+ *
+ * @return none
+ */
+static_inline void
+set_db_flags(struct ubik_dbase *dbase, int flags)
+{
+    dbase->flags |= flags;
+    DBRELE(dbase);
+}
+
+/**
+ * Clear flag(s) from the database
+ *
+ * @param[in]  dbase  database
+ * @param[in]  flags  flag(s) to be cleared
+ * @param[in]  abort  if true, abort transactions
+ *
+ * @pre        database lock dropped
+ * @post       database lock held
+ *
+ * @return none
+ */
+static_inline void
+clear_db_flags(struct ubik_dbase *dbase, int flags, int abort)
+{
+    DBHOLD(dbase);
+    if (abort && flags == DBRECEIVING) {
+	/* at this point, we have the guarantee that we do not have any write
+	 * transaction. however, we cannot assume the same for reads. as a
+	 * result, we have to make sure that we do not have any read transaction
+	 * before we replace our local database. */
+	urecovery_AbortAll(dbase);
+    }
+    dbase->flags &= ~flags;
+#ifdef AFS_PTHREAD_ENV
+    opr_cv_broadcast(&dbase->flags_cond);
+#else
+    LWP_NoYieldSignal(&dbase->flags);
+#endif
+}
+
+/**
+ * Wait until flags are cleared
+ *
+ * @param[in]  dbase  database
+ * @param[in]  flags  flag(s) we will wait for
+ *
+ * @return none
+ */
+static_inline void
+wait_db_flags(struct ubik_dbase *dbase, int flags)
+{
+    while (dbase->flags & flags) {
+#ifdef AFS_PTHREAD_ENV
+	opr_cv_wait(&dbase->flags_cond, &dbase->versionLock);
+#else
+	DBRELE(dbase);
+	LWP_WaitProcess(&dbase->flags);
+	DBHOLD(dbase);
+#endif
+    }
+}
 #endif /* UBIK_INTERNALS */
 
 extern afs_int32 ubik_nBuffers;

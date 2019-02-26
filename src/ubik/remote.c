@@ -55,6 +55,10 @@ SDISK_Begin(struct rx_call *rxcall, struct ubik_tid *atid)
 	return code;
     }
     DBHOLD(ubik_dbase);
+
+    /* check if we are sending / receiving the database. if so, wait. */
+    wait_db_flags(ubik_dbase, (DBSENDING | DBRECEIVING));
+
     if (urecovery_AllBetter(ubik_dbase, 0) == 0) {
 	code = UNOQUORUM;
 	goto out;
@@ -400,6 +404,7 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
     struct rx_connection *tconn;
     afs_uint32 otherHost = 0;
     char hoststr[16];
+    int flags_cleared = 0;
 
     if ((code = ubik_CheckAuth(rxcall))) {
 	return code;
@@ -414,6 +419,9 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 
     dbase = ubik_dbase;
     DBHOLD(dbase);
+
+    /* check if we are sending / receiving the database. if so, wait. */
+    wait_db_flags(dbase, (DBSENDING | DBRECEIVING));
 
     /* A new quorum was just elected and, at this point, write transactions
      * should not exist. If we have a write transaction, it is from the last
@@ -440,6 +448,11 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 	goto failed;
     }
     offset = 0;
+
+    /* at this point, we know that we do not have any write transaction. we also
+     * have the guarantee that we are not sending or receiving a database. */
+    set_db_flags(dbase, DBSENDING);
+
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
 	code = (*dbase->read) (dbase, file, tbuffer, offset, tlen);
@@ -457,13 +470,19 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 	length -= tlen;
 	offset += tlen;
     }
+
+    clear_db_flags(dbase, DBSENDING, 0);
+    flags_cleared = 1;
+
     code = (*dbase->getlabel) (dbase, file, version);	/* return the dbase, too */
     if (code)
 	ViceLog(0, ("getlabel error=%d\n", code));
 
  failed:
-    DBRELE(dbase);
     if (code) {
+	if (!flags_cleared) {
+	    clear_db_flags(dbase, DBSENDING, 0);
+	}
 	ViceLog(0,
 	    ("Ubik: Synchronize database: send (via GetFile) to "
 	     "server %s failed (error = %d)\n",
@@ -474,6 +493,7 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 	     "server %s complete, version: %d.%d\n",
 	    afs_inet_ntoa_r(otherHost, hoststr), version->epoch, version->counter));
     }
+    DBRELE(dbase);
     return code;
 }
 
@@ -494,6 +514,7 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     char pbuffer[1028];
     int fd = -1;
     afs_int32 pass;
+    int flags_cleared = 0;
 
     /* send the file back to the requester */
 
@@ -530,11 +551,18 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 
     DBHOLD(dbase);
 
+    /* check if we are sending / receiving the database. if so, wait. */
+    wait_db_flags(dbase, (DBSENDING | DBRECEIVING));
     /* abort any active trans that may scribble over the database */
     urecovery_AbortAll(dbase);
 
     ViceLog(0, ("Ubik: Synchronize database: receive (via SendFile) from server %s begin\n",
 	       afs_inet_ntoa_r(otherHost, hoststr)));
+
+    /* at this point, we know that we do not have any read or write
+     * transaction (they were aborted). we also have the guarantee that
+     * we are not sending or receiving a database. */
+    set_db_flags(ubik_dbase, DBRECEIVING);
 
     offset = 0;
     snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
@@ -583,6 +611,9 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	goto failed;
     }
 
+    clear_db_flags(ubik_dbase, DBRECEIVING, 1);
+    flags_cleared = 1;
+
     /* sync data first, then write label and resync (resync done by setlabel call).
      * This way, good label is only on good database. */
     snprintf(tbuffer, sizeof(tbuffer), "%s.DB%s%d",
@@ -624,6 +655,9 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 
 failed:
     if (code) {
+	if (!flags_cleared) {
+	    clear_db_flags(ubik_dbase, DBRECEIVING, 0);
+	}
 	if (pbuffer[0] != '\0')
 	    unlink(pbuffer);
 

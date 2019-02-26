@@ -555,6 +555,11 @@ urecovery_Interact(void *dummy)
 
 	    DBHOLD(ubik_dbase);
 
+	    /* check if we are sending / receiving the database. if so, wait.
+	     * we should not be sending / receiving a database here but check
+	     * just to be safe */
+	    wait_db_flags(ubik_dbase, (DBSENDING | DBRECEIVING));
+
             if (okcalls + 1 >= ubik_quorum) {
                 /* If we've asked a majority of sites about their db version,
                  * then we can say with confidence that we've found the best db
@@ -606,6 +611,11 @@ urecovery_Interact(void *dummy)
 			"from server %s begin\n",
 		       afs_inet_ntoa_r(bestServer->addr[0], hoststr)));
 	    UBIK_ADDR_UNLOCK;
+
+	    /* at this point, we know that we do not have any read or write
+	     * transaction (they were aborted). we also have the guarantee that
+	     * we are not sending or receiving a database. */
+	    set_db_flags(ubik_dbase, DBRECEIVING);
 
 	    code = StartDISK_GetFile(rxcall, file);
 	    if (code) {
@@ -664,6 +674,9 @@ urecovery_Interact(void *dummy)
 	    code = EndDISK_GetFile(rxcall, &tversion);
 	  FetchEndCall:
 	    code = rx_EndCall(rxcall, code);
+
+	    clear_db_flags(ubik_dbase, DBRECEIVING, code ? 0 : 1);
+
 	    if (!code) {
 		/* we got a new file, set up its header */
 		urecovery_state |= UBIK_RECHAVEDB;
@@ -783,6 +796,11 @@ urecovery_Interact(void *dummy)
 		}
 	    }
 
+	    /* check if we are sending / receiving the database. if so, wait.
+	     * we should not be sending / receiving a database here but check
+	     * just to be safe */
+	    wait_db_flags(ubik_dbase, (DBSENDING | DBRECEIVING));
+
 	    for (ts = ubik_servers; ts; ts = ts->next) {
 		UBIK_ADDR_LOCK;
 		inAddr.s_addr = ts->addr[0];
@@ -816,6 +834,12 @@ urecovery_Interact(void *dummy)
 			UBIK_ADDR_LOCK;
 			rxcall = rx_NewCall(ts->disk_rxcid);
 			UBIK_ADDR_UNLOCK;
+
+			/* at this point, we know that we do not have any write
+			 * transaction. we also have the guarantee that we are
+			 * not sending or receiving a database. */
+			set_db_flags(ubik_dbase, DBSENDING);
+
 			code =
 			    StartDISK_SendFile(rxcall, file, length,
 					       &ubik_dbase->version);
@@ -848,6 +872,7 @@ urecovery_Interact(void *dummy)
 			code = EndDISK_SendFile(rxcall);
 		      StoreEndCall:
 			code = rx_EndCall(rxcall, code);
+			clear_db_flags(ubik_dbase, DBSENDING, 0);
 		    }
 
 		    if (code == 0) {

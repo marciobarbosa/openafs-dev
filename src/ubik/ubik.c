@@ -617,16 +617,8 @@ BeginTrans(struct ubik_dbase *dbase, afs_int32 transMode,
      * we can't even handle two non-conflicting writes, since our log and recovery modules
      * don't know how to restore one without possibly picking up some data from the other. */
     if (transMode == UBIK_WRITETRANS) {
-	/* if we're writing already, wait */
-	while (dbase->flags & DBWRITING) {
-#ifdef AFS_PTHREAD_ENV
-	    opr_cv_wait(&dbase->flags_cond, &dbase->versionLock);
-#else
-	    DBRELE(dbase);
-	    LWP_WaitProcess(&dbase->flags);
-	    DBHOLD(dbase);
-#endif
-	}
+	/* if we're writing, sending, or receiving a database, wait */
+	wait_db_flags(dbase, (DBWRITING | DBSENDING | DBRECEIVING));
 
 	if (!ubeacon_AmSyncSite()) {
 	    DBRELE(dbase);
