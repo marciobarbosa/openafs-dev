@@ -414,6 +414,18 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 
     dbase = ubik_dbase;
     DBHOLD(dbase);
+
+    /* A new quorum was just elected and, at this point, write transactions
+     * should not exist. If we have a write transaction, it is from the last
+     * mandate and it should be aborted. */
+    if (dbase->flags & DBWRITING) {
+	udisk_abort(ubik_currentTrans);
+	if (ubik_currentTrans->locktype != LOCKWAIT) {
+	    udisk_end(ubik_currentTrans);
+	}
+	ubik_currentTrans = (struct ubik_trans *)0;
+    }
+
     code = (*dbase->stat) (dbase, file, &ubikstat);
     if (code < 0) {
 	ViceLog(0, ("database stat() error:%d\n", code));
