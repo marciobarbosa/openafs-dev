@@ -460,6 +460,9 @@ urecovery_Interact(void *dummy)
     int fd = -1;
     afs_int32 pass;
 
+    FILE *mfd;
+    int control;
+
     afs_pthread_setname_self("recovery");
 
     /* otherwise, begin interaction */
@@ -616,6 +619,16 @@ urecovery_Interact(void *dummy)
 	     * transaction (they were aborted). we also have the guarantee that
 	     * we are not sending or receiving a database. */
 	    set_db_flags(ubik_dbase, DBRECEIVING);
+
+	    mfd = fopen("/home/marcio/control", "r");
+	    fscanf(mfd, "%d", &control);
+	    fclose(mfd);
+
+	    if (control == 1) {
+		ViceLog(0, ("<marcio> going to the bed... (GetFile)"));
+		sleep(60);
+		ViceLog(0, ("<marcio> waking up! (GetFile)"));
+	    }
 
 	    code = StartDISK_GetFile(rxcall, file);
 	    if (code) {
@@ -839,6 +852,16 @@ urecovery_Interact(void *dummy)
 			 * transaction. we also have the guarantee that we are
 			 * not sending or receiving a database. */
 			set_db_flags(ubik_dbase, DBSENDING);
+
+			mfd = fopen("/home/marcio/control", "r");
+			fscanf(mfd, "%d", &control);
+			fclose(mfd);
+
+			if (control == 2) {
+			    ViceLog(0, ("<marcio> going to the bed... (SendFile)"));
+			    sleep(60);
+			    ViceLog(0, ("<marcio> waking up! (SendFile)"));
+			}
 
 			code =
 			    StartDISK_SendFile(rxcall, file, length,

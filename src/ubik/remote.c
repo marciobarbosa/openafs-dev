@@ -406,6 +406,9 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
     char hoststr[16];
     int flags_cleared = 0;
 
+    FILE *mfd;
+    int control;
+
     if ((code = ubik_CheckAuth(rxcall))) {
 	return code;
     }
@@ -452,6 +455,16 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
     /* at this point, we know that we do not have any write transaction. we also
      * have the guarantee that we are not sending or receiving a database. */
     set_db_flags(dbase, DBSENDING);
+
+    mfd = fopen("/home/marcio/control", "r");
+    fscanf(mfd, "%d", &control);
+    fclose(mfd);
+
+    if (control == 3) {
+	ViceLog(0, ("<marcio> going to the bed... (GetFile - Remote)"));
+	sleep(60);
+	ViceLog(0, ("<marcio> waking up! (GetFile - Remote)"));
+    }
 
     while (length > 0) {
 	tlen = (length > sizeof(tbuffer) ? sizeof(tbuffer) : length);
@@ -516,6 +529,9 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     afs_int32 pass;
     int flags_cleared = 0;
 
+    FILE *mfd;
+    int control;
+
     /* send the file back to the requester */
 
     dbase = ubik_dbase;
@@ -563,6 +579,16 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
      * transaction (they were aborted). we also have the guarantee that
      * we are not sending or receiving a database. */
     set_db_flags(ubik_dbase, DBRECEIVING);
+
+    mfd = fopen("/home/marcio/control", "r");
+    fscanf(mfd, "%d", &control);
+    fclose(mfd);
+
+    if (control == 4) {
+	ViceLog(0, ("<marcio> going to the bed... (SendFile - Remote)"));
+	sleep(60);
+	ViceLog(0, ("<marcio> waking up! (SendFile - Remote)"));
+    }
 
     offset = 0;
     snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
