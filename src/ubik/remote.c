@@ -59,6 +59,17 @@ SDISK_Begin(struct rx_call *rxcall, struct ubik_tid *atid)
 	code = UNOQUORUM;
 	goto out;
     }
+    /* check if we are messing with the database. if so, wait. */
+    if (ubik_wait_db_flags(ubik_dbase, DBWRITING | DBSENDING)) {
+	ViceLog(0, ("Ubik: Unexpected database flags in SDISK_BeginFlags (flags: 0x%x)",
+		   ubik_dbase->flags));
+	code = UNOQUORUM;
+	goto out;
+    }
+    if (urecovery_AllBetter(ubik_dbase, 0) == 0) {
+	code = UNOQUORUM;
+	goto out;
+    }
     urecovery_CheckTid(atid, 1);
     code = udisk_begin(ubik_dbase, UBIK_WRITETRANS, &ubik_currentTrans);
     if (!code && ubik_currentTrans) {
@@ -414,6 +425,12 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 
     dbase = ubik_dbase;
     DBHOLD(dbase);
+
+    /* check if we are messing with the database. if so, wait. */
+    code = ubik_wait_db_flags(dbase, DBWRITING | DBSENDING | DBRECEIVING);
+    osi_Assert(code == 0);
+    ubik_set_db_flags(dbase, DBSENDING);
+
     code = (*dbase->stat) (dbase, file, &ubikstat);
     if (code < 0) {
 	ViceLog(0, ("database stat() error:%d\n", code));
@@ -436,7 +453,14 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 	    code = UIOERROR;
 	    goto failed;
 	}
+
+	/* at this point, we know that we do not have a write transaction, and
+	 * we also know that we are not sending or receiving a database. so we
+	 * can safely drop DBHOLD here to allow read transactions. */
+	DBRELE(dbase);
 	code = rx_Write(rxcall, tbuffer, tlen);
+	DBHOLD(dbase);
+
 	if (code != tlen) {
 	    ViceLog(0, ("Rx-write data error=%d\n", code));
 	    code = BULK_ERROR;
@@ -450,6 +474,7 @@ SDISK_GetFile(struct rx_call *rxcall, afs_int32 file,
 	ViceLog(0, ("getlabel error=%d\n", code));
 
  failed:
+    ubik_clear_db_flags(dbase, DBSENDING);
     DBRELE(dbase);
     if (code) {
 	ViceLog(0,
@@ -483,6 +508,7 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     int fd = -1;
     afs_int32 pass;
     int newdb_visible = 0;
+    int db_locked = 0;
 
     /* send the file back to the requester */
 
@@ -519,11 +545,32 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 
     DBHOLD(dbase);
 
+    /* check if we are messing with the database. if so, wait. since every 
+     * transaction will be aborted (via urecovery_AbortAll below), we do not
+     * have to wait for writes. */
+    if (ubik_wait_db_flags(dbase, DBSENDING)) {
+	ViceLog(0, ("Ubik: Unexpected database flags in SDISK_SendFile (flags: 0x%x)",
+		   ubik_dbase->flags));
+	DBRELE(ubik_dbase);
+	return UINTERNAL;
+    }
+    ubik_set_db_flags(ubik_dbase, DBRECEIVING);
+
     /* abort any active trans that may scribble over the database */
     urecovery_AbortAll(dbase);
 
     ViceLog(0, ("Ubik: Synchronize database: receive (via SendFile) from server %s begin\n",
 	       afs_inet_ntoa_r(otherHost, hoststr)));
+
+    /* at this point, we know that we do not have any read or write
+     * transactions (they were aborted). we also have the guarantee that
+     * we are not sending or receiving a database. we drop DBHOLD here, so new
+     * read transactions to come in while the database is being transferred.
+     * that might seem a bit odd because we just aborted any existing read
+     * transactions; in the future we could probably avoid aborting read
+     * transactions (and just abort writes), but for now we just abort
+     * everything. */
+    DBRELE(ubik_dbase);
 
     offset = 0;
     snprintf(pbuffer, sizeof(pbuffer), "%s.DB%s%d.TMP",
@@ -572,6 +619,17 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
 	goto failed;
     }
 
+    DBHOLD(ubik_dbase);
+    ubik_clear_db_flags(ubik_dbase, DBRECEIVING);
+    db_locked = 1;
+
+    /* at this point, we are guaranteed that we do not have a write
+     * transaction, but new read transactions may have started while the DBHOLD
+     * lock was dropped. we are about to install the new database we just
+     * received, so make sure to abort any read transactions, so those read
+     * transactions don't see new db data suddenly appear. */
+    urecovery_AbortAll(ubik_dbase);
+
     /* sync data first, then write label and resync (resync done by setlabel call).
      * This way, good label is only on good database. */
     snprintf(tbuffer, sizeof(tbuffer), "%s.DB%s%d",
@@ -606,6 +664,10 @@ SDISK_SendFile(struct rx_call *rxcall, afs_int32 file,
     udisk_Invalidate(dbase, file);	/* new dbase, flush disk buffers */
 
 failed:
+    if (!db_locked) {
+	DBHOLD(ubik_dbase);
+	ubik_clear_db_flags(ubik_dbase, DBRECEIVING);
+    }
     if (code) {
 	if (pbuffer[0] != '\0')
 	    unlink(pbuffer);
