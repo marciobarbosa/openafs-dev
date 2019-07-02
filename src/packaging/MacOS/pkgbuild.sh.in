@@ -324,9 +324,91 @@ if [ x"$PASS1" = x1 ]; then
 		   "$PKGROOT"/Library/Security/SecurityAgentPlugins/aklog.bundle \
 		   "$PKGROOT"/Library/OpenAFS/Tools/tools/growlagent-openafs.app \
 		   "$PKGROOT"/Library/OpenAFS/Tools/tools/aklog.bundle \
-		   "$PLUGINS"/afscell.bundle
+		   "$PLUGINS"/afscell.bundle \
+		   "$PKGROOT"/Library/OpenAFS/Tools/tools/OpenAFS.prefPane/Contents/Resources/afshlp \
+		   "$PKGROOT"/Library/OpenAFS/Tools/tools/OpenAFS.prefPane/Contents/Resources/AFSBackgrounder.app/Contents/Resources/afshlp \
+		   "$PKGROOT"/Library/PreferencePanes/OpenAFS.prefPane/Contents/Resources/afshlp \
+		   "$PKGROOT"/Library/PreferencePanes/OpenAFS.prefPane/Contents/Resources/AFSBackgrounder.app/Contents/Resources/afshlp \
+		   "$PKGROOT"/Library/OpenAFS/Tools/tools/OpenAFS.prefPane/Contents/Resources/AFSBackgrounder.app/Contents/MacOS/AFSBackgrounder \
+		   "$PKGROOT"/Library/PreferencePanes/OpenAFS.prefPane/Contents/Resources/AFSBackgrounder.app/Contents/MacOS/AFSBackgrounder \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/afsio \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/udebug \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/pagsh.krb \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/afs_compile_et \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/afsmonitor \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/livesys \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/aklog \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/unlog \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/scout \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/translate_et \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/sys \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/tokens.krb \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/up \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/pagsh \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/pts \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/cmdebug \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/bos \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/xstat_cm_test \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/xstat_fs_test \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/fs \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/rxgen \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/tokens \
+		   "$PKGROOT"/Library/OpenAFS/Tools/bin/klog.krb5 \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/vos \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/uss \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/voldump \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/butc \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/fms \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/rmtsysd \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/rxdebug \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/afssettings \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/vldb_check \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/prdb_check \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/fstrace \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/read_tape \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/vsys \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/backup \
+		   "$PKGROOT"/Library/OpenAFS/Tools/etc/vldb_convert \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.client/usr/vice/etc/afsd \
+		   "$PKGROOT"/Library/OpenAFS/Tools/lib/libkopenafs.2.dylib \
+		   "$PKGROOT"/Library/OpenAFS/Tools/lib/libafsrpc.2.dylib \
+		   "$PKGROOT"/Library/OpenAFS/Tools/lib/librokenafs.2.dylib \
+		   "$PKGROOT"/Library/OpenAFS/Tools/lib/libafshcrypto.2.dylib \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/volserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/ptserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/buserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/vos \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/restorevol \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/bosserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/vlserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/salvager \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/salvsync-debug \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/dafssync-debug \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/dafileserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/udebug \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/upclient \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/volscan \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/akeyconvert \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/fssync-debug \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/asetkey \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/bos_util \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/fileserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/davolserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/dasalvager \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/tokens.krb \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/volinfo \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/pts \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/pt_util \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/bos \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/upserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/salvageserver \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/fs \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/tokens \
+		   "$PKGROOT"/Library/OpenAFS/Tools/root.server/usr/afs/bin/state_analyzer \
+		   "$PKGROOT"/private/var/db/openafs/etc/config/afssettings
+
 	do
-	    codesign --verbose --force --timestamp --sign "$APP_KEY" "$obj"
+	    codesign --verbose --force --timestamp --sign "$APP_KEY" --options runtime "$obj"
 	done
 
 	# Check if our signatures for our kexts are valid. 'kextutil' will exit
