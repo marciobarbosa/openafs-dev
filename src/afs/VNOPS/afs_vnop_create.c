@@ -181,7 +181,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 		tvc = afs_LookupVCache(&newFid, treq, adp, aname);
 	    }
 	    if (!tvc)		/* lookup failed or wasn't called */
-		tvc = afs_GetVCache(&newFid, treq);
+		tvc = afs_GetVCache(adp, &newFid, treq);
 
 	    if (tvc) {
 		/* if the thing exists, we need the right access to open it.
@@ -436,7 +436,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
      * queue, since the find will only succeed in the event of a create race, and 
      * then the vcache will be at the front of the VLRU queue anyway...  */
     if (!(tvc = afs_FindVCache(&newFid, 0, DO_STATS))) {
-	tvc = afs_NewVCache(&newFid, hostp);
+	tvc = afs_NewVCache(adp, &newFid, hostp);
 	if (tvc) {
 	    int finalCBs;
 	    ObtainWriteLock(&tvc->lock, 139);

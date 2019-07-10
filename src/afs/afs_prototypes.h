@@ -1074,13 +1074,24 @@ extern int afs_FlushVCache(struct vcache *avc, int *slept);
 extern struct vcache *afs_GetRootVCache(struct VenusFid *afid,
 					struct vrequest *areq,
 					struct volume *tvolp);
-extern struct vcache *afs_NewVCache(struct VenusFid *afid,
+extern struct vcache *afs_NewVCache(struct vcache *parent,
+				    struct VenusFid *afid,
 				    struct server *serverp);
-extern struct vcache *afs_NewBulkVCache(struct VenusFid *afid,
+extern struct vcache *afs_NewBulkVCache(struct vcache *parent,
+					struct VenusFid *afid,
 					struct server *serverp, int seq);
 extern int afs_VerifyVCache2(struct vcache *avc, struct vrequest *areq);
-extern struct vcache *afs_GetVCache(struct VenusFid *afid,
+extern struct vcache *afs_GetVCache(struct vcache *parent,
+				    struct VenusFid *afid,
 				    struct vrequest *areq);
+extern struct vcache *afs_GetVCache4(struct vcache *parent,
+				     struct VenusFid *afid,
+				     struct vrequest *areq,
+				     struct afs_osi_vcinfo *vcinfo);
+extern struct vcache *afs_GetVCacheStale(struct vcache *parent,
+					 struct VenusFid *afid,
+					 int *a_newvcache,
+					 struct afs_osi_vcinfo *vcinfo);
 extern void afs_PutVCache(struct vcache *avc);
 extern int afs_RefVCache(struct vcache *avc);
 

@@ -237,7 +237,7 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     /* now we're done with parent dir, create the link's entry.  Note that
      * no one can get a pointer to the new cache entry until we release 
      * the xvcache lock. */
-    tvc = afs_NewVCache(&newFid, hostp);
+    tvc = afs_NewVCache(adp, &newFid, hostp);
     if (!tvc)
     {
 	code = -2;

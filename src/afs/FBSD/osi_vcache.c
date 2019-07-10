@@ -65,7 +65,8 @@ osi_TryEvictVCache(struct vcache *avc, int *slept, int defersleep)
 }
 
 struct vcache *
-osi_NewVnode(void)
+osi_NewVnode(struct vcache *parent, struct VenusFid *fid,
+	     struct afs_osi_vcinfo *vcinfo)
 {
     struct vcache *tvc;
 

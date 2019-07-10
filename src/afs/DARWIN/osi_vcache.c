@@ -14,7 +14,8 @@
 #include "afsincludes.h"        /*AFS-based standard headers */
 
 struct vcache *
-osi_NewVnode(void)
+osi_NewVnode(struct vcache *parent, struct VenusFid *fid,
+	     struct afs_osi_vcinfo *vcinfo)
 {
     struct vcache *tvc;
 

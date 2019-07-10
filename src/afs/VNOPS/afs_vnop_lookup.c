@@ -386,7 +386,7 @@ afs_EvalFakeStat_int(struct vcache **avcp, struct afs_fakestat_state *state,
 	    } while (root_vp && retry);
 	    ReleaseReadLock(&afs_xvcache);
 	} else {
-	    root_vp = afs_GetVCache(tvc->mvid.target_root, areq);
+	    root_vp = afs_GetVCache(NULL, tvc->mvid.target_root, areq);
 	}
 	if (!root_vp) {
 	    code = canblock ? EIO : 0;
@@ -842,7 +842,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 	    } while (tvcp && retry);
 	    if (!tvcp) {	/* otherwise, create manually */
 		UpgradeSToWLock(&afs_xvcache, 129);
-		tvcp = afs_NewBulkVCache(&tfid, hostp, statSeqNo);
+		tvcp = afs_NewBulkVCache(adp, &tfid, hostp, statSeqNo);
 		if (tvcp)
 		{
 		    ObtainWriteLock(&tvcp->lock, 505);
@@ -1487,7 +1487,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 	}
 	/* otherwise we have the fid here, so we use it */
 	/*printf("Getting vcache\n");*/
-	tvc = afs_GetVCache(adp->mvid.parent, treq);
+	tvc = afs_GetVCache(NULL, adp->mvid.parent, treq);
 	afs_Trace3(afs_iclSetp, CM_TRACE_GETVCDOTDOT, ICL_TYPE_FID, adp->mvid.parent,
 		   ICL_TYPE_POINTER, tvc, ICL_TYPE_INT32, code);
 	*avcp = tvc;
@@ -1573,6 +1573,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
      */
     if (afs_IsDynrootMount(adp)) {
 	struct VenusFid tfid;
+	struct vcache *parent = NULL;
 	afs_uint32 cellidx, volid, vnoid, uniq;
 
 	code = EvalMountData('%', aname, 0, 0, NULL, treq, &cellidx, &volid, &vnoid, &uniq);
@@ -1586,12 +1587,19 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 	    tfid.Fid.Vnode = vnoid;
 	    tfid.Fid.Volume = volid;
 	    tfid.Fid.Unique = uniq;
+	    /*
+	     * Note that parent is NULL in this path, because the vcache we're
+	     * looking up is not in the same volume as 'adp', so 'adp' isn't
+	     * the real parent.
+	     */
+
 	} else {
+	    parent = adp;
 	    afs_GetDynrootMountFid(&tfid);
 	    tfid.Fid.Vnode = VNUM_FROM_TYPEID(VN_TYPE_MOUNT, cellidx << 2);
 	    tfid.Fid.Unique = volid;
 	}
-	*avcp = tvc = afs_GetVCache(&tfid, treq);
+	*avcp = tvc = afs_GetVCache(parent, &tfid, treq);
 	code = (tvc ? 0 : EIO);
 	hit = 1;
 	goto done;
@@ -1607,7 +1615,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 	struct VenusFid tfid;
 
 	afs_GetDynrootMountFid(&tfid);
-	*avcp = tvc = afs_GetVCache(&tfid, treq);
+	*avcp = tvc = afs_GetVCache(NULL, &tfid, treq);
 	code = 0;
 	hit = 1;
 	goto done;
@@ -1819,7 +1827,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 		tvc = afs_LookupVCache(&tfid, treq, adp, tname);
 	    }
 	    if (!tvc && !bulkcode) {	/* lookup failed or wasn't called */
-		tvc = afs_GetVCache(&tfid, treq);
+		tvc = afs_GetVCache(adp, &tfid, treq);
 	    }
 	}			/* if !tvc */
     }				/* sub-block just to reduce stack usage */
@@ -1881,7 +1889,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 			tvc =
 			    afs_GetRootVCache(tvc->mvid.target_root, treq, tvolp);
 		    } else {
-			tvc = afs_GetVCache(tvc->mvid.target_root, treq);
+			tvc = afs_GetVCache(NULL, tvc->mvid.target_root, treq);
 		    }
 		    afs_PutVCache(uvc);	/* we're done with it */
 

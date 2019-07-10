@@ -2300,7 +2300,7 @@ DECL_PIOCTL(PNewStatMount)
     if (!tfid.Fid.Unique && (avc->f.states & CForeign)) {
 	tvc = afs_LookupVCache(&tfid, areq, avc, bufp);
     } else {
-	tvc = afs_GetVCache(&tfid, areq);
+	tvc = afs_GetVCache(avc, &tfid, areq);
     }
     if (!tvc) {
 	code = EIO;
@@ -3361,7 +3361,7 @@ DECL_PIOCTL(PRemoveMount)
     if (!tfid.Fid.Unique && (avc->f.states & CForeign)) {
 	tvc = afs_LookupVCache(&tfid, areq, avc, bufp);
     } else {
-	tvc = afs_GetVCache(&tfid, areq);
+	tvc = afs_GetVCache(avc, &tfid, areq);
     }
     if (!tvc) {
 	code = EIO;
@@ -4902,7 +4902,7 @@ DECL_PIOCTL(PFlushMount)
     if (!tfid.Fid.Unique && (avc->f.states & CForeign)) {
 	tvc = afs_LookupVCache(&tfid, areq, avc, bufp);
     } else {
-	tvc = afs_GetVCache(&tfid, areq);
+	tvc = afs_GetVCache(avc, &tfid, areq);
     }
     if (!tvc) {
 	code = EIO;
@@ -5038,7 +5038,7 @@ DECL_PIOCTL(PPrefetchFromTape)
     tfid.Fid.Vnode = Fid->Vnode;
     tfid.Fid.Unique = Fid->Unique;
 
-    tvc = afs_GetVCache(&tfid, areq);
+    tvc = afs_GetVCache(NULL, &tfid, areq);
     if (!tvc) {
 	afs_Trace3(afs_iclSetp, CM_TRACE_PREFETCHCMD, ICL_TYPE_POINTER, tvc,
 		   ICL_TYPE_FID, &tfid, ICL_TYPE_FID, &avc->f.fid);
@@ -5109,7 +5109,7 @@ DECL_PIOCTL(PFsCmd)
     tfid.Fid.Vnode = Fid->Vnode;
     tfid.Fid.Unique = Fid->Unique;
 
-    tvc = afs_GetVCache(&tfid, areq);
+    tvc = afs_GetVCache(NULL, &tfid, areq);
     afs_Trace3(afs_iclSetp, CM_TRACE_RESIDCMD, ICL_TYPE_POINTER, tvc,
 	       ICL_TYPE_INT32, Inputs->command, ICL_TYPE_FID, &tfid);
     if (!tvc)

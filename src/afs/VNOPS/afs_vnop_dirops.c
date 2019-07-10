@@ -187,7 +187,7 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     	/* When disconnected, we have to create the full dir here. */
 
 	/* Generate a new vcache and fill it. */
-	tvc = afs_NewVCache(&newFid, NULL);
+	tvc = afs_NewVCache(adp, &newFid, NULL);
 	if (tvc) {
 	    *avcp = tvc;
 	} else {
@@ -225,7 +225,7 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	ReleaseWriteLock(&tvc->lock);
     } else {
     	/* now we're done with parent dir, create the real dir's cache entry */
-	tvc = afs_GetVCache(&newFid, treq);
+	tvc = afs_GetVCache(adp, &newFid, treq);
     	if (tvc) {
 	    code = 0;
 	    *avcp = tvc;

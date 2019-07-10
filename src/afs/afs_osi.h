@@ -144,7 +144,10 @@ extern struct vnodeops *afs_ops;
 
 struct vcache;
 extern int osi_TryEvictVCache(struct vcache *, int *, int);
-extern struct vcache *osi_NewVnode(void);
+struct VenusFid;
+struct afs_osi_vcinfo;
+extern struct vcache *osi_NewVnode(struct vcache *parent, struct VenusFid *fid,
+				   struct afs_osi_vcinfo *vcinfo);
 extern void osi_PrePopulateVCache(struct vcache *);
 extern void osi_PostPopulateVCache(struct vcache *);
 extern void osi_AttachVnode(struct vcache *, int seq);

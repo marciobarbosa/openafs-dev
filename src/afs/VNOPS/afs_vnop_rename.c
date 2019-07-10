@@ -362,7 +362,7 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 	    tvc = afs_LookupVCache(&unlinkFid, areq, aodp, aname1);
 	}
 	if (!tvc)		/* lookup failed or wasn't called */
-	    tvc = afs_GetVCache(&unlinkFid, areq);
+	    tvc = afs_GetVCache(aodp, &unlinkFid, areq);
 
 	if (tvc) {
 	    ObtainWriteLock(&tvc->lock, 151);
@@ -392,7 +392,7 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 	if (!fileFid.Fid.Unique)
 	    tvc = afs_LookupVCache(&fileFid, areq, andp, aname2);
 	else
-	    tvc = afs_GetVCache(&fileFid, areq);
+	    tvc = afs_GetVCache(aodp, &fileFid, areq);
 	if (tvc && (vType(tvc) == VDIR)) {
 	    ObtainWriteLock(&tvc->lock, 152);
 	    tdc1 = afs_FindDCache(tvc, (afs_size_t) 0);

@@ -431,7 +431,7 @@ afs_remunlink(struct vcache *avc, int doit)
 	    dirFid.Fid.Volume = avc->f.fid.Fid.Volume;
 	    dirFid.Fid.Vnode = avc->f.parent.vnode;
 	    dirFid.Fid.Unique = avc->f.parent.unique;
-	    adp = afs_GetVCache(&dirFid, treq);
+	    adp = afs_GetVCache(avc, &dirFid, treq);
 
 	    if (adp) {
 		tdc = afs_FindDCache(adp, (afs_size_t) 0);

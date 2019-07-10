@@ -139,7 +139,8 @@ osi_TryEvictVCache(struct vcache *avc, int *slept, int defersleep)
 }
 
 struct vcache *
-osi_NewVnode(void)
+osi_NewVnode(struct vcache *parent, struct VenusFid *fid,
+	     struct afs_osi_vcinfo *vcinfo)
 {
     struct inode *ip;
     struct vcache *tvc;
@@ -213,7 +214,7 @@ osi_ResetRootVCache(afs_uint32 volid)
     credp = crref();
     if (afs_CreateReq(&treq, credp))
 	goto out;
-    vcp = afs_GetVCache(&afs_rootFid, treq);
+    vcp = afs_GetVCache(NULL, &afs_rootFid, treq);
     if (!vcp)
 	goto out;
     afs_getattr(vcp, &vattr, credp);

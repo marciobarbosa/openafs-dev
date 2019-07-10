@@ -919,11 +919,12 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 /* Alloc new vnode. */
 
 static struct vcache *
-afs_AllocVCache(void)
+afs_AllocVCache(struct vcache *parent, struct VenusFid *fid,
+		struct afs_osi_vcinfo *vcinfo)
 {
     struct vcache *tvc;
 
-    tvc = osi_NewVnode();
+    tvc = osi_NewVnode(parent, fid, vcinfo);
     if (tvc == NULL) {
 	return NULL;
     }
@@ -1041,7 +1042,8 @@ afs_FlushAllVCaches(void)
  */
 
 static_inline struct vcache *
-afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
+afs_NewVCache_int(struct vcache *parent, struct VenusFid *afid,
+		  struct server *serverp, int seq, struct afs_osi_vcinfo *vcinfo)
 {
     struct vcache *tvc;
     afs_int32 i, j;
@@ -1059,7 +1061,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 	    return NULL;
 	}
     }
-    tvc = afs_AllocVCache();
+    tvc = afs_AllocVCache(parent, afid, vcinfo);
     if (tvc == NULL) {
 	return NULL;
     }
@@ -1070,7 +1072,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
     }
 
     if (!freeVCList) {
-	tvc = afs_AllocVCache();
+	tvc = afs_AllocVCache(parent, afid, vcinfo);
 	if (tvc == NULL) {
 	    return NULL;
 	}
@@ -1140,15 +1142,17 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 
 
 struct vcache *
-afs_NewVCache(struct VenusFid *afid, struct server *serverp)
+afs_NewVCache(struct vcache *parent, struct VenusFid *afid,
+	      struct server *serverp)
 {
-    return afs_NewVCache_int(afid, serverp, 0);
+    return afs_NewVCache_int(parent, afid, serverp, 0, NULL);
 }
 
 struct vcache *
-afs_NewBulkVCache(struct VenusFid *afid, struct server *serverp, int seq)
+afs_NewBulkVCache(struct vcache *parent, struct VenusFid *afid,
+		  struct server *serverp, int seq)
 {
-    return afs_NewVCache_int(afid, serverp, seq);
+    return afs_NewVCache_int(parent, afid, serverp, seq, NULL);
 }
 
 /*!
@@ -1361,7 +1365,7 @@ afs_VerifyVCache2(struct vcache *avc, struct vrequest *areq)
     ReleaseWriteLock(&avc->lock);
 
     /* fetch the status info */
-    tvc = afs_GetVCache(&avc->f.fid, areq);
+    tvc = afs_GetVCache(avc, &avc->f.fid, areq);
     if (!tvc)
 	return EIO;
     /* Put it back; caller has already incremented vrefCount */
@@ -1736,46 +1740,26 @@ afs_RemoteLookup(struct VenusFid *afid, struct vrequest *areq,
     return code;
 }
 
-
 /*!
- * afs_GetVCache
+ * afs_GetVCacheStale
  *
- * Given a file id and a vrequest structure, fetch the status
- * information associated with the file.
+ * Given a fid, get a vcache representing that file. The returned vcache may or
+ * may not have status information fetched for it yet.
  *
+ * \param parent See 'afs_GetVCache'.
  * \param afid File ID.
- * \param areq Ptr to associated vrequest structure, specifying the
- *  user whose authentication tokens will be used.
+ * \param a_newvcache (optional) Set to 1 if the returned vcache was newly
+ *				 allocated.
+ * \param vcinfo (optional) Platform-specific vcache info.
  *
- * \note Environment:
- *	The cache entry is returned with an increased vrefCount field.
- *	The entry must be discarded by calling afs_PutVCache when you
- *	are through using the pointer to the cache entry.
- *
- *	You should not hold any locks when calling this function, except
- *	locks on other vcache entries.  If you lock more than one vcache
- *	entry simultaneously, you should lock them in this order:
- *
- *	    1. Lock all files first, then directories.
- *	    2.  Within a particular type, lock entries in Fid.Vnode order.
- *
- *	This locking hierarchy is convenient because it allows locking
- *	of a parent dir cache entry, given a file (to check its access
- *	control list).  It also allows renames to be handled easily by
- *	locking directories in a constant order.
- *
- * \note NB.  NewVCache -> FlushVCache presently (4/10/95) drops the xvcache lock.
+ * \note See 'afs_GetVCache' for more information.
  */
 struct vcache *
-afs_GetVCache(struct VenusFid *afid, struct vrequest *areq)
+afs_GetVCacheStale(struct vcache *parent, struct VenusFid *afid,
+		   int *a_newvcache, struct afs_osi_vcinfo *vcinfo)
 {
-
-    afs_int32 code, newvcache = 0;
     struct vcache *tvc;
-    struct volume *tvp;
     afs_int32 retry;
-
-    AFS_STATCNT(afs_GetVCache);
 
 #if	defined(AFS_SGI_ENV) && !defined(AFS_SGI53_ENV)
   loop:
@@ -1802,8 +1786,10 @@ afs_GetVCache(struct VenusFid *afid, struct vrequest *areq)
 	UpgradeSToWLock(&afs_xvcache, 21);
 
 	/* no cache entry, better grab one */
-	tvc = afs_NewVCache(afid, NULL);
-	newvcache = 1;
+	tvc = afs_NewVCache_int(parent, afid, NULL, 0, vcinfo);
+	if (a_newvcache) {
+	    *a_newvcache = 1;
+	}
 
 	ConvertWToSLock(&afs_xvcache);
 	if (tvc == NULL)
@@ -1816,6 +1802,61 @@ afs_GetVCache(struct VenusFid *afid, struct vrequest *areq)
     }
 
     ReleaseSharedLock(&afs_xvcache);
+
+    return tvc;
+}
+
+/*!
+ * afs_GetVCache
+ *
+ * Given a file id and a vrequest structure, fetch the status
+ * information associated with the file.
+ *
+ * \param parent A vcache in the same volume as 'afid' (if available).
+ *		 Typically this is the parent vcache for the fid, but some
+ *		 callers use a different vcache (e.g. VerifyVCache2 passes in
+ *		 the same vcache, and dir ops pass in a child of 'afid'). When
+ *		 getting the vcache for the root dir for a volume, 'parent'
+ *		 will be NULL.
+ * \param afid File ID.
+ * \param areq Ptr to associated vrequest structure, specifying the
+ *  user whose authentication tokens will be used.
+ * \param vcinfo (optional) Platform-specific vcache info.
+ *
+ * \note Environment:
+ *	The cache entry is returned with an increased vrefCount field.
+ *	The entry must be discarded by calling afs_PutVCache when you
+ *	are through using the pointer to the cache entry.
+ *
+ *	You should not hold any locks when calling this function, except
+ *	locks on other vcache entries.  If you lock more than one vcache
+ *	entry simultaneously, you should lock them in this order:
+ *
+ *	    1. Lock all files first, then directories.
+ *	    2.  Within a particular type, lock entries in Fid.Vnode order.
+ *
+ *	This locking hierarchy is convenient because it allows locking
+ *	of a parent dir cache entry, given a file (to check its access
+ *	control list).  It also allows renames to be handled easily by
+ *	locking directories in a constant order.
+ *
+ * \note NB.  NewVCache -> FlushVCache presently (4/10/95) drops the xvcache lock.
+ */
+struct vcache *
+afs_GetVCache4(struct vcache *parent, struct VenusFid *afid,
+	       struct vrequest *areq, struct afs_osi_vcinfo *vcinfo)
+{
+
+    afs_int32 code, newvcache = 0;
+    struct vcache *tvc;
+    struct volume *tvp;
+
+    AFS_STATCNT(afs_GetVCache);
+
+    tvc = afs_GetVCacheStale(parent, afid, &newvcache, vcinfo);
+    if (!tvc) {
+	return NULL;
+    }
 
     ObtainWriteLock(&tvc->lock, 54);
 
@@ -1966,9 +2007,14 @@ afs_GetVCache(struct VenusFid *afid, struct vrequest *areq)
     ReleaseWriteLock(&tvc->lock);
     return tvc;
 
-}				/*afs_GetVCache */
+}				/*afs_GetVCache4 */
 
-
+struct vcache *
+afs_GetVCache(struct vcache *parent, struct VenusFid *afid,
+	      struct vrequest *areq)
+{
+    return afs_GetVCache4(parent, afid, areq, NULL);
+}
 
 /*!
  * Lookup a vcache by fid. Look inside the cache first, if not
@@ -2059,7 +2105,7 @@ afs_LookupVCache(struct VenusFid *afid, struct vrequest *areq,
     if (!tvc) {
 	/* no cache entry, better grab one */
 	UpgradeSToWLock(&afs_xvcache, 22);
-	tvc = afs_NewVCache(&nfid, serverp);
+	tvc = afs_NewVCache(adp, &nfid, serverp);
 	newvcache = 1;
 	ConvertWToSLock(&afs_xvcache);
 	if (!tvc)
@@ -2243,7 +2289,7 @@ afs_GetRootVCache(struct VenusFid *afid, struct vrequest *areq,
     if (!tvc) {
 	UpgradeSToWLock(&afs_xvcache, 23);
 	/* no cache entry, better grab one */
-	tvc = afs_NewVCache(afid, NULL);
+	tvc = afs_NewVCache(NULL, afid, NULL);
 	if (!tvc)
 	{
 		ReleaseWriteLock(&afs_xvcache);
