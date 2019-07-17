@@ -7505,3 +7505,31 @@ MapHostToNetwork(struct nvldbentry *entry)
 	entry->serverNumber[i] = htonl(entry->serverNumber[i]);
     }
 }
+
+/*
+ * Add new partitions to the running servers.
+ *
+ * @param[in]  server   server address
+ * @param[out] parts    ids of the partitions attached by this function
+ * @param[out] n_parts  number of new partitions attached
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+int
+UV_LoadPartitions(afs_uint32 server, int *parts, afs_uint32 *n_parts)
+{
+    struct rx_connection *aconn;
+    int code;
+    struct pIDs partIds;
+
+    aconn = UV_Bind(server, AFSCONF_VOLUMEPORT);
+    code = AFSVolLoadPartitions(aconn, &partIds, n_parts);
+
+    memcpy(parts, partIds.partIds, sizeof(partIds.partIds));
+    if (aconn) {
+	rx_DestroyConnection(aconn);
+    }
+    return code;
+}

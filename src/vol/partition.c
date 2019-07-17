@@ -135,6 +135,8 @@ struct DiskPartition64 *DiskPartitionList;
 #define AFS_PARTLOCK_FILE ".volheaders.lock"
 #define AFS_VOLUMELOCK_FILE ".volume.lock"
 
+extern int VInit;
+
 static struct DiskPartition64 *DiskPartitionTable[VOLMAXPARTS+1];
 
 static struct DiskPartition64 * VLookupPartition_r(char * path);
@@ -279,6 +281,20 @@ VCheckPartition(char *part, char *devname, int logging)
     char AFSIDatPath[MAXPATHLEN];
 #endif
 
+#ifdef AFS_DEMAND_ATTACH_FS
+    int dynamic_attach = 0;
+
+    /* if all volumes have been attached, we are trying to add a new partition
+     * to the live servers. */
+    if (VInit > 1) {
+	dynamic_attach = 1;
+    }
+    /* check if the partition is already attached */
+    if (dynamic_attach && VLookupPartition_r(part) != NULL) {
+	return 0;
+    }
+#endif
+
     /* Only keep track of "/vicepx" partitions since it can get hairy
      * when NFS mounts are involved.. */
     if (strncmp(part, VICE_PARTITION_PREFIX, VICE_PREFIX_SIZE)) {
@@ -301,6 +317,38 @@ VCheckPartition(char *part, char *devname, int logging)
 	    "fileserver backend. Aborting...\n", part);
 	return -1;
     }
+
+#ifdef AFS_DEMAND_ATTACH_FS
+    /* new partitions must be empty. this restriction can be relaxed in the
+     * future. */
+    if (dynamic_attach) {
+	DIR *dir;
+	struct dirent *dent;
+	char *ext;
+
+	if ((dir = opendir(part)) == NULL) {
+	    Log("VCheckPartition: Error opening directory.\n");
+	    return -1;
+	}
+	while ((dent = readdir(dir))) {
+	    ext = strrchr(dent->d_name, '.');
+	    if (!ext) {
+		continue;
+	    }
+	    if (!strcmp(ext, ".vol")) {
+		break;
+	    }
+	}
+	/* if this new partition has at least one volume, fail. */
+	if (dent) {
+	    Log("VCheckPartition: %s is not empty.\n", part);
+	    closedir(dir);
+	    return -1;
+	}
+	closedir(dir);
+    }
+#endif
+
 #ifndef AFS_AIX32_ENV
     if (programType == fileServer) {
 	char salvpath[MAXPATHLEN];
@@ -1449,12 +1497,95 @@ AddPartitionToTable_r(struct DiskPartition64 *dp)
     DiskPartitionTable[dp->index] = dp;
 }
 
-#if 0
 static void
 DeletePartitionFromTable_r(struct DiskPartition64 *dp)
 {
     opr_Assert(dp->index >= 0 && dp->index <= VOLMAXPARTS);
     DiskPartitionTable[dp->index] = NULL;
 }
-#endif
+
+/*
+ * Add new partitions to the running server.
+ *
+ * @param[out] parts   ids of the new partitions
+ * @param[out] n_parts number of new partitions
+ *
+ * @return operation status
+ *   @retval 0 success
+ */
+int
+VAttachNewPartitions(int *parts, int *n_parts)
+{
+    int i;
+    int code, id;
+
+    int existed[VOLMAXPARTS + 1];
+
+    *n_parts = 0;
+    memset(existed, 0, sizeof(existed));
+
+    VOL_LOCK;
+    /* remember partitions already attached */
+    for (i = 0; i < VOLMAXPARTS + 1; i++) {
+	if (DiskPartitionTable[i]) {
+	    id = DiskPartitionTable[i]->index;
+	    existed[id] = 1;
+	}
+    }
+    VOL_UNLOCK;
+
+    code = VAttachPartitions();
+
+    VOL_LOCK;
+    for (i = 0; i < VOLMAXPARTS + 1; i++) {
+	if (!DiskPartitionTable[i]) {
+	    continue;
+	}
+	id = DiskPartitionTable[i]->index;
+	if (!existed[id]) {
+	    parts[*n_parts] = DiskPartitionTable[i]->index;
+	    *n_parts += 1;
+	}
+    }
+    VOL_UNLOCK;
+
+    return code;
+}
+
+/*
+ * Delete partition object indexed by id.
+ *
+ * Removes partition object from the partition liked list and from the partition
+ * table. Also, the lock and readme files associated with it will be removed. The
+ * partition in question must be empty.
+ *
+ * @param[in] id partition index number
+ *
+ * @return none
+ */
+void
+VDeletePartitionById(int id)
+{
+    struct DiskPartition64 *curr;
+    struct DiskPartition64 *prev = DiskPartitionList;
+
+    VOL_LOCK;
+    for (curr = DiskPartitionList; curr; curr = curr->next) {
+	if (curr && curr->index == id) {
+	    break;
+	}
+	prev = curr;
+    }
+    if (curr && !curr->vol_list.len) {
+	if (curr == prev) {
+	    DiskPartitionList = curr->next;
+	} else {
+	    prev->next = curr->next;
+	}
+	DeletePartitionFromTable_r(curr);
+	free(curr);
+    }
+    VOL_UNLOCK;
+}
+
 #endif /* AFS_DEMAND_ATTACH_FS */

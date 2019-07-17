@@ -128,6 +128,7 @@ extern int UV_GetSize(afs_uint32 afromvol, afs_uint32 afromserver,
                       struct volintSize *vol_size);
 extern int UV_ConvertRO(afs_uint32 server, afs_uint32 partition, afs_uint32 volid,
 			struct nvldbentry *entry);
+extern int UV_LoadPartitions(afs_uint32 server, int *parts, afs_uint32 *n_parts);
 extern int verbose;
 extern int noresolve;
 #endif

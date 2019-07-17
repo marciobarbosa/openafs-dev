@@ -3158,3 +3158,70 @@ GetPartName(afs_int32 partid, char *pname)
     } else
 	return -1;
 }
+
+static int
+VolLoadPartitions(struct rx_call *acid, struct pIDs *parts, afs_uint32 *n_parts)
+{
+    int code;
+#ifndef AFS_DEMAND_ATTACH_FS
+    code = -1; /* only supported by dafs */
+#else
+    int i;
+    struct DiskPartition64 *dp;
+    char caller[MAXKTCNAMELEN];
+
+    int newparts[VOLMAXPARTS + 1];
+    int n_newparts;
+
+    if (!afsconf_SuperUser(tdir, acid, caller)) {
+	return VOLSERBAD_ACCESS;
+    }
+
+    /* attach new partitions on the volume server */
+    code = VAttachNewPartitions(newparts, &n_newparts);
+    *n_parts = n_newparts;
+
+    if (!code) {
+	/* if we successfully attached the new partitions on the volume server,
+	 * do the same on the fileserver and salvager server. since the
+	 * fileserver does not have the new partitions yet, volume operations
+	 * (create, move) on the new partitions should not succeed. */
+	code = FSYNC_VolOp(0, NULL, FSYNC_PART_LOAD, FSYNC_WHATEVER, NULL);
+    }
+    /* if the attachment did not work as expected in at least one server, remove
+     * the new partitions previously attached to keep the partition list / table
+     * consistent between the servers. */
+    for (i = 0; i < n_newparts; i++) {
+	if (code) {
+	    VDeletePartitionById(newparts[i]);
+	} else {
+	    parts->partIds[i] = newparts[i];
+	    dp = VGetPartitionById(newparts[i], 0);
+	    Log("Partition %s successfully attached\n", dp->name);
+	}
+    }
+#endif
+    return code;
+}
+
+/*
+ * Add new partitions to the running server.
+ *
+ * @param[in]  acid     incoming rx call
+ * @param[out] parts    ids of the partitions attached by this function
+ * @param[out] n_parts  number of new partitions attached
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+int
+SAFSVolLoadPartitions(struct rx_call *acid, struct pIDs *parts, afs_uint32 *n_parts)
+{
+    int code;
+
+    code = VolLoadPartitions(acid, parts, n_parts);
+    osi_auditU(acid, VS_LoadPartEvent, code, AUD_END);
+
+    return code;
+}
