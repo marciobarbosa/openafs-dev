@@ -2027,8 +2027,6 @@ HandleLocking(Vnode * targetptr, struct client *client, afs_int32 rights, ViceLo
 static afs_int32
 CheckWriteMode(Vnode * targetptr, afs_int32 rights, int Prfs_Mode)
 {
-    if (readonlyServer)
-	return (VREADONLY);
     if (!(rights & Prfs_Mode))
 	return (EACCES);
     if ((targetptr->disk.type != vDirectory)
@@ -3292,6 +3290,11 @@ SAFSS_RemoveFile(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     /* set volume synchronization information */
     SetVolumeSync(Sync, volptr);
 
+    /* if this server is read-only, return */
+    if (readonlyServer) {
+	errorCode = VREADONLY;
+	goto Bad_RemoveFile;
+    }
     /* Does the caller has delete (& write) access to the parent directory? */
     if ((errorCode = CheckWriteMode(parentptr, rights, PRSFS_DELETE))) {
 	goto Bad_RemoveFile;
@@ -3431,6 +3434,11 @@ SAFSS_CreateFile(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     /* set volume synchronization information */
     SetVolumeSync(Sync, volptr);
 
+    /* if this server is read-only, return */
+    if (readonlyServer) {
+	errorCode = VREADONLY;
+	goto Bad_CreateFile;
+    }
     /* Can we write (and insert) onto the parent directory? */
     if ((errorCode = CheckWriteMode(parentptr, rights, PRSFS_INSERT))) {
 	goto Bad_CreateFile;
@@ -3626,6 +3634,11 @@ SAFSS_Rename(struct rx_call *acall, struct AFSFid *OldDirFid, char *OldName,
     /* set volume synchronization information */
     SetVolumeSync(Sync, volptr);
 
+    /* if this server is read-only, return */
+    if (readonlyServer) {
+	errorCode = VREADONLY;
+	goto Bad_Rename;
+    }
     if ((errorCode = CheckWriteMode(oldvptr, rights, PRSFS_DELETE))) {
 	goto Bad_Rename;
     }
@@ -4084,6 +4097,11 @@ SAFSS_Symlink(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     /* set volume synchronization information */
     SetVolumeSync(Sync, volptr);
 
+    /* if this server is read-only, return */
+    if (readonlyServer) {
+	errorCode = VREADONLY;
+	goto Bad_SymLink;
+    }
     /* Does the caller has insert (and write) access to the parent directory? */
     if ((errorCode = CheckWriteMode(parentptr, rights, PRSFS_INSERT)))
 	goto Bad_SymLink;
@@ -4264,6 +4282,11 @@ SAFSS_Link(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     /* set volume synchronization information */
     SetVolumeSync(Sync, volptr);
 
+    /* if this server is read-only, return */
+    if (readonlyServer) {
+	errorCode = VREADONLY;
+	goto Bad_Link;
+    }
     /* Can the caller insert into the parent directory? */
     if ((errorCode = CheckWriteMode(parentptr, rights, PRSFS_INSERT))) {
 	goto Bad_Link;
@@ -4440,6 +4463,11 @@ SAFSS_MakeDir(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     /* set volume synchronization information */
     SetVolumeSync(Sync, volptr);
 
+    /* if this server is read-only, return */
+    if (readonlyServer) {
+	errorCode = VREADONLY;
+	goto Bad_MakeDir;
+    }
     /* Write access to the parent directory? */
 #ifdef DIRCREATE_NEED_WRITE
     /*
@@ -4597,6 +4625,11 @@ SAFSS_RemoveDir(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     /* set volume synchronization information */
     SetVolumeSync(Sync, volptr);
 
+    /* if this server is read-only, return */
+    if (readonlyServer) {
+	errorCode = VREADONLY;
+	goto Bad_RemoveDir;
+    }
     /* Does the caller has delete (&write) access to the parent dir? */
     if ((errorCode = CheckWriteMode(parentptr, rights, PRSFS_DELETE))) {
 	goto Bad_RemoveDir;
