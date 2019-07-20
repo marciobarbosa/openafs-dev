@@ -127,6 +127,11 @@ permissions, see the B<fs setacl> reference page.
 
 Don't allow writes to this fileserver.
 
+=item B<-admin-write>
+
+Allow write requests on read-only fileservers for members of
+system:administrators.
+
 =item B<-hr> <I<number of hours between refreshing the host cps>>
 
 Specifies how often the File Server refreshes its knowledge of the

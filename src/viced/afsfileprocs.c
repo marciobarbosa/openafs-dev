@@ -179,6 +179,7 @@ afs_int32 BlocksSpare = 1024;	/* allow 1 MB overruns */
 afs_int32 PctSpare;
 extern afs_int32 implicitAdminRights;
 extern afs_int32 readonlyServer;
+extern afs_int32 adminwriteServer;
 extern int CopyOnWrite_calls, CopyOnWrite_off0, CopyOnWrite_size0;
 extern afs_fsize_t CopyOnWrite_maxsize;
 
@@ -1007,6 +1008,30 @@ VolumeRootVnode(Vnode * targetptr)
 
 }				/*VolumeRootVnode */
 
+/**
+ * Check if the server is read-only.
+ *
+ * This functions checks if the fileserver is read-only for the client received
+ * as an argument. Read-only fileservers allow write requests for members of
+ * system:administrators, if it was initialized with -readonly -admin-write.
+ *
+ * @param[in]  client  calling user
+ *
+ * @return VREADONLY if read-only for this user; 0 otherwise
+ */
+static int
+ReadonlyUser(struct client *client)
+{
+    if (readonlyServer && adminwriteServer) {
+	if (VanillaUser(client)) {
+	    return VREADONLY;
+	}
+    } else if (readonlyServer) {
+	return VREADONLY;
+    }
+    return 0;
+}
+
 /*
  * Check if target file has the proper access permissions for the Fetch
  * (FetchData, FetchACL, FetchStatus) and Store (StoreData, StoreACL,
@@ -1085,7 +1110,7 @@ Check_PermissionRights(Vnode * targetptr, struct client *client,
 	     * unless you are a system administrator */
 	  /******  InStatus->Owner && UnixModeBits better be SET!! */
 	    if (CHOWN(InStatus, targetptr) || CHGRP(InStatus, targetptr)) {
-		if (readonlyServer)
+		if (ReadonlyUser(client))
 		    return (VREADONLY);
 		else if (VanillaUser(client))
 		    return (EPERM);	/* Was EACCES */
@@ -1100,7 +1125,7 @@ Check_PermissionRights(Vnode * targetptr, struct client *client,
 			  (client ? client->z.ViceId : 0), AUD_INT,
 			  CallingRoutine, AUD_END);
 	    } else {
-		if (readonlyServer) {
+		if (ReadonlyUser(client)) {
 		    return (VREADONLY);
 		}
 		if (CallingRoutine == CHK_STOREACL) {
@@ -1111,7 +1136,7 @@ Check_PermissionRights(Vnode * targetptr, struct client *client,
 		    /* watch for chowns and chgrps */
 		    if (CHOWN(InStatus, targetptr)
 			|| CHGRP(InStatus, targetptr)) {
-			if (readonlyServer)
+			if (ReadonlyUser(client))
 			    return (VREADONLY);
 			else if (VanillaUser(client))
 			    return (EPERM);	/* Was EACCES */
@@ -1127,7 +1152,7 @@ Check_PermissionRights(Vnode * targetptr, struct client *client,
 #else
 			(InStatus->UnixModeBits & (S_ISUID | S_ISGID)) != 0) {
 #endif
-			if (readonlyServer)
+			if (ReadonlyUser(client))
 			    return (VREADONLY);
 			if (VanillaUser(client))
 			    return (EACCES);
@@ -1137,7 +1162,7 @@ Check_PermissionRights(Vnode * targetptr, struct client *client,
 				      CallingRoutine, AUD_END);
 		    }
 		    if (CallingRoutine == CHK_STOREDATA) {
-			if (readonlyServer)
+			if (ReadonlyUser(client))
 			    return (VREADONLY);
 			if (!(rights & PRSFS_WRITE))
 			    return (EACCES);
@@ -1166,7 +1191,7 @@ Check_PermissionRights(Vnode * targetptr, struct client *client,
 #endif
 			    if ((targetptr->disk.type != vDirectory)
 				&& (!(targetptr->disk.modeBits & OWNERWRITE))) {
-			    if (readonlyServer)
+			    if (ReadonlyUser(client))
 				return (VREADONLY);
 			    if (VanillaUser(client))
 				return (EACCES);
@@ -1176,7 +1201,7 @@ Check_PermissionRights(Vnode * targetptr, struct client *client,
 					  AUD_INT, CallingRoutine, AUD_END);
 			}
 		    } else {	/* a status store */
-			if (readonlyServer)
+			if (ReadonlyUser(client))
 			    return (VREADONLY);
 			if (targetptr->disk.type == vDirectory) {
 			    if (!(rights & PRSFS_DELETE)
@@ -3291,7 +3316,7 @@ SAFSS_RemoveFile(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     SetVolumeSync(Sync, volptr);
 
     /* if this server is read-only, return */
-    if (readonlyServer) {
+    if (ReadonlyUser(client)) {
 	errorCode = VREADONLY;
 	goto Bad_RemoveFile;
     }
@@ -3435,7 +3460,7 @@ SAFSS_CreateFile(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     SetVolumeSync(Sync, volptr);
 
     /* if this server is read-only, return */
-    if (readonlyServer) {
+    if (ReadonlyUser(client)) {
 	errorCode = VREADONLY;
 	goto Bad_CreateFile;
     }
@@ -3635,7 +3660,7 @@ SAFSS_Rename(struct rx_call *acall, struct AFSFid *OldDirFid, char *OldName,
     SetVolumeSync(Sync, volptr);
 
     /* if this server is read-only, return */
-    if (readonlyServer) {
+    if (ReadonlyUser(client)) {
 	errorCode = VREADONLY;
 	goto Bad_Rename;
     }
@@ -3722,7 +3747,7 @@ SAFSS_Rename(struct rx_call *acall, struct AFSFid *OldDirFid, char *OldName,
         goto Bad_Rename;
     }
     if (!code) {
-	if (readonlyServer) {
+	if (ReadonlyUser(client)) {
 	    errorCode = VREADONLY;
 	    goto Bad_Rename;
 	}
@@ -4098,7 +4123,7 @@ SAFSS_Symlink(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     SetVolumeSync(Sync, volptr);
 
     /* if this server is read-only, return */
-    if (readonlyServer) {
+    if (ReadonlyUser(client)) {
 	errorCode = VREADONLY;
 	goto Bad_SymLink;
     }
@@ -4112,7 +4137,7 @@ SAFSS_Symlink(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
      * to do this.
      */
     if ((InStatus->Mask & AFS_SETMODE) && !(InStatus->UnixModeBits & 0111)) {
-	if (readonlyServer) {
+	if (ReadonlyUser(client)) {
 	    errorCode = VREADONLY;
 	    goto Bad_SymLink;
 	}
@@ -4283,7 +4308,7 @@ SAFSS_Link(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     SetVolumeSync(Sync, volptr);
 
     /* if this server is read-only, return */
-    if (readonlyServer) {
+    if (ReadonlyUser(client)) {
 	errorCode = VREADONLY;
 	goto Bad_Link;
     }
@@ -4464,7 +4489,7 @@ SAFSS_MakeDir(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     SetVolumeSync(Sync, volptr);
 
     /* if this server is read-only, return */
-    if (readonlyServer) {
+    if (ReadonlyUser(client)) {
 	errorCode = VREADONLY;
 	goto Bad_MakeDir;
     }
@@ -4626,7 +4651,7 @@ SAFSS_RemoveDir(struct rx_call *acall, struct AFSFid *DirFid, char *Name,
     SetVolumeSync(Sync, volptr);
 
     /* if this server is read-only, return */
-    if (readonlyServer) {
+    if (ReadonlyUser(client)) {
 	errorCode = VREADONLY;
 	goto Bad_RemoveDir;
     }
@@ -5989,7 +6014,7 @@ SRXAFS_SetVolumeStatus(struct rx_call * acall, afs_int32 avolid,
 			  &rights, &anyrights)))
 	goto Bad_SetVolumeStatus;
 
-    if (readonlyServer) {
+    if (ReadonlyUser(client)) {
 	errorCode = VREADONLY;
 	goto Bad_SetVolumeStatus;
     }
