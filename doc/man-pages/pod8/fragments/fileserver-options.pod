@@ -127,6 +127,12 @@ permissions, see the B<fs setacl> reference page.
 
 Don't allow writes to this fileserver.
 
+=item B<-admin-write>
+
+If -readonly is also specified, this flag allows write requests for members of
+system:administrators on the read-only fileserver in question. If -readonly is
+not specified, this flag does nothing.
+
 =item B<-hr> <I<number of hours between refreshing the host cps>>
 
 Specifies how often the File Server refreshes its knowledge of the
