@@ -5181,6 +5181,7 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 {
     afs_int32 vcode;
     struct nvldbentry entry, storeEntry;
+    afs_uint32 volid_ro;
 
     vcode = ubik_VL_SetLock(cstruct, 0, volid, RWVOL, VLOP_ADDSITE);
     if (vcode) {
@@ -5197,6 +5198,7 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 	PrintError("", vcode);
 	return (vcode);
     }
+    volid_ro = entry.volumeId[ROVOL];
     MapHostToNetwork(&entry);
     if (!Lp_ROMatch(server, part, &entry)) {
 	/*this site doesnot exist  */
@@ -5221,7 +5223,7 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 	if (entry.nServers < 1) {	/*this is the last ref */
 	    VPRINT1("Deleting the VLDB entry for %u ...", volid);
 	    fflush(STDOUT);
-	    vcode = ubik_VL_DeleteEntry(cstruct, 0, volid, ROVOL);
+	    vcode = ubik_VL_DeleteEntry(cstruct, 0, volid_ro, ROVOL);
 	    if (vcode) {
 		fprintf(STDERR,
 			"Could not delete VLDB entry for volume %lu \n",
@@ -5230,6 +5232,7 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 		return (vcode);
 	    }
 	    VDONE;
+	    return 0;
 	}
 	MapNetworkToHost(&entry, &storeEntry);
 	fprintf(STDOUT, "Deleting the replication site for volume %lu ...",
