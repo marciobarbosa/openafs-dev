@@ -585,6 +585,12 @@ extern int ubik_ClientInit(struct rx_connection **serverconns,
 			   struct ubik_client **aclient);
 extern afs_int32 ubik_ClientDestroy(struct ubik_client *aclient);
 extern struct rx_connection *ubik_RefreshConn(struct rx_connection *tc);
+
+typedef afs_int32 (*ubik_callrock_func)(struct rx_connection *tc, void *rock);
+extern afs_int32 ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
+			       ubik_callrock_func, void *rock)
+			       AFS_NONNULL((1,3));
+
 #ifdef UBIK_LEGACY_CALLITER
 extern afs_int32 ubik_CallIter(int (*aproc) (), struct ubik_client *aclient,
 			       afs_int32 aflags, int *apos, long p1, long p2,
