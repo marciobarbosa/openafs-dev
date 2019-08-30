@@ -89,6 +89,59 @@ extern int LogLevel; /* For logging macros only. */
 #define ViceLogThenPanic(level, str) \
     do { ViceLog(level, str); osi_Panic str; } while(0);
 
+/*
+ * A simple helper for rate-limiting log messages. Use like so:
+ *
+ * static time_t lastlog;
+ * if (ViceLog_ratelimit(&lastlog, 60)) {
+ *     ViceLog(0, ("Some message.\n"));
+ * }
+ *
+ * This will try to limit the relevant log message to being logged about once
+ * per minute, using 'lastlog' as a place to store the last log time.
+ * Protecting 'a_last' from access in other threads is the responsibility of
+ * the caller.
+ */
+static_inline int
+ViceLog_ratelimit(time_t *a_last, time_t interval)
+{
+    time_t now = time(NULL);
+    if (now < *a_last || now - *a_last >= interval) {
+	*a_last = now;
+	return 1;
+    }
+    return 0;
+}
+
+/*
+ * A ViceLog variant that rate-limits potentially-frequent messages to avoid
+ * flooding the log. Use like so:
+ *
+ * ViceLog_timedlimit(60, 0, ("Some message.\n"));
+ *
+ * And the given message will be limiting to being logged at most about once
+ * per minute. The rate-limiting logic is not protected against simultaneous
+ * access from different threads, so we may exceed the given limit temporarily,
+ * but practically speaking this should be fairly minimal.
+ */
+#define ViceLog_timedlimit(interval, level, str) do { \
+    if ((level) <= LogLevel) { \
+	static time_t _last; \
+	if (ViceLog_ratelimit(&_last, (interval))) { \
+	    (FSLog str); \
+	} \
+    } \
+} while (0)
+
+/*
+ * A ViceLog variant that tries to avoid flooding the log. Use just like
+ * ViceLog(), but we'll rate-limit how often we actually log the given message,
+ * to avoid flooding the log.
+ */
+#define VICELOG_RATELIMIT_DEFAULT 60
+#define ViceLog_limit(level, str) \
+	ViceLog_timedlimit(VICELOG_RATELIMIT_DEFAULT, level, str)
+
 extern int OpenLog(struct logOptions *opts);
 extern int ReOpenLog(void);
 extern void SetupLogSignals(void);
