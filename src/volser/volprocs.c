@@ -63,6 +63,8 @@ extern int DoPreserveVolumeStats;
 extern int restrictedQueryLevel;
 extern enum vol_s2s_crypt doCrypt;
 
+extern int VInit;
+
 extern void LogError(afs_int32 errcode);
 
 /* Forward declarations */
@@ -3157,4 +3159,88 @@ GetPartName(afs_int32 partid, char *pname)
 	return 0;
     } else
 	return -1;
+}
+
+#ifdef AFS_DEMAND_ATTACH_FS
+static int
+VolLoadPartitions(struct rx_call *acid, struct partEntries *pEntries)
+{
+    int code, i;
+    char caller[MAXKTCNAMELEN];
+
+    struct DiskPartition64 *dp;
+    int newparts[VOLMAXPARTS + 1];
+    int n_newparts;
+
+    if (!afsconf_SuperUser(tdir, acid, caller)) {
+	return VOLSERBAD_ACCESS;
+    }
+    VOL_LOCK;
+    /* do not attempt to attach new partitions if initialization is not
+     * complete. */
+    if (VInit < 2) {
+	code = VOLSERNO_OP;
+	goto done;
+    }
+    /* attach new partitions on the volume server */
+    code = VAttachNewPartitions(newparts, VOLMAXPARTS + 1, &n_newparts);
+
+    if (!code) {
+	/* if we successfully attached the new partitions on the volume server,
+	 * do the same on the fileserver and salvager server. */
+	code = FSYNC_VolOp(0, NULL, FSYNC_PART_LOAD, FSYNC_WHATEVER, NULL);
+    }
+    if (!code) {
+	pEntries->partEntries_val = calloc(n_newparts, sizeof(int));
+
+	if (!pEntries->partEntries_val) {
+	    code = ENOMEM;
+	    goto done;
+	}
+	pEntries->partEntries_len = n_newparts;
+    } else {
+	pEntries->partEntries_val = NULL;
+	pEntries->partEntries_len = 0;
+    }
+    /* if the attachment did not work as expected in at least one server, remove
+     * the new partitions previously attached to keep the partition list / table
+     * consistent between the servers. */
+    for (i = 0; i < n_newparts; i++) {
+	if (code) {
+	    VDeletePartitionById(newparts[i]);
+	} else {
+	    pEntries->partEntries_val[i] = newparts[i];
+	    dp = VGetPartitionById_r(newparts[i], 0);
+	    Log("Partition %s successfully attached\n", dp->name);
+	}
+    }
+    if (code) {
+	code = VOLSERNO_OP;
+    }
+ done:
+    VOL_UNLOCK;
+
+    return code;
+}
+#endif
+
+/*
+ * Add new partitions to the running server.
+ *
+ * @param[in]  acid      incoming rx call
+ * @param[out] pEntries  ids of the partitions attached by this function
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+int
+SAFSVolLoadPartitions(struct rx_call *acid, struct partEntries *pEntries)
+{
+    int code = RXGEN_OPCODE;
+#ifdef AFS_DEMAND_ATTACH_FS
+    code = VolLoadPartitions(acid, pEntries);
+    osi_auditU(acid, VS_LoadPartEvent, code, AUD_END);
+#endif
+    return code;
 }

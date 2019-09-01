@@ -113,6 +113,7 @@ static afs_int32 SALVSYNC_com_Cancel(SALVSYNC_command * com, SALVSYNC_response *
 static afs_int32 SALVSYNC_com_Query(SALVSYNC_command * com, SALVSYNC_response * res);
 static afs_int32 SALVSYNC_com_CancelAll(SALVSYNC_command * com, SALVSYNC_response * res);
 static afs_int32 SALVSYNC_com_Link(SALVSYNC_command * com, SALVSYNC_response * res);
+static afs_int32 SALVSYNC_com_LoadPart(SALVSYNC_command * com, SALVSYNC_response * res);
 
 
 extern int VInit;
@@ -456,6 +457,10 @@ SALVSYNC_com(osi_socket fd)
     case SALVSYNC_OP_LINK:
 	/* link a clone to its parent in the scheduler */
 	res.hdr.response = SALVSYNC_com_Link(&scom, &sres);
+	break;
+    case SALVSYNC_PART_LOAD:
+	/* load new partitions */
+	res.hdr.response = SALVSYNC_com_LoadPart(&scom, &sres);
 	break;
     default:
 	res.hdr.response = SYNC_BAD_COMMAND;
@@ -1357,6 +1362,43 @@ SALVSYNC_doneWorkByPid(int pid, int status)
 	    }
 	}
     }
+}
+
+/*
+ * Add new partitions to the running server.
+ *
+ * @param[in]  com  inbound command object
+ * @param[out] res  outbound response object
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ *
+ * @pre VOL_LOCK must be held
+ */
+static int
+SALVSYNC_com_LoadPart(SALVSYNC_command * com, SALVSYNC_response * res)
+{
+    int i, code;
+
+    struct DiskPartition64 *dp;
+    int newparts[VOLMAXPARTS + 1];
+    int n_newparts;
+
+    /* attach new partitions on salvager */
+    code = VAttachNewPartitions(newparts, VOLMAXPARTS + 1, &n_newparts);
+
+    /* if the attachment did not work as expected, remove the partitions
+     * previously attached. */
+    for (i = 0; i < n_newparts; i++) {
+	if (code) {
+	    VDeletePartitionById(newparts[i]);
+	} else {
+	    dp = VGetPartitionById_r(newparts[i], 0);
+	    Log("Partition %s successfully attached\n", dp->name);
+	}
+    }
+    return code;
 }
 
 #endif /* AFS_DEMAND_ATTACH_FS */
