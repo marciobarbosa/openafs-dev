@@ -322,8 +322,11 @@ if [ x"$PASS1" = x1 ]; then
 		   "$PKGROOT"/Library/OpenAFS/Tools/tools/aklog.bundle \
 		   "$PLUGINS"/afscell.bundle
 	do
-	    codesign --verbose --force --timestamp --sign "$APP_KEY" "$obj"
+	    codesign --verbose --force --timestamp --sign "$APP_KEY" --options runtime "$obj"
 	done
+
+	find "$PKGROOT" -perm +111 -type f -exec codesign --verbose --force \
+	    --timestamp --sign "$APP_KEY" --options runtime {} \;
 
 	# Check if our signatures for our kexts are valid. 'kextutil' will exit
 	# with an error and print out a message if something is wrong with the
