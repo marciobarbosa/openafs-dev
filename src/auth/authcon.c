@@ -27,6 +27,7 @@
 #include <afs/pthread_glock.h>
 #include <afs/afsutil.h>
 #include <afs/opr.h>
+#include <opr/time64.h>
 
 #include "cellconfig.h"
 #include "keys.h"
@@ -36,6 +37,7 @@
 
 #ifdef AFS_RXGK_ENV
 # include <rx/rxgk.h>
+# include <afs/token.h>
 #endif
 
 /* return a null security object if nothing else can be done */
@@ -335,15 +337,67 @@ afsconf_ClientAuthToken(struct afsconf_cell *info,
     *sc = NULL;
     *scIndex = RX_SECIDX_NULL;
 
-    if ((flags & AFSCONF_SECOPTS_RXGK)) {
-	/* We don't support non-printed rxgk tokens yet */
-	code = AFSCONF_NO_SECURITY_CLASS;
-	goto out;
-    }
-
     code = ktc_GetTokenEx(info->name, &tokenSet);
     if (code)
 	goto out;
+
+#ifdef AFS_RXGK_ENV
+    if ((flags & AFSCONF_SECOPTS_RXGK)) {
+	struct ktc_tokenUnion tokenU;
+	token_rxgk *rxgkToken;
+	RXGK_Level level;
+	rxgk_key k0 = NULL;
+	RXGK_Data tokenblob;
+
+	code = token_findByType(tokenSet, AFSTOKEN_UNION_GK, &tokenU);
+	if (code != 0) {
+	    goto out;
+	}
+
+	rxgkToken = &tokenU.ktc_tokenUnion_u.at_gk;
+	level = rxgkToken->gk_level;
+
+	/* Our token specifies what security level it is for. Check if the
+	 * flags given to us contradict that security level. */
+	if (level != RXGK_LEVEL_CLEAR && (flags & AFSCONF_SECOPTS_ALWAYSCLEAR)) {
+	    code = RXGK_BADLEVEL;
+	}
+	if (level == RXGK_LEVEL_CRYPT && (flags & AFSCONF_SECOPTS_NEVERENCRYPT)) {
+	    code = RXGK_BADLEVEL;
+	}
+	if (level != RXGK_LEVEL_CRYPT && (flags & AFSCONF_SECOPTS_ALWAYSENCRYPT)) {
+	    code = RXGK_BADLEVEL;
+	}
+	if (code != 0) {
+	    goto out;
+	}
+
+	code = rxgk_make_key(&k0, rxgkToken->gk_k0.gk_k0_val,
+			     rxgkToken->gk_k0.gk_k0_len,
+			     rxgkToken->gk_enctype);
+	if (code != 0) {
+	    goto out;
+	}
+
+	tokenblob.val = rxgkToken->gk_token.gk_token_val;
+	tokenblob.len = rxgkToken->gk_token.gk_token_len;
+
+	*sc = rxgk_NewClientSecurityObject(level, rxgkToken->gk_enctype, k0,
+					   &tokenblob);
+	*scIndex = RX_SECIDX_GK;
+	if (expires) {
+	    *expires = opr_time64_toSecs(&rxgkToken->gk_expiration);
+	}
+
+	rxgk_release_key(&k0);
+	goto out;
+    }
+#else /* AFS_RXGK_ENV */
+    if ((flags & AFSCONF_SECOPTS_RXGK)) {
+	code = AFSCONF_NO_SECURITY_CLASS;
+	goto out;
+    }
+#endif
 
     code = token_extractRxkad(tokenSet, &ttoken, NULL, NULL);
     if (code == 0) {

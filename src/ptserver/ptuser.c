@@ -284,35 +284,45 @@ pr_Initialize2(IN afs_int32 secLevel, IN const char *confDir, IN char *cell,
     case RXGK_LEVEL_AUTH:
     case RXGK_LEVEL_CRYPT:
 	use_rxgk = 1;
-	if (secLevel != 2) {
-	    fprintf(stderr, "libprot: Cannot use rxgk with non-localauth right now\n");
-	    return EINVAL;
-	}
     }
 
     /* Most callers use secLevel==1, however, the fileserver uses secLevel==2
      * to force use of the KeyFile.  secLevel == 0 implies -noauth was
      * specified. */
-    if (use_rxgk) {
-	switch (rxgk_level) {
-	case RXGK_LEVEL_CLEAR: code = afsconf_ClientAuthRXGKClear(tdir, &sc, &scIndex);
-			       break;
-	case RXGK_LEVEL_AUTH:  code = afsconf_ClientAuthRXGKAuth(tdir, &sc, &scIndex);
-			       break;
-	case RXGK_LEVEL_CRYPT: code = afsconf_ClientAuthRXGKCrypt(tdir, &sc, &scIndex);
+    if (secLevel == 2) {
+	if (use_rxgk) {
+	    switch (rxgk_level) {
+	    case RXGK_LEVEL_CLEAR: code = afsconf_ClientAuthRXGKClear(tdir, &sc, &scIndex);
+				   break;
+	    case RXGK_LEVEL_AUTH:  code = afsconf_ClientAuthRXGKAuth(tdir, &sc, &scIndex);
+				   break;
+	    case RXGK_LEVEL_CRYPT: code = afsconf_ClientAuthRXGKCrypt(tdir, &sc, &scIndex);
+	    }
+	    if (code)
+		afs_com_err(whoami, code, "(calling client rxgk)");
+	} else {
+	    code = afsconf_ClientAuthSecure(tdir, &sc, &scIndex);
+	    if (code)
+		afs_com_err(whoami, code, "(calling client secure)\n");
 	}
-	if (code)
-	    afs_com_err(whoami, code, "(calling client rxgk)");
-    } else if (secLevel == 2) {
-	/* If secLevel is two assume we're on a file server and use
-	 * ClientAuthSecure if possible. */
-	code = afsconf_ClientAuthSecure(tdir, &sc, &scIndex);
-	if (code)
-	    afs_com_err(whoami, code, "(calling client secure)\n");
     } else if (secLevel > 0) {
 	secFlags = 0;
-	if (secLevel > 1)
-	    secFlags |= AFSCONF_SECOPTS_ALWAYSENCRYPT;
+	if (use_rxgk) {
+	    secFlags |= AFSCONF_SECOPTS_RXGK;
+	    switch (rxgk_level) {
+	    case RXGK_LEVEL_CLEAR:
+		secFlags |= AFSCONF_SECOPTS_ALWAYSCLEAR;
+		break;
+	    case RXGK_LEVEL_AUTH:
+		secFlags |= AFSCONF_SECOPTS_NEVERENCRYPT;
+		break;
+	    case RXGK_LEVEL_CRYPT:
+		secFlags |= AFSCONF_SECOPTS_ALWAYSENCRYPT;
+	    }
+	} else {
+	    if (secLevel > 1)
+		secFlags |= AFSCONF_SECOPTS_ALWAYSENCRYPT;
+	}
 
 	code = afsconf_ClientAuthToken(&info, secFlags, &sc, &scIndex, NULL);
 	if (code) {
