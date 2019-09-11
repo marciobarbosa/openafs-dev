@@ -7409,3 +7409,47 @@ MapHostToNetwork(struct nvldbentry *entry)
 	entry->serverNumber[i] = htonl(entry->serverNumber[i]);
     }
 }
+
+/**
+ * Add new partitions to the running servers.
+ *
+ * @param[in]  server   server address
+ * @param[out] parts    ids of the partitions attached by this function
+ * @param[out] n_parts  number of new partitions attached
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+int
+UV_AttachPartitions(afs_uint32 server, struct partList *parts, afs_uint32 *n_parts)
+{
+    struct rx_connection *aconn;
+    struct partEntries partEnts;
+    int code, i;
+
+    partEnts.partEntries_len = 0;
+    partEnts.partEntries_val = NULL;
+
+    aconn = UV_Bind(server, AFSCONF_VOLUMEPORT);
+    code = AFSVolAttachPartitions(aconn, &partEnts);
+
+    if (code == 0) {
+	*n_parts = partEnts.partEntries_len;
+	if (*n_parts > VOLMAXPARTS) {
+	    fprintf(STDERR,
+		    "Warning: number of partitions too high %d (process only %d)\n",
+		    *n_parts, VOLMAXPARTS);
+	    *n_parts = VOLMAXPARTS;
+	}
+	for (i = 0; i < *n_parts; i++) {
+	    parts->partId[i] = partEnts.partEntries_val[i];
+	    parts->partFlags[i] = PARTVALID;
+	}
+	free(partEnts.partEntries_val);
+    }
+    if (aconn) {
+	rx_DestroyConnection(aconn);
+    }
+    return code;
+}

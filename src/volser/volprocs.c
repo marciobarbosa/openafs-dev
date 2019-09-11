@@ -62,6 +62,7 @@ extern struct afsconf_dir *tdir;
 extern int DoPreserveVolumeStats;
 extern int restrictedQueryLevel;
 extern enum vol_s2s_crypt doCrypt;
+extern int VInit;
 
 extern void LogError(afs_int32 errcode);
 
@@ -3157,4 +3158,89 @@ GetPartName(afs_int32 partid, char *pname)
 	return 0;
     } else
 	return -1;
+}
+
+#ifdef AFS_DEMAND_ATTACH_FS
+static int
+VolAttachPartitions(struct rx_call *acid, struct partEntries *pEntries)
+{
+    int code, i;
+    char caller[MAXKTCNAMELEN];
+
+    struct DiskPartition64 *dp;
+    int newparts[VOLMAXPARTS + 1];
+    int n_newparts = 0;
+
+    if (!afsconf_SuperUser(tdir, acid, caller)) {
+	return VOLSERBAD_ACCESS;
+    }
+
+    VOL_LOCK;
+    /* do not attach new partitions if initialization is not complete */
+    if (VInit < 2) {
+	VOL_UNLOCK;
+	return VOLSERVOLBUSY;
+    }
+    VOL_UNLOCK;
+
+    VPARTLOAD_LOCK;
+    /* attach new partitions on the fileserver and salvager server */
+    code = FSYNC_VolOp(0, NULL, FSYNC_ATTACH_PART, FSYNC_WHATEVER, NULL);
+
+    if (code == 0) {
+	/* if we successfully attached the new partitions on the fileserver and
+	 * salvager server, do the same on the volume server. since the volume
+	 * server does not have the new partitions yet, volume operations
+	 * (create, move) on the new partitions should not suceed. */
+	code = VAttachNewPartitions(newparts, VOLMAXPARTS + 1, &n_newparts);
+    }
+    if (n_newparts > 0) {
+	pEntries->partEntries_val =
+	    calloc(n_newparts, sizeof(pEntries->partEntries_val[0]));
+
+	if (pEntries->partEntries_val == NULL) {
+	    VPARTLOAD_UNLOCK;
+	    return ENOMEM;
+	}
+    }
+    pEntries->partEntries_len = n_newparts;
+
+    for (i = 0; i < n_newparts; i++) {
+	pEntries->partEntries_val[i] = newparts[i];
+	dp = VGetPartitionById(newparts[i], 0);
+	if (dp != NULL) {
+	    Log("VolAttachPartitions: %s successfully attached\n", dp->name);
+	} else {
+	    Log("VolAttachPartitions: %d (id) successfully attached\n", newparts[i]);
+	}
+    }
+    if (code != 0) {
+	Log("VolAttachPartitions: could not attach all new partitions\n");
+	code = VOLSERNO_OP;
+    }
+    VPARTLOAD_UNLOCK;
+
+    return code;
+}
+#endif
+
+/**
+ * Add new partitions to the running server.
+ *
+ * @param[in]  acid      incoming rx call
+ * @param[out] pEntries  ids of the partitions attached by this function
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+int
+SAFSVolAttachPartitions(struct rx_call *acid, struct partEntries *pEntries)
+{
+    int code = RXGEN_OPCODE;
+#ifdef AFS_DEMAND_ATTACH_FS
+    code = VolAttachPartitions(acid, pEntries);
+    osi_auditU(acid, VS_LoadPartEvent, code, AUD_END);
+#endif
+    return code;
 }

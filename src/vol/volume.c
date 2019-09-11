@@ -113,6 +113,7 @@
 #ifdef AFS_PTHREAD_ENV
 pthread_mutex_t vol_glock_mutex;
 pthread_mutex_t vol_trans_mutex;
+pthread_mutex_t vol_partload_mutex;
 pthread_cond_t vol_put_volume_cond;
 pthread_cond_t vol_sleep_cond;
 pthread_cond_t vol_init_attach_cond;
@@ -567,6 +568,7 @@ VInitVolumePackage2(ProgramType pt, VolumePackageOptions * opts)
 
     opr_mutex_init(&vol_glock_mutex);
     opr_mutex_init(&vol_trans_mutex);
+    opr_mutex_init(&vol_partload_mutex);
     opr_cv_init(&vol_put_volume_cond);
     opr_cv_init(&vol_sleep_cond);
     opr_cv_init(&vol_init_attach_cond);
@@ -613,7 +615,7 @@ VInitVolumePackage2(ProgramType pt, VolumePackageOptions * opts)
     VInitVnodes(vSmall, opts->nSmallVnodes);
 
 
-    errors = VAttachPartitions();
+    errors = VAttachPartitions(0);
     if (errors)
 	return -1;
 

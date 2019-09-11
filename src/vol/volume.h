@@ -62,6 +62,7 @@ typedef bit32 FileOffset;	/* Offset in this file */
 #include <pthread.h>
 extern pthread_mutex_t vol_glock_mutex;
 extern pthread_mutex_t vol_trans_mutex;
+extern pthread_mutex_t vol_partload_mutex;
 extern pthread_cond_t vol_put_volume_cond;
 extern pthread_cond_t vol_sleep_cond;
 extern pthread_cond_t vol_vinit_cond;
@@ -97,6 +98,8 @@ extern pthread_t vol_glock_holder;
 #define VSALVSYNC_UNLOCK opr_mutex_exit(&vol_salvsync_mutex)
 #define VTRANS_LOCK opr_mutex_enter(&vol_trans_mutex)
 #define VTRANS_UNLOCK opr_mutex_exit(&vol_trans_mutex)
+#define VPARTLOAD_LOCK opr_mutex_enter(&vol_partload_mutex)
+#define VPARTLOAD_UNLOCK opr_mutex_exit(&vol_partload_mutex)
 #else /* AFS_PTHREAD_ENV */
 #define VOL_LOCK
 #define VOL_UNLOCK
@@ -104,6 +107,8 @@ extern pthread_t vol_glock_holder;
 #define VSALVSYNC_UNLOCK
 #define VTRANS_LOCK
 #define VTRANS_UNLOCK
+#define VPARTLOAD_LOCK
+#define VPARTLOAD_UNLOCK
 #endif /* AFS_PTHREAD_ENV */
 
 /**
