@@ -162,6 +162,7 @@ static afs_int32 FSYNC_com_VolOpQuery(FSSYNC_VolOp_command * com, SYNC_response 
 static afs_int32 FSYNC_com_VGQuery(FSSYNC_VolOp_command * com, SYNC_response * res);
 static afs_int32 FSYNC_com_VGScan(FSSYNC_VolOp_command * com, SYNC_response * res);
 static afs_int32 FSYNC_com_VGScanAll(FSSYNC_VolOp_command * com, SYNC_response * res);
+static afs_int32 FSYNC_com_AttachPart(FSSYNC_VolOp_command * com, SYNC_response * res);
 #endif /* AFS_DEMAND_ATTACH_FS */
 
 static afs_int32 FSYNC_com_VnQry(osi_socket fd, SYNC_command * com, SYNC_response * res);
@@ -519,6 +520,7 @@ FSYNC_com(osi_socket fd)
     case FSYNC_VG_QUERY:
     case FSYNC_VG_SCAN:
     case FSYNC_VG_SCAN_ALL:
+    case FSYNC_ATTACH_PART:
 #endif
 	res.hdr.response = FSYNC_com_VolOp(fd, &com, &res);
 	break;
@@ -634,6 +636,9 @@ FSYNC_com_VolOp(osi_socket fd, SYNC_command * com, SYNC_response * res)
 	break;
     case FSYNC_VG_SCAN_ALL:
 	code = FSYNC_com_VGScanAll(&vcom, res);
+	break;
+    case FSYNC_ATTACH_PART:
+	code = FSYNC_com_AttachPart(&vcom, res);
 	break;
 #endif /* AFS_DEMAND_ATTACH_FS */
     default:
@@ -1733,6 +1738,57 @@ FSYNC_com_VGScanAll(FSSYNC_VolOp_command * com, SYNC_response * res)
     if (VVGCache_scanStart_r(NULL) == 0) {
 	code = SYNC_OK;
     }
+
+    return code;
+}
+
+/**
+ * Add new partitions to the running server.
+ *
+ * @param[in]  vcom  pointer to command packet
+ * @param[out] res   response
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+static int
+FSYNC_com_AttachPart(FSSYNC_VolOp_command * vcom, SYNC_response * res)
+{
+    int i, code;
+
+    struct DiskPartition64 *dp;
+    int newparts[VOLMAXPARTS + 1];
+    int n_newparts;
+
+    VOL_UNLOCK;
+    /* attach new partitions on the fileserver */
+    code = VAttachNewPartitions(newparts, VOLMAXPARTS + 1, &n_newparts);
+
+    if (code == 0) {
+	/* attach new partitions on salvager */
+	code = SALVSYNC_SalvageVolume(0, NULL, SALVSYNC_ATTACH_PART,
+				      SALVSYNC_WHATEVER, 0, NULL);
+    }
+    /* if the attachment did not work as expected, remove the partitions
+     * previously attached. */
+    for (i = 0; i < n_newparts; i++) {
+	if (code != 0) {
+	    VDeletePartitionById(newparts[i]);
+	} else {
+	    dp = VGetPartitionById(newparts[i], 0);
+	    if (dp != NULL) {
+		ViceLog(0, ("FSYNC_com_AttachPart: %s attached\n", dp->name));
+	    } else {
+		ViceLog(0, ("FSYNC_com_AttachPart: %d (id) attached\n", newparts[i]));
+	    }
+	}
+    }
+    if (code != 0) {
+	ViceLog(0, ("FSYNC_com_AttachPart: could not attach new partitions\n"));
+	code = SYNC_FAILED;
+    }
+    VOL_LOCK;
 
     return code;
 }
