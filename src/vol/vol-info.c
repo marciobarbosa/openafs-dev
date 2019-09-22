@@ -1696,6 +1696,44 @@ ModeMaskMatch(struct VolInfoOpt *opt, unsigned int modeBits)
     return 1;
 }
 
+static void
+ProcessVnodes(struct VolInfoOpt *opt, afs_sfsize_t nvnodes, afs_int32 disksize,
+	      VnodeClass class, Volume *vp, StreamHandle_t *file)
+{
+    int i;
+    char buf[SIZEOF_LARGEDISKVNODE];
+    struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
+    struct VnodeDetails vnodeDetails;
+
+    struct opr_queue *scanList = &VnodeScanLists[class];
+    struct opr_queue *cursor;
+    struct VnodeScanProc *entry;
+
+    afs_foff_t offset = 0;
+
+    for (i = 0; nvnodes && STREAM_READ(vnode, disksize, 1, file) == 1; i++) {
+	if (!ModeMaskMatch(opt, vnode->modeBits)) {
+	    continue;
+	}
+	memset(&vnodeDetails, 0, sizeof(struct VnodeDetails));
+	vnodeDetails.vp = vp;
+	vnodeDetails.class = class;
+	vnodeDetails.vnode = vnode;
+	vnodeDetails.vnodeNumber = bitNumberToVnodeNumber(i, class);
+	vnodeDetails.offset = offset;
+	vnodeDetails.index = i;
+
+	for (opr_queue_Scan(scanList, cursor)) {
+	    entry = (struct VnodeScanProc *)cursor;
+	    if (entry->proc) {
+		(*entry->proc) (opt, &vnodeDetails);
+	    }
+	}
+	nvnodes--;
+	offset += disksize;
+    }
+}
+
 /**
  * Scan a volume index and handle each vnode
  *
@@ -1709,12 +1747,8 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
 {
     afs_int32 diskSize =
 	(class == vSmall ? SIZEOF_SMALLDISKVNODE : SIZEOF_LARGEDISKVNODE);
-    char buf[SIZEOF_LARGEDISKVNODE];
-    struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
     StreamHandle_t *file = NULL;
-    int vnodeIndex;
     afs_sfsize_t nVnodes;
-    afs_foff_t offset = 0;
     IHandle_t *ih = vp->vnodeIndex[class].handle;
     FdHandle_t *fdP = NULL;
     afs_sfsize_t size;
@@ -1759,31 +1793,7 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
     } else
 	nVnodes = 0;
 
-    for (vnodeIndex = 0;
-	 nVnodes && STREAM_READ(vnode, diskSize, 1, file) == 1;
-	 nVnodes--, vnodeIndex++, offset += diskSize) {
-
-	struct VnodeDetails vnodeDetails;
-
-	if (!ModeMaskMatch(opt, vnode->modeBits)) {
-	    continue;
-	}
-
-	memset(&vnodeDetails, 0, sizeof(struct VnodeDetails));
-	vnodeDetails.vp = vp;
-	vnodeDetails.class = class;
-	vnodeDetails.vnode = vnode;
-	vnodeDetails.vnodeNumber = bitNumberToVnodeNumber(vnodeIndex, class);
-	vnodeDetails.offset = offset;
-	vnodeDetails.index = vnodeIndex;
-
-	for (opr_queue_Scan(scanList, cursor)) {
-	    struct VnodeScanProc *entry = (struct VnodeScanProc *)cursor;
-	    if (entry->proc) {
-		(*entry->proc) (opt, &vnodeDetails);
-	    }
-	}
-    }
+    ProcessVnodes(opt, nVnodes, diskSize, class, vp, file);
 
   error:
     if (file) {
