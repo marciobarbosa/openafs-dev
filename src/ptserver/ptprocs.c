@@ -136,9 +136,10 @@ static afs_int32 isAMemberOf(struct rx_call *call, afs_int32 uid, afs_int32 gid,
 			     afs_int32 *flag, afs_int32 *cid);
 static afs_int32 addWildCards(struct ubik_trans *tt, prlist *alist,
 			      afs_uint32 host);
-static afs_int32 WhoIsThisWithName(struct rx_call *acall,
-				   struct ubik_trans *at, afs_int32 *aid,
-				   char *aname);
+static afs_int32 WhoIsThisForeign(struct rx_call *acall,
+				  struct ubik_trans *at, afs_int32 *aid,
+				  int *a_isforeign, char *fname,
+				  size_t fname_len);
 
 /* when we abort, the ubik cachedVersion will be reset, so we'll read in the
  * header on the next call.
@@ -175,12 +176,27 @@ CreateOK(struct ubik_trans *ut, afs_int32 cid, afs_int32 oid, afs_int32 flag,
     return 1;			/* OK! */
 }
 
-afs_int32
-WhoIsThis(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid)
+/**
+ * Figure out the ptdb id number for the user running the given Rx call. If the
+ * user is a foreign user, it is considered an error (PRNOENT).
+ *
+ * @param[in] acall	The Rx call.
+ * @param[in] at	The ubik transaction to use.
+ * @param[out] aid	The ptdb id number of the calling user.
+ *
+ * @return status
+ * @retval 0 success
+ * @retval nonzero error
+ */
+static afs_int32
+WhoIsThisLocal(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid)
 {
-    int code = WhoIsThisWithName(acall, at, aid, NULL);
-    if (code == 2 && *aid == ANONYMOUSID)
+    afs_int32 code;
+    int is_foreign;
+    code = WhoIsThisForeign(acall, at, aid, &is_foreign, NULL, 0);
+    if (is_foreign) {
 	return PRNOENT;
+    }
     return code;
 }
 
@@ -266,7 +282,7 @@ iNewEntry(struct rx_call *call, char aname[], afs_int32 aid, afs_int32 oid,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     admin = IsAMemberOf(tt, *cid, SYSADMINID);
@@ -328,17 +344,18 @@ newEntry(struct rx_call *call, char aname[], afs_int32 flag, afs_int32 oid,
     if (code)
 	return code;
 
-    /* this is for cross-cell self registration. It is not added in the
-     * SPR_INewEntry because we want self-registration to only do
-     * automatic id assignment.
+    /*
+     * We call WhoIsThisForeign here (instead of WhoIsThisLocal) to allow for
+     * foreign users to do cross-cell self registration. We only do this for
+     * SPR_NewEntry, and not SPR_INewEntry, because we want to generate the id
+     * for cross-cell users ourselves (SPR_INewEntry gets the new id from the
+     * caller).
      */
-    code = WhoIsThisWithName(call, tt, cid, cname);
-    if (code && code != 2)
+    code = WhoIsThisForeign(call, tt, cid, &foreign, cname, sizeof(cname));
+    if (code)
 	ABORT_WITH(tt, PRPERM);
     admin = IsAMemberOf(tt, *cid, SYSADMINID);
-    if (code == 2 /* foreign cell request */) {
-	foreign = 1;
-
+    if (foreign /* foreign cell request */) {
 	if (!restricted && (strcmp(aname, cname) == 0)) {
 	    /* can't autoregister while providing an owner id */
 	    if (oid != 0)
@@ -393,7 +410,7 @@ whereIsIt(struct rx_call *call, afs_int32 aid, afs_int32 *apos, afs_int32 *cid)
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     if (!pr_noAuth && restrict_anonymous && *cid == ANONYMOUSID)
@@ -434,7 +451,7 @@ dumpEntry(struct rx_call *call, afs_int32 apos, struct prdebugentry *aentry,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     code = pr_ReadEntry(tt, 0, apos, (struct prentry *)aentry);
@@ -482,7 +499,7 @@ addToGroup(struct rx_call *call, afs_int32 aid, afs_int32 gid, afs_int32 *cid)
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     tempu = FindByID(tt, aid);
@@ -662,7 +679,7 @@ idToName(struct rx_call *call, idlist *aid, namelist *aname, afs_int32 *cid)
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     if (!pr_noAuth && restrict_anonymous && *cid == ANONYMOUSID)
@@ -753,7 +770,7 @@ Delete(struct rx_call *call, afs_int32 aid, afs_int32 *cid)
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
 
@@ -999,7 +1016,7 @@ UpdateEntry(struct rx_call *call, afs_int32 aid, char *name,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     code = IsAMemberOf(tt, *cid, SYSADMINID);
@@ -1074,7 +1091,7 @@ removeFromGroup(struct rx_call *call, afs_int32 aid, afs_int32 gid,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     tempu = FindByID(tt, aid);
@@ -1149,7 +1166,7 @@ getCPS(struct rx_call *call, afs_int32 aid, prlist *alist, afs_int32 *over,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     if (!pr_noAuth && restrict_anonymous && *cid == ANONYMOUSID)
@@ -1232,8 +1249,7 @@ getCPS2(struct rx_call *call, afs_int32 aid, afs_uint32 ahost, prlist *alist,
 	if (code)
 	    ABORT_WITH(tt, code);
 
-	/* afs does authenticate now */
-	code = WhoIsThis(call, tt, cid);
+	code = WhoIsThisLocal(call, tt, cid);
 	if (code
 	    || !AccessOK(tt, *cid, &tentry, PRP_MEMBER_MEM, PRP_MEMBER_ANY))
 	    ABORT_WITH(tt, PRPERM);
@@ -1298,7 +1314,7 @@ getHostCPS(struct rx_call *call, afs_uint32 ahost, prlist *alist,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     if (!pr_noAuth && restrict_anonymous && *cid == ANONYMOUSID)
@@ -1351,7 +1367,7 @@ listMax(struct rx_call *call, afs_int32 *uid, afs_int32 *gid, afs_int32 *cid)
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     if (!pr_noAuth && restrict_anonymous && *cid == ANONYMOUSID)
@@ -1390,7 +1406,7 @@ setMax(struct rx_call *call, afs_int32 aid, afs_int32 gflag, afs_int32 *cid)
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     if (!AccessOK(tt, *cid, 0, 0, 0))
@@ -1433,7 +1449,7 @@ listEntry(struct rx_call *call, afs_int32 aid, struct prcheckentry *aentry,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     if (!pr_noAuth && restrict_anonymous && *cid == ANONYMOUSID)
@@ -1503,7 +1519,7 @@ listEntries(struct rx_call *call, afs_int32 flag, afs_int32 startindex,
     /* Make sure we are an authenticated caller and that we are on the
      * SYSADMIN list.
      */
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     code = IsAMemberOf(tt, *cid, SYSADMINID);
@@ -1617,7 +1633,7 @@ changeEntry(struct rx_call *call, afs_int32 aid, char *name, afs_int32 oid,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     pos = FindByID(tt, aid);
@@ -1673,7 +1689,7 @@ setFieldsEntry(struct rx_call *call,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     pos = FindByID(tt, id);
@@ -1755,7 +1771,7 @@ listElements(struct rx_call *call, afs_int32 aid, prlist *alist,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
 
@@ -1811,7 +1827,7 @@ listSuperGroups(struct rx_call *call, afs_int32 aid, prlist *alist,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
     if (!pr_noAuth && restrict_anonymous && *cid == ANONYMOUSID)
@@ -1882,7 +1898,7 @@ listOwned(struct rx_call *call, afs_int32 aid, prlist *alist, afs_int32 *lastP,
     if (code)
 	return code;
 
-    code = WhoIsThis(call, tt, cid);
+    code = WhoIsThisLocal(call, tt, cid);
     if (code)
 	ABORT_WITH(tt, PRPERM);
 
@@ -1955,7 +1971,7 @@ isAMemberOf(struct rx_call *call, afs_int32 uid, afs_int32 gid, afs_int32 *flag,
 
 	if (!uloc || !gloc)
 	    ABORT_WITH(tt, PRNOENT);
-	code = WhoIsThis(call, tt, cid);
+	code = WhoIsThisLocal(call, tt, cid);
 	if (code)
 	    ABORT_WITH(tt, PRPERM);
 	code = pr_ReadEntry(tt, 0, uloc, &uentry);
@@ -2031,13 +2047,28 @@ addWildCards(struct ubik_trans *tt, prlist *alist, afs_uint32 host)
     return 0;
 }
 
+/**
+ * Figure out the ptdb id number for the user running the given Rx call, and
+ * (optionally) return some info about foreign users.
+ *
+ * @param[in] acall	The Rx call.
+ * @param[in] at	The ubik transaction to use.
+ * @param[out] aid	The ptdb id number of the calling user.
+ * @param[out] a_isforeign  Optional. On success, set to nonzero if the calling
+ *			    user is a foreign user.
+ * @param[out] fname	    Optional. On success, set to the name of the
+ *			    calling user if they are a foreign user.
+ * @param[in] fname_len	    The amount of space available in 'fname'.
+ *
+ * @return status
+ * @retval 0 success
+ * @retval nonzero error
+ */
 static afs_int32
-WhoIsThisWithName(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
-		  char *aname)
+WhoIsThisForeign(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
+		 int *a_isforeign, char *fname, size_t fname_len)
 {
     afs_int32 islocal = 1;
-    /* aid is set to the identity of the caller, if known, else ANONYMOUSID */
-    /* returns -1 and sets aid to ANONYMOUSID on any failure */
     struct rx_connection *tconn;
     afs_int32 code;
     char tcell[MAXKTCREALMLEN];
@@ -2046,46 +2077,54 @@ WhoIsThisWithName(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
     int ilen;
     char vname[256];
 
+    if (a_isforeign) {
+	*a_isforeign = 0;
+    }
+
     *aid = ANONYMOUSID;
     tconn = rx_ConnectionOf(acall);
     code = rx_SecurityClassOf(tconn);
     if (code == RX_SECIDX_NULL)
-	return 0;
+	goto done;
     else if (code == RX_SECIDX_VAB) {
-	goto done;		/* no longer supported */
+	goto error;		/* no longer supported */
     } else if (code == RX_SECIDX_KAD) {
 	if ((code = rxkad_GetServerInfo(rx_ConnectionOf(acall), NULL, NULL,
 					name, inst, tcell, NULL)))
-	    goto done;
+	    goto error;
 
 	if (tcell[0]) {
 	    code = afsconf_IsLocalRealmMatch(prdir, &islocal, name, inst, tcell);
 	    if (code)
-		goto done;
+		goto error;
 	}
 	strncpy(vname, name, sizeof(vname));
 	if ((ilen = strlen(inst))) {
 	    if (strlen(vname) + 1 + ilen >= sizeof(vname))
-		goto done;
+		goto error;
 	    strcat(vname, ".");
 	    strcat(vname, inst);
 	}
 	if (!islocal) {
+	    if (a_isforeign) {
+		*a_isforeign = 1;
+	    }
 	    if (strlen(vname) + strlen(tcell) + 1  >= sizeof(vname))
-		goto done;
+		goto error;
 	    strcat(vname, "@");
 	    strcat(vname, tcell);
-	    lcstring(vname, vname, sizeof(vname));
-	    lookup_id_from_name(at, vname, aid);
-	    if (aname)
-		strcpy(aname, vname);
-	    return 2;
 	}
 
-	if (strcmp(AUTH_SUPERUSER, vname) == 0)
+	if (islocal && strcmp(AUTH_SUPERUSER, vname) == 0)
 	    *aid = SYSADMINID;	/* special case for the fileserver */
 	else {
 	    lcstring(vname, vname, sizeof(vname));
+	    if (!islocal && fname != NULL) {
+		if (strlen(vname) + 1 > fname_len) {
+		    goto error;
+		}
+		strlcpy(fname, vname, fname_len);
+	    }
 	    code = lookup_id_from_name(at, vname, aid);
 	}
 
@@ -2108,8 +2147,17 @@ WhoIsThisWithName(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
             rx_identity_free(&id);
         }
     }
-  done:
-    if (code && !pr_noAuth)
-	return -1;
+
+    if (code) {
+	goto error;
+    }
+
+ done:
     return 0;
+
+ error:
+    if (pr_noAuth) {
+	return 0;
+    }
+    return -1;
 }
