@@ -45,6 +45,7 @@ struct VolInfoOpt {
     unsigned int modeMask[64]; /**< unix mode bit pattern for searching for specific modes */
     int scanVolType;	     /**< volume types to scan; zero means do not check */
     int findVnType;	     /**< types of objects to find */
+    int cache;               /**< Cache vnodes info to speedup lookups. */
 };
 
 
@@ -102,5 +103,6 @@ void volinfo_AddVnodeHandler(int vnodeClass,
 		     const char *heading);
 int volinfo_AddOutputColumn(char *name);
 int volinfo_ScanPartitions(struct VolInfoOpt *opt, char *partNameOrId, VolumeId volumeId);
+void PrintStats(void);
 
 #endif /* AFS_VOL_INFO_H */

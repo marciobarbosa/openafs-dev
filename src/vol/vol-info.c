@@ -31,6 +31,7 @@
 #include <afs/errors.h>
 #include <afs/acl.h>
 #include <afs/prs_fs.h>
+#include <afs/opr.h>
 #include <rx/rx_queue.h>
 
 #include "nfs.h"
@@ -123,6 +124,7 @@ static struct sizeTotals volumeTotals = { 0, 0, 0, 0, 0, 0 };
 static struct sizeTotals partitionTotals = { 0, 0, 0, 0, 0, 0 };
 static struct sizeTotals serverTotals = { 0, 0, 0, 0, 0, 0 };
 static int PrintingVolumeSizes = 0;	/*print volume size lines */
+static int PrintingPaths;
 
 /**
  * List of procedures to call when scanning vnodes.
@@ -151,6 +153,204 @@ extern void SetSalvageDirHandle(DirHandle * dir, afs_int32 volume,
 				Device device, Inode inode,
 				int *volumeChanged);
 extern void FidZap(DirHandle * file);
+
+struct vnode_cache_slot {
+    unsigned int vnode_number;
+    char vnode_name[16];
+    struct VnodeDiskObject vnode_obj;
+};
+struct vnode_cache_slot *vnode_cache[nVNODECLASSES];
+
+static unsigned int vnode_hits;
+static unsigned int vnode_misses;
+static unsigned int name_hits;
+static unsigned int name_misses;
+
+void
+PrintStats(void)
+{
+    fprintf(stdout, "<marcio> vnode hits: %u\n", vnode_hits);
+    fprintf(stdout, "<marcio> vnode misses: %u\n", vnode_misses);
+    fprintf(stdout, "<marcio> name hits: %u\n", name_hits);
+    fprintf(stdout, "<marcio> name misses: %u\n", name_misses);
+}
+
+/**
+ * Allocate memory for the vnode cache.
+ *
+ * @param[in]  n_largevnodes  number of large vnodes
+ * @param[in]  n_smallvnodes  number of small vnodes
+ *
+ * @return 0 on success; -1 otherwise
+ */
+static int
+InitVnodeCache(VnodeClass class, int n_vnodes)
+{
+    if (n_vnodes <= 0) {
+	return -1;
+    }
+    vnode_cache[class] = calloc(n_vnodes, sizeof(*vnode_cache[class]));
+
+    if (vnode_cache[class] == NULL) {
+	return -1;
+    }
+    return 0;
+}
+
+static void
+DestroyVnodeCache(VnodeClass class)
+{
+    if (vnode_cache[class]) {
+	free(vnode_cache[class]);
+    }
+    vnode_cache[class] = NULL;
+}
+
+static int
+AddName(void *rock, char *name, afs_int32 vnode, afs_int32 unique)
+{
+    int index = vnodeIdToBitNumber(vnode);
+    VnodeClass class = vnodeIdToClass(vnode);
+    struct vnode_cache_slot *cache = vnode_cache[class];
+
+    if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+	return 0;
+    }
+    cache[index].vnode_number = vnode;
+    strcpy(cache[index].vnode_name, name);
+
+    return 0;
+}
+
+static void
+InsertNames(struct VnodeDetails *vdp)
+{
+    DirHandle dir;
+    Inode ino;
+    VolumeId parent = V_parentId(vdp->vp);
+    Device device = V_device(vdp->vp);
+    afs_int32 volchanged;
+
+    ino = VNDISK_GET_INO(vdp->vnode);
+    if (!VALID_INO(ino)) {
+	return;
+    }
+    SetSalvageDirHandle(&dir, parent, device, ino, &volchanged);
+    afs_dir_EnumerateDir(&dir, AddName, 0);
+    FidZap(&dir);
+}
+
+/**
+ * Insert vnode object into the cache.
+ *
+ * @param[in]  vdp  vnode details object
+ *
+ * @return none
+ */
+static void
+InsertVnodeCache(struct VnodeDetails *vdp)
+{
+    int index = vnodeIdToBitNumber(vdp->vnodeNumber);
+    struct vnode_cache_slot *cache;
+
+    if (vnode_cache[vLarge] == NULL || vnode_cache[vSmall] == NULL) {
+	return;
+    }
+    cache = vnode_cache[vdp->class];
+    cache[index].vnode_number = vdp->vnodeNumber;
+    memcpy(&cache[index].vnode_obj, vdp->vnode, sizeof(*vdp->vnode));
+    InsertNames(vdp);
+}
+
+/**
+ * Return cache entry, if found.
+ *
+ * @param[in]  vnumber  vnode number
+ *
+ * @return cache entry, if found; NULL otherwise
+ */
+static struct vnode_cache_slot *
+FindVnodeCache(int vnumber)
+{
+    struct vnode_cache_slot *slot, *cache;
+    int index = vnodeIdToBitNumber(vnumber);
+    VnodeClass class = vnodeIdToClass(vnumber);
+
+    if (vnode_cache[class] == NULL) {
+	return NULL;
+    }
+    cache = vnode_cache[class];
+    slot = &cache[index];
+
+    if (slot->vnode_number != vnumber) {
+	return NULL;
+    }
+    return slot;
+}
+
+/**
+ * Count how many vnodes of a given class we have.
+ *
+ * @param[in] ih     ihandle of the file holding vnodes
+ * @param[in] class  class of vnodes stored by ih
+ *
+ * @return number of vnodes; -1 on failure
+ */
+static int
+CountVnodes(IHandle_t *ih, VnodeClass class)
+{
+    struct afs_stat stat;
+    int nVnodes, diskSize, code;
+    FdHandle_t *fdP;
+
+    fdP = IH_OPEN(ih);
+    if (fdP == NULL) {
+	nVnodes = -1;
+	goto error;
+    }
+    code = afs_fstat(fdP->fd_fd, &stat);
+    if (code == -1) {
+	nVnodes = -1;
+	goto error;
+    }
+    diskSize =
+	(class == vSmall ? SIZEOF_SMALLDISKVNODE : SIZEOF_LARGEDISKVNODE);
+
+    nVnodes = (stat.st_size / diskSize) - 1;
+    if (nVnodes < 0) {
+	nVnodes = 0;
+    }
+ error:
+    if (fdP) {
+	FDH_CLOSE(fdP);
+    }
+    return nVnodes;
+}
+
+static int
+InitCache(Volume *vp)
+{
+    int nLargeVnodes, nSmallVnodes;
+    int code = -1;
+
+    nLargeVnodes = CountVnodes(vp->vnodeIndex[vLarge].handle, vLarge);
+    nSmallVnodes = CountVnodes(vp->vnodeIndex[vSmall].handle, vSmall);
+
+    if (nLargeVnodes >= 0 && nSmallVnodes >= 0) {
+	code = InitVnodeCache(vLarge, nLargeVnodes);
+	if (code == 0) {
+	    code = InitVnodeCache(vSmall, nSmallVnodes);
+	}
+    }
+    return code;
+}
+
+static void
+DestroyCache(void)
+{
+    DestroyVnodeCache(vLarge);
+    DestroyVnodeCache(vSmall);
+}
 
 /**
  * Format time as a timestamp string
@@ -739,6 +939,9 @@ volinfo_AddOutputColumn(char *name)
 	    if (t == col_path) {
 		NeedDirIndex = 1;
 	    }
+	    if (strcmp(name, "path") == 0) {
+		PrintingPaths = 1;
+	    }
 	    return 0;
 	}
     }
@@ -1076,8 +1279,18 @@ HandleVolume(struct VolInfoOpt *opt, struct DiskPartition64 *dp, char *name)
 	    }
 	}
 
+	if (PrintingPaths && opt->cache) {
+	    if (InitCache(vp) != 0) {
+		fprintf(stderr, "%s: Could not initialize caches\n", progname);
+	    }
+	}
+
 	HandleVnodes(opt, vp, vLarge);
 	HandleVnodes(opt, vp, vSmall);
+
+	if (PrintingPaths && opt->cache) {
+	    DestroyCache();
+	}
 
 	if (DirIndexFd) {
 	    FDH_CLOSE(DirIndexFd);
@@ -1418,6 +1631,7 @@ LookupPath(struct VolInfoOpt *opt, struct VnodeDetails *vdp)
     VnodeId parent = vdp->vnode->parent;
     VnodeId cvnid = vdp->vnodeNumber;
     afs_uint32 cuniq = vdp->vnode->uniquifier;
+    struct vnode_cache_slot *cache;
 
     if (!parent) {
 	vdp->path = "/";	/* this is root */
@@ -1431,15 +1645,34 @@ LookupPath(struct VolInfoOpt *opt, struct VnodeDetails *vdp)
     while (parent) {
 	int len;
 
-	code = GetDirVnode(opt, vp, parent, pvn);
-	if (code) {
-	    cursor = NULL;
-	    break;
+	cache = FindVnodeCache(parent);
+
+	if (cache) {
+	    vnode_hits++;
+	    memcpy(pvn, &cache->vnode_obj, sizeof(*pvn));
+	} else {
+	    vnode_misses++;
+	    code = GetDirVnode(opt, vp, parent, pvn);
+	    if (code) {
+		cursor = NULL;
+		break;
+	    }
+	    fprintf(stdout, "<marcio> missed vnode\n");
 	}
-	code = GetDirEntry(vp, pvn, cvnid, cuniq, dirent, MAX_PATH_LEN);
-	if (code) {
-	    cursor = NULL;
-	    break;
+
+	cache = FindVnodeCache(cvnid);
+
+	if (cache) {
+	    name_hits++;
+	    strncpy(dirent, cache->vnode_name, MAX_PATH_LEN);
+	} else {
+	    name_misses++;
+	    code = GetDirEntry(vp, pvn, cvnid, cuniq, dirent, MAX_PATH_LEN);
+	    if (code) {
+		cursor = NULL;
+		break;
+	    }
+	    fprintf(stdout, "<marcio> missed %s\n", dirent);
 	}
 
 	len = strlen(dirent);
@@ -1734,6 +1967,61 @@ ProcessVnodes(struct VolInfoOpt *opt, afs_sfsize_t nvnodes, afs_int32 disksize,
     }
 }
 
+static void
+ProcessLargeVnodes(struct VolInfoOpt *opt, afs_sfsize_t nvnodes,
+		   afs_int32 disksize, VnodeClass class, Volume *vp,
+		   StreamHandle_t *file)
+{
+    int i;
+    char buf[SIZEOF_LARGEDISKVNODE];
+    struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
+    struct VnodeDetails *vnodeDetails;
+
+    struct opr_queue *scanList = &VnodeScanLists[class];
+    struct opr_queue *cursor;
+    struct VnodeScanProc *entry;
+
+    afs_foff_t offset = 0;
+
+    vnodeDetails = calloc(nvnodes, sizeof(*vnodeDetails));
+    opr_Assert(vnodeDetails != NULL);
+
+    for (i = 0; nvnodes && STREAM_READ(vnode, disksize, 1, file) == 1; i++) {
+	if (!ModeMaskMatch(opt, vnode->modeBits)) {
+	    continue;
+	}
+	memset(&vnodeDetails[i], 0, sizeof(struct VnodeDetails));
+	vnodeDetails[i].vp = vp;
+	vnodeDetails[i].class = class;
+	vnodeDetails[i].vnodeNumber = bitNumberToVnodeNumber(i, class);
+	vnodeDetails[i].offset = offset;
+	vnodeDetails[i].index = i;
+
+	vnodeDetails[i].vnode = calloc(1, sizeof(struct VnodeDiskObject));
+	opr_Assert(vnodeDetails[i].vnode != NULL);
+	memcpy(vnodeDetails[i].vnode, vnode, sizeof(*vnode));
+
+	InsertVnodeCache(&vnodeDetails[i]);
+
+	nvnodes--;
+	offset += disksize;
+    }
+    nvnodes = i;
+
+    for (i = 0; i < nvnodes; i++) {
+	if (vnodeDetails[i].vp == NULL) {
+	    continue;
+	}
+	for (opr_queue_Scan(scanList, cursor)) {
+	    entry = (struct VnodeScanProc *)cursor;
+	    if (entry->proc) {
+		(*entry->proc) (opt, &vnodeDetails[i]);
+	    }
+	}
+	free(vnodeDetails[i].vnode);
+    }
+    free(vnodeDetails);
+}
 /**
  * Scan a volume index and handle each vnode
  *
@@ -1793,7 +2081,11 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
     } else
 	nVnodes = 0;
 
-    ProcessVnodes(opt, nVnodes, diskSize, class, vp, file);
+    if (class == vLarge && opt->cache) {
+	ProcessLargeVnodes(opt, nVnodes, diskSize, class, vp, file);
+    } else {
+	ProcessVnodes(opt, nVnodes, diskSize, class, vp, file);
+    }
 
   error:
     if (file) {
