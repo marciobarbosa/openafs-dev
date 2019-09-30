@@ -258,6 +258,7 @@ extern void afsconf_BuildServerSecurityObjects(void *,
 /* userok.c */
 
 struct rx_call;
+struct rx_connection;
 struct rx_identity;
 extern int afsconf_CheckAuth(void *arock, struct rx_call *acall);
 extern int afsconf_GetNoAuthFlag(struct afsconf_dir *adir);
@@ -278,6 +279,8 @@ extern int afsconf_IsSuperIdentity(struct afsconf_dir *, struct rx_identity *);
 extern int afsconf_CheckRestrictedQuery(struct afsconf_dir *adir,
 					struct rx_call *acall,
 					int needed_level);
+extern int afsconf_Krb4LocalIdentity(struct afsconf_dir *adir,
+				     struct rx_identity **a_rxid);
 
 /*
  * Level constants for the -restricted_query option used by vlserver

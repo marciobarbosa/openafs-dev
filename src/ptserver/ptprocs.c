@@ -2068,14 +2068,9 @@ static afs_int32
 WhoIsThisForeign(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
 		 int *a_isforeign, char *fname, size_t fname_len)
 {
-    afs_int32 islocal = 1;
     struct rx_connection *tconn;
     afs_int32 code;
-    char tcell[MAXKTCREALMLEN];
-    char name[MAXKTCNAMELEN];
-    char inst[MAXKTCNAMELEN];
-    int ilen;
-    char vname[256];
+    struct rx_identity *rxid = NULL;
 
     if (a_isforeign) {
 	*a_isforeign = 0;
@@ -2088,64 +2083,48 @@ WhoIsThisForeign(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
 	goto done;
     else if (code == RX_SECIDX_VAB) {
 	goto error;		/* no longer supported */
-    } else if (code == RX_SECIDX_KAD) {
-	if ((code = rxkad_GetServerInfo(rx_ConnectionOf(acall), NULL, NULL,
-					name, inst, tcell, NULL)))
-	    goto error;
+    }
 
-	if (tcell[0]) {
-	    code = afsconf_IsLocalRealmMatch(prdir, &islocal, name, inst, tcell);
-	    if (code)
-		goto error;
+    code = rx_GetConnSecId(rx_ConnectionOf(acall), &rxid);
+    if (code != 0) {
+	goto error;
+    }
+
+    code = afsconf_Krb4LocalIdentity(prdir, &rxid);
+    if (code != 0) {
+	goto error;
+    }
+
+    if (rxid->kind == RX_ID_SUPERUSER) {
+	*aid = SYSADMINID;
+	goto done;
+    }
+
+    if (rxid->kind == RX_ID_KRB4) {
+	char vname[256];
+	size_t len = strlen(rxid->displayName);
+	if (len >= sizeof(vname)) {
+	    goto error;
 	}
-	strncpy(vname, name, sizeof(vname));
-	if ((ilen = strlen(inst))) {
-	    if (strlen(vname) + 1 + ilen >= sizeof(vname))
-		goto error;
-	    strcat(vname, ".");
-	    strcat(vname, inst);
-	}
-	if (!islocal) {
+	lcstring(vname, rxid->displayName, sizeof(vname));
+	if (strchr(vname, '@') != NULL) {
+	    /* Our calling user is a foreign user. */
 	    if (a_isforeign) {
 		*a_isforeign = 1;
 	    }
-	    if (strlen(vname) + strlen(tcell) + 1  >= sizeof(vname))
-		goto error;
-	    strcat(vname, "@");
-	    strcat(vname, tcell);
-	}
-
-	if (islocal && strcmp(AUTH_SUPERUSER, vname) == 0)
-	    *aid = SYSADMINID;	/* special case for the fileserver */
-	else {
-	    lcstring(vname, vname, sizeof(vname));
-	    if (!islocal && fname != NULL) {
-		if (strlen(vname) + 1 > fname_len) {
+	    if (fname != NULL) {
+		if (len + 1 > fname_len) {
 		    goto error;
 		}
 		strlcpy(fname, vname, fname_len);
 	    }
-	    code = lookup_id_from_name(at, vname, aid);
 	}
+	code = lookup_id_from_name(at, vname, aid);
 
     } else {
-        /* If we reached here, we don't understand the security class of the
-         * given call. But if the calling user is RX_ID_SUPERUSER, we can check
-         * that without even needing to understand the security class. Remember
-         * to only check for RX_ID_SUPERUSER specifically; we do not use
-         * SYSADMINID for other admins. */
-        int is_super;
-        struct rx_identity *id = NULL;
-        is_super = afsconf_SuperIdentity(prdir, acall, &id);
-        if (is_super && id->kind == RX_ID_SUPERUSER) {
-            *aid = SYSADMINID;
-            code = 0;
-        } else {
-            code = -1;
-        }
-        if (id != NULL) {
-            rx_identity_free(&id);
-        }
+	/* We don't understand the identity of our caller. */
+	goto error;
+	*aid = ANONYMOUSID;
     }
 
     if (code) {
@@ -2153,9 +2132,11 @@ WhoIsThisForeign(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
     }
 
  done:
+    rx_identity_free(&rxid);
     return 0;
 
  error:
+    rx_identity_free(&rxid);
     if (pr_noAuth) {
 	return 0;
     }

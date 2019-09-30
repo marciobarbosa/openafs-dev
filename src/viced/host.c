@@ -35,7 +35,9 @@
 #include <afs/auth.h>
 #include <afs/afsutil.h>
 #include <afs/com_err.h>
+#include <opr/time64.h>
 #include <rx/rx.h>
+#include <rx/rx_identity.h>
 #include <afs/cellconfig.h>
 #include "viced_prototypes.h"
 #include "viced.h"
@@ -2501,48 +2503,13 @@ h_EnumerateClients(VolumeId vid,
 }
 
 static int
-format_vname(char *vname, int usize, const char *tname, const char *tinst,
-	     const char *tcell, afs_int32 islocal)
-{
-    int len;
-
-    len = strlcpy(vname, tname, usize);
-    if (len >= usize)
-	return -1;
-    if (tinst[0]) {
-	len = strlcat(vname, ".", usize);
-	if (len >= usize)
-	    return -1;
-	len = strlcat(vname, tinst, usize);
-	if (len >= usize)
-	    return -1;
-    }
-    if (tcell[0] && !islocal) {
-	len = strlcat(vname, "@", usize);
-	if (len >= usize)
-	    return -1;
-	len = strlcat(vname, tcell, usize);
-	if (len >= usize)
-	    return -1;
-    }
-    return 0;
-}
-
-static int
 getPeerDetails(struct rx_connection *conn,
 	       afs_int32 *viceid, afs_int32 *expTime, int authClass)
 {
     int code;
-#if (64-MAXKTCNAMELEN)
-    ticket name length != 64
-#endif
-    char tname[64];
-    char tinst[64];
-    char tcell[MAXKTCREALMLEN];
-    char uname[PR_MAXNAMELEN];
-
-    *viceid = AnonymousID;
-    *expTime = 0x7fffffff;
+    struct afs_time64 exp;
+    afs_int64 exp_secs;
+    struct rx_identity *rxid = NULL;
 
     ViceLog(5,
 	    ("FindClient: authenticating connection: authClass=%d\n",
@@ -2550,49 +2517,59 @@ getPeerDetails(struct rx_connection *conn,
     if (authClass == RX_SECIDX_VAB) {
 	/* A bcrypt tickets, no longer supported */
 	ViceLog(1, ("FindClient: bcrypt ticket, using AnonymousID\n"));
-	return 0;
+	goto anon;
     }
 
-    if (authClass == RX_SECIDX_KAD) {
-	/* an rxkad ticket */
-	afs_int32 islocal;
+    code = rx_GetConnSecExpiration(conn, &exp);
+    if (code) {
+	ViceLog(1, ("Failed to get caller expiration info\n"));
+	goto anon;
+    }
+    exp_secs = opr_time64_toSecs(&exp);
+    if (exp_secs > MAX_AFS_INT32 || exp_secs < MIN_AFS_INT32) {
+	ViceLog(1, ("Caller expiration out of range\n"));
+	goto anon;
+    }
+    *expTime = exp_secs;
 
-	/* kerberos ticket */
-	code = rxkad_GetServerInfo(conn, /*level */ 0, (afs_uint32 *)expTime,
-				   tname, tinst, tcell, NULL);
+    code = rx_GetConnSecId(conn, &rxid);
+    if (code) {
+	ViceLog(1, ("Failed to get caller identity\n"));
+	goto anon;
+    }
+
+    if (rxid->kind == RX_ID_KRB4) {
+	/* krb4-like caller */
+
+	code = afsconf_Krb4LocalIdentity(confDir, &rxid);
 	if (code) {
-	    ViceLog(1, ("Failed to get rxkad ticket info\n"));
-	    return 0;
-	}
-
-	ViceLog(5,
-		("FindClient: rxkad conn: name=%s,inst=%s,cell=%s,exp=%d\n",
-		 tname, tinst, tcell, *expTime));
-	code = afsconf_IsLocalRealmMatch(confDir, &islocal, tname, tinst, tcell);
-
-	if (code) {
-	    ViceLog(0, ("FindClient: local realm check failed; code=%d", code));
-	    return 0;
-	}
-
-	code = format_vname(uname, sizeof(uname), tname, tinst, tcell, islocal);
-	if (code) {
-	    ViceLog(0, ("FindClient: uname truncated."));
-	    return 0;
+	    ViceLog(1, ("Failed to get caller local identity\n"));
+	    goto anon;
 	}
 
 	/* translate the name to a vice id */
-	code = MapName_r(uname, viceid);
+	code = MapName_r(rxid->displayName, viceid);
 	if (code) {
-	    ViceLog(1, ("failed to map name=%s -> code=%d\n", uname,
-			code));
-	    return code; /* Actually flag this is a failure */
+	    ViceLog(1, ("failed to map name=%s -> code=%d\n",
+		    rxid->displayName, code));
+	    goto fail; /* Actually flag this is a failure */
 	}
 
-	return 0;
+	goto success;
     }
 
+    ViceLog(1, ("Unable to understand caller identity\n"));
+ anon:
+    *viceid = AnonymousID;
+    *expTime = 0x7fffffff;
+
+ success:
+    rx_identity_free(&rxid);
     return 0;
+
+ fail:
+    rx_identity_free(&rxid);
+    return code;
 }
 
 /*

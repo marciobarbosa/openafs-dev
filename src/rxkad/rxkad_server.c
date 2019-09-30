@@ -25,7 +25,9 @@
 #include <rx/rx.h>
 #include <rx/xdr.h>
 #include <rx/rx_packet.h>
+#include <rx/rx_identity.h>
 #include <afs/afsutil.h>
+#include <opr/time64.h>
 
 #include "stats.h"
 #include "private_data.h"
@@ -41,6 +43,11 @@ afs_int32(*rxkad_AlternateTicketDecoder) (afs_int32, char *, afs_int32,
 					  struct ktc_encryptionKey *,
 					  afs_int32 *, afs_uint32 *,
 					  afs_uint32 *);
+static int rxkad_GetConnSecInfo(struct rx_securityClass *aobj,
+				struct rx_connection *conn,
+				rx_connSecLevel *a_level,
+				struct afs_time64 *a_expires,
+				struct rx_identity **a_id);
 
 static struct rx_securityOps rxkad_server_ops = {
     rxkad_Close,
@@ -56,7 +63,7 @@ static struct rx_securityOps rxkad_server_ops = {
     rxkad_DestroyConnection,
     rxkad_GetStats,
     rxkad_SetConfiguration,
-    0,				/* spare 2 */
+    rxkad_GetConnSecInfo,
     0,				/* spare 3 */
 };
 extern afs_uint32 rx_MyMaxSendSize;
@@ -444,7 +451,7 @@ rxkad_CheckResponse(struct rx_securityClass *aobj,
 }
 
 /* return useful authentication info about a server-side connection */
-
+/* Deprecated; please use rx_GetConnSec* functions instead where possible. */
 afs_int32
 rxkad_GetServerInfo(struct rx_connection * aconn, rxkad_level * level,
 		    afs_uint32 * expiration, char *name, char *instance,
@@ -471,6 +478,77 @@ rxkad_GetServerInfo(struct rx_connection * aconn, rxkad_level * level,
     } else
 	return RXKADNOAUTH;
 }
+
+static int
+rxkad_GetConnSecInfo(struct rx_securityClass *aobj,
+		     struct rx_connection * aconn, rx_connSecLevel *a_level,
+		     struct afs_time64 *a_expires, struct rx_identity **a_id)
+{
+    struct rxkad_sconn *sconn;
+
+    sconn = rx_GetSecurityData(aconn);
+    if (sconn && sconn->authenticated && sconn->rock
+	&& (time(0) < sconn->expirationTime)) {
+	if (a_level) {
+	    switch (sconn->level) {
+	    case rxkad_clear:
+		*a_level = RX_LEVEL_CLEAR;
+		break;
+	    case rxkad_auth:
+		*a_level = RX_LEVEL_AUTH;
+		break;
+	    case rxkad_crypt:
+		*a_level = RX_LEVEL_CRYPT;
+		break;
+	    default:
+		return RXKADINCONSISTENCY;
+	    }
+	}
+	if (a_expires) {
+	    int code;
+	    code = opr_time64_fromSecs(sconn->expirationTime, a_expires);
+	    if (code != 0) {
+		return RXKADINCONSISTENCY;
+	    }
+	}
+	if (a_id) {
+	    int size;
+	    char *name = sconn->rock->client.name;
+	    char *instance = sconn->rock->client.instance;
+	    char *cell = sconn->rock->client.cell;
+	    char *fullname;
+
+	    /* alloc space for "name.inst@cell" */
+	    size = strlen(name) + 1 + strlen(instance) + 1 + strlen(cell) + 1;
+
+	    /* Skip blank components */
+	    if (instance[0] == '\0') {
+		instance = NULL;
+	    }
+	    if (cell[0] == '\0') {
+		cell = NULL;
+	    }
+
+	    fullname = rxi_Alloc(size);
+	    snprintf(fullname, size, "%s%s%s%s%s", name,
+		     instance ? "." : "",
+		     instance ? instance : "",
+		     cell ? "@" : "",
+		     cell ? cell : "");
+
+	    *a_id = rx_identity_new(RX_ID_KRB4, fullname,
+				    fullname, strlen(fullname));
+	    rxi_Free(fullname, size);
+	    if (*a_id == NULL) {
+		return RXKADINCONSISTENCY;
+	    }
+	}
+	return 0;
+    } else
+	return RXKADNOAUTH;
+}
+
+
 
 /* Set security object configuration variables */
 afs_int32 rxkad_SetConfiguration(struct rx_securityClass *aobj,

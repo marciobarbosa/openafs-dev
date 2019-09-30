@@ -120,3 +120,33 @@ rx_ConnError(struct rx_connection *conn)
 {
     return conn->error;
 }
+
+static int
+conn_secinfo(struct rx_connection *conn, rx_connSecLevel *a_level,
+	     struct afs_time64 *a_expires, struct rx_identity **a_id)
+{
+    struct rx_securityOps *ops = conn->securityObject->ops;
+    if (ops->op_GetConnSecInfo == NULL) {
+	return RX_INVALID_OPERATION;
+    }
+    return (*ops->op_GetConnSecInfo)(conn->securityObject, conn, a_level,
+				     a_expires, a_id);
+}
+
+int
+rx_GetConnSecLevel(struct rx_connection *conn, rx_connSecLevel *a_level)
+{
+    return conn_secinfo(conn, a_level, NULL, NULL);
+}
+
+int
+rx_GetConnSecExpiration(struct rx_connection *conn, struct afs_time64 *a_expires)
+{
+    return conn_secinfo(conn, NULL, a_expires, NULL);
+}
+
+int
+rx_GetConnSecId(struct rx_connection *conn, struct rx_identity **a_id)
+{
+    return conn_secinfo(conn, NULL, NULL, a_id);
+}

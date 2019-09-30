@@ -605,126 +605,6 @@ afsconf_AddUser(struct afsconf_dir *adir, char *aname)
     return code;
 }
 
-/* special CompFindUser routine that builds up a princ and then
-	calls finduser on it. If found, returns char * to user string,
-	otherwise returns NULL. The resulting string should be immediately
-	copied to other storage prior to release of mutex. */
-static int
-CompFindUser(struct afsconf_dir *adir, char *name, char *sep, char *inst,
-	     char *realm, struct rx_identity **identity)
-{
-    static char fullname[MAXKTCNAMELEN + MAXKTCNAMELEN + MAXKTCREALMLEN + 3];
-    struct rx_identity *testId;
-
-    /* always must have name */
-    if (!name || !name[0]) {
-	return 0;
-    }
-
-    if (strlcpy(fullname, name, sizeof(fullname)) >= sizeof(fullname))
-	return 0;
-
-    /* might have instance */
-    if (inst && inst[0]) {
-	if (!sep || !sep[0]) {
-	    return 0;
-	}
-
-	if (strlcat(fullname, sep, sizeof(fullname)) >= sizeof(fullname))
-	    return 0;
-
-	if (strlcat(fullname, inst, sizeof(fullname)) >= sizeof(fullname))
-	    return 0;
-    }
-
-    /* might have realm */
-    if (realm && realm[0]) {
-	if (strlcat(fullname, "@", sizeof(fullname)) >= sizeof(fullname))
-	    return 0;
-
-	if (strlcat(fullname, realm, sizeof(fullname)) >= sizeof(fullname))
-	    return 0;
-    }
-
-    testId = rx_identity_new(RX_ID_KRB4, fullname, fullname, strlen(fullname));
-    if (afsconf_IsSuperIdentity(adir, testId)) {
-	if (identity)
-	     *identity = testId;
-	else
-	     rx_identity_free(&testId);
-	return 1;
-    }
-
-    rx_identity_free(&testId);
-    return 0;
-}
-
-static int
-kerberosSuperUser(struct afsconf_dir *adir, char *tname, char *tinst,
-		  char *tcell, struct rx_identity **identity)
-{
-    char tcell_l[MAXKTCREALMLEN] = "";
-    int code;
-    afs_int32 islocal;
-    int flag;
-
-    /* generate lowercased version of cell name */
-    if (tcell)
-	opr_lcstring(tcell_l, tcell, sizeof(tcell_l));
-
-    code = afsconf_IsLocalRealmMatch(adir, &islocal, tname, tinst, tcell);
-    if (code) {
-	return 0;
-    }
-
-    /* start with no authorization */
-    flag = 0;
-
-    /* localauth special case */
-    if ((tinst == NULL || strlen(tinst) == 0) &&
-	(tcell == NULL || strlen(tcell) == 0)
-	&& !strcmp(tname, AUTH_SUPERUSER)) {
-	if (identity)
-	    *identity = rx_identity_new(RX_ID_KRB4, AFS_LOCALAUTH_NAME,
-	                                AFS_LOCALAUTH_NAME, AFS_LOCALAUTH_LEN);
-	flag = 1;
-
-	/* cell of connection matches local cell or one of the realms */
-    } else if (islocal) {
-	if (CompFindUser(adir, tname, ".", tinst, NULL, identity)) {
-	    flag = 1;
-	}
-	/* cell of conn doesn't match local cell or realm */
-    } else {
-	if (CompFindUser(adir, tname, ".", tinst, tcell, identity)) {
-	    flag = 1;
-	} else if (CompFindUser(adir, tname, ".", tinst, tcell_l, identity)) {
-	    flag = 1;
-	}
-    }
-
-    return flag;
-}
-
-static int
-rxkadSuperUser(struct afsconf_dir *adir, struct rx_call *acall,
-	       struct rx_identity **identity)
-{
-    char tname[MAXKTCNAMELEN];	/* authentication from ticket */
-    char tinst[MAXKTCNAMELEN];
-    char tcell[MAXKTCREALMLEN];
-
-    int code;
-
-    /* get auth details from server connection */
-    code = rxkad_GetServerInfo(rx_ConnectionOf(acall), NULL, NULL, tname,
-			       tinst, tcell, NULL);
-    if (code)
-	return 0;		/* bogus connection/other error */
-
-    return kerberosSuperUser(adir, tname, tinst, tcell, identity);
-}
-
 #ifdef AFS_RXGK_ENV
 static int
 rxgkSuperUser(struct afsconf_dir *adir, struct rx_call *acall,
@@ -773,6 +653,7 @@ afsconf_SuperIdentity(struct afsconf_dir *adir, struct rx_call *acall,
     struct rx_connection *tconn;
     afs_int32 code;
     int flag;
+    struct rx_identity *rxid = NULL;
 
     LOCK_GLOBAL_MUTEX;
     if (!adir) {
@@ -797,20 +678,34 @@ afsconf_SuperIdentity(struct afsconf_dir *adir, struct rx_call *acall,
 	/* bcrypt tokens */
 	UNLOCK_GLOBAL_MUTEX;
 	return 0;		/* not supported any longer */
-    } else if (code == RX_SECIDX_KAD) {
-	flag = rxkadSuperUser(adir, acall, identity);
-	UNLOCK_GLOBAL_MUTEX;
-	return flag;
 #ifdef AFS_RXGK_ENV
     } else if (code == RX_SECIDX_GK) {
 	flag = rxgkSuperUser(adir, acall, identity);
 	UNLOCK_GLOBAL_MUTEX;
 	return flag;
 #endif
-    } else {			/* some other auth type */
-	UNLOCK_GLOBAL_MUTEX;
-	return 0;		/* mysterious, just say no */
     }
+
+    code = rx_GetConnSecId(tconn, &rxid);
+    if (code != 0) {
+	UNLOCK_GLOBAL_MUTEX;
+	return 0;
+    }
+
+    code = afsconf_Krb4LocalIdentity(adir, &rxid);
+    if (code != 0) {
+	UNLOCK_GLOBAL_MUTEX;
+	return 0;
+    }
+
+    flag = afsconf_IsSuperIdentity(adir, rxid);
+    if (flag && identity != NULL) {
+	*identity = rxid;
+    } else {
+	rx_identity_free(&rxid);
+    }
+    UNLOCK_GLOBAL_MUTEX;
+    return flag;
 }
 
 /*!
@@ -842,12 +737,7 @@ afsconf_SuperUser(struct afsconf_dir *adir, struct rx_call *acall,
     if (namep) {
 	ret = afsconf_SuperIdentity(adir, acall, &identity);
 	if (ret) {
-	    if (identity->kind == RX_ID_KRB4) {
-		strlcpy(namep, identity->displayName, MAXKTCNAMELEN-1);
-	    } else {
-		snprintf(namep, MAXKTCNAMELEN-1, "eName: %s",
-			 identity->displayName);
-	    }
+	    strlcpy(namep, identity->displayName, MAXKTCNAMELEN-1);
 	    rx_identity_free(&identity);
 	}
     } else {
@@ -882,4 +772,117 @@ afsconf_CheckRestrictedQuery(struct afsconf_dir *adir,
 	return 1;
 
     return afsconf_SuperIdentity(adir, acall, NULL);
+}
+
+static int
+LocalUser(struct afsconf_dir *adir, char *name, char **a_localname)
+{
+    char *atsign;
+    int code = 0;
+    char *realm;
+    int islocal;
+
+    *a_localname = NULL;
+
+    name = strdup(name);
+    if (name == NULL) {
+	code = AFSCONF_FAILURE;
+	goto done;
+    }
+
+    atsign = strchr(name, '@');
+    if (atsign == NULL) {
+	/* Not a foreign user; no cell. */
+	goto done;
+    }
+
+    /* Transform "user@realm" into "user\0realm" */
+    *atsign = '\0';
+    realm = &atsign[1];
+
+    islocal = 0;
+    code = afsconf_IsLocalRealmMatch(adir, &islocal, name, NULL, realm);
+    if (code != 0) {
+	goto done;
+    }
+
+    if (islocal) {
+	/*
+	 * If we are a local name, return the modified name (with the realm
+	 * trimmed off) to the caller. Otherwise, we'll return nothing, and the
+	 * caller will re-use the given name.
+	 */
+	*a_localname = name;
+	name = NULL;
+    }
+
+ done:
+    free(name);
+    return code;
+}
+
+/**
+ * Transform the given Rx identity into a "local" user identity.
+ *
+ * This function performs a couple of possible transformations on an RX_ID_KRB4
+ * identity. If the given identity is the user "afs" (with no realm), we
+ * transform the identity into an RX_ID_SUPERUSER identity. If the given
+ * identity is of the form "user@realm", and "realm" is a local realm
+ * (according to afsconf_IsLocalRealmMatch), then we strip the realm portion of
+ * the username string off (leaving just "user").
+ *
+ * If the given identity is not an RX_ID_KRB4 identity, we leave it alone and
+ * return success.
+ *
+ * @param[in] adir  The config directory to use.
+ * @param[inout] a_rxid	    On entry, this is an rx identity allocated by
+ *			    rx_identity_new. On successful return, this is set
+ *			    to a new transformed identity, freeable with
+ *			    rx_identity_free.
+ */
+int
+afsconf_Krb4LocalIdentity(struct afsconf_dir *adir,
+			  struct rx_identity **a_rxid)
+{
+    struct rx_identity *new_rxid = NULL;
+    struct rx_identity *rxid = *a_rxid;
+    if (rxid == NULL || rxid->kind != RX_ID_KRB4) {
+	return 0;
+    }
+
+    if (strcmp(rxid->displayName, AUTH_SUPERUSER) == 0) {
+	/*
+	 * Transform the identity "afs" (with no realm) into a superuser
+	 * identity.
+	 */
+	new_rxid = rx_identity_new(RX_ID_SUPERUSER, AFS_LOCALAUTH_NAME,
+				   AFS_LOCALAUTH_NAME, AFS_LOCALAUTH_LEN);
+	if (new_rxid == NULL) {
+	    return AFSCONF_FAILURE;
+	}
+
+    } else {
+	/*
+	 * Transform the identity "user@realm" into "user" (with no realm), if
+	 * "realm" is a local realm.
+	 */
+	char *localname = NULL;
+	int code = LocalUser(adir, rxid->displayName, &localname);
+	if (code != 0) {
+	    return code;
+	}
+	if (localname != NULL) {
+	    new_rxid = rx_identity_new(RX_ID_KRB4, localname, localname,
+				       strlen(localname)+1);
+	    free(localname);
+	    if (new_rxid == NULL) {
+		return AFSCONF_FAILURE;
+	    }
+	}
+    }
+    if (new_rxid != NULL) {
+	rx_identity_free(a_rxid);
+	*a_rxid = new_rxid;
+    }
+    return 0;
 }
