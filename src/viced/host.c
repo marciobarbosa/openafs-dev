@@ -2555,20 +2555,19 @@ getPeerDetails(struct rx_connection *conn,
 
     if (authClass == RX_SECIDX_KAD) {
 	/* an rxkad ticket */
-	afs_int32 kvno;
 	afs_int32 islocal;
 
 	/* kerberos ticket */
 	code = rxkad_GetServerInfo(conn, /*level */ 0, (afs_uint32 *)expTime,
-				   tname, tinst, tcell, &kvno);
+				   tname, tinst, tcell, NULL);
 	if (code) {
 	    ViceLog(1, ("Failed to get rxkad ticket info\n"));
 	    return 0;
 	}
 
 	ViceLog(5,
-	        ("FindClient: rxkad conn: name=%s,inst=%s,cell=%s,exp=%d,kvno=%d\n",
-		 tname, tinst, tcell, *expTime, kvno));
+		("FindClient: rxkad conn: name=%s,inst=%s,cell=%s,exp=%d\n",
+		 tname, tinst, tcell, *expTime));
 	code = afsconf_IsLocalRealmMatch(confDir, &islocal, tname, tinst, tcell);
 
 	if (code) {
