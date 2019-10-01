@@ -5114,7 +5114,7 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 	if (entry.nServers < 1) {	/*this is the last ref */
 	    VPRINT1("Deleting the VLDB entry for %u ...", volid);
 	    fflush(STDOUT);
-	    vcode = ubik_VL_DeleteEntry(cstruct, 0, volid, ROVOL);
+	    vcode = ubik_VL_DeleteEntry(cstruct, 0, volid, RWVOL);
 	    if (vcode) {
 		fprintf(STDERR,
 			"Could not delete VLDB entry for volume %lu \n",
