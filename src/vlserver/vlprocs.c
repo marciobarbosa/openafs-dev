@@ -168,6 +168,9 @@ rxinfo(char *str, struct rx_call *rxcall)
 	case RX_ID_KRB4:
 	    prefix = "rxkad:";
 	    break;
+	case RX_ID_GSS:
+	    prefix = "gss:";
+	    break;
 	default:
 	    prefix = "unknown:";
 	}

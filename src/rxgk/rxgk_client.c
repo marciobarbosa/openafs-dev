@@ -465,6 +465,45 @@ rxgk_ClientGetStats(struct rx_securityClass *aobj, struct rx_connection *aconn,
     return 0;
 }
 
+static int
+rxgk_GetClientSecInfo(struct rx_securityClass *aobj, struct rx_connection *conn,
+		      rx_connSecLevel *a_level, struct afs_time64 *a_expires,
+		      struct rx_identity **a_id)
+{
+    struct rxgk_cprivate *cp;
+
+    cp = aobj->privateData;
+    if (cp == NULL) {
+	return RXGK_INCONSISTENCY;
+    }
+
+    if (a_expires != NULL) {
+	return RX_INVALID_OPERATION;
+    }
+
+    if (a_id != NULL) {
+	return RX_INVALID_OPERATION;
+    }
+
+    if (a_level != NULL) {
+	switch (cp->level) {
+	case RXGK_LEVEL_CLEAR:
+	    *a_level = RX_LEVEL_CLEAR;
+	    break;
+	case RXGK_LEVEL_AUTH:
+	    *a_level = RX_LEVEL_AUTH;
+	    break;
+	case RXGK_LEVEL_CRYPT:
+	    *a_level = RX_LEVEL_CRYPT;
+	    break;
+	default:
+	    return RXGK_INCONSISTENCY;
+	}
+    }
+
+    return 0;
+}
+
 static struct rx_securityOps rxgk_client_ops = {
     rxgk_ClientClose,
     rxgk_NewClientConnection,		/* every new connection */
@@ -478,9 +517,9 @@ static struct rx_securityOps rxgk_client_ops = {
     rxgk_ClientCheckPacket,		/* check data packet */
     rxgk_DestroyClientConnection,
     rxgk_ClientGetStats,
-    0,
-    0,					/* spare 1 */
-    0,					/* spare 2 */
+    0,					/* SetConfiguration */
+    rxgk_GetClientSecInfo,
+    0,					/* spare */
 };
 
 /*
