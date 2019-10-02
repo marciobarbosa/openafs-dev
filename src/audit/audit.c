@@ -710,28 +710,28 @@ osi_auditU(struct rx_call *call, char *audEvent, int errCode, ...)
 	    osi_audit("AFS_Aud_NoAFSId", (-1), AUD_STR, audEvent, AUD_END);
 	    strcpy(afsName, "--NoName--");
 
-	} else if (rxid->kind == RX_ID_KRB4 || rxid->kind == RX_ID_SUPERUSER) {
-	    /* authenticated with a krb4-like id */
-	    char *atsign;
+	} else {
 	    strlcpy(afsName, rxid->displayName, sizeof(afsName));
-	    atsign = strchr(afsName, '@');
-	    if (atsign != NULL && audit_user_check.islocal) {
-		int islocal;
-		/* Change afsName from "user@cell" to "user\0cell" */
-		char *cell = &atsign[1];
-		*atsign = '\0';
-		islocal =
-		    audit_user_check.islocal(audit_user_check.rock, afsName,
-					     NULL, cell);
-		if (!islocal) {
-		    /* If we're not a local user, change afsName back to
-		     * "name@cell". */
-		    *atsign = '@';
+
+	    if (rxid->kind == RX_ID_KRB4 || rxid->kind == RX_ID_SUPERUSER) {
+		/* authenticated with a krb4-like id */
+		char *atsign;
+		atsign = strchr(afsName, '@');
+		if (atsign != NULL && audit_user_check.islocal) {
+		    int islocal;
+		    /* Change afsName from "user@cell" to "user\0cell" */
+		    char *cell = &atsign[1];
+		    *atsign = '\0';
+		    islocal =
+			audit_user_check.islocal(audit_user_check.rock, afsName,
+						 NULL, cell);
+		    if (!islocal) {
+			/* If we're not a local user, change afsName back to
+			 * "name@cell". */
+			*atsign = '@';
+		    }
 		}
 	    }
-	} else {		/* Unauthenticated and/or unknown */
-	    osi_audit("AFS_Aud_UnknSec", (-1), AUD_STR, audEvent, AUD_END);
-	    strcpy(afsName, "--Unknown--");
 	}
 	rx_identity_free(&rxid);
 	peer = rx_PeerOf(conn);	/* conn -> peer */

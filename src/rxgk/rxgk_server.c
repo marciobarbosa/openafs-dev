@@ -720,32 +720,49 @@ rxgk_ServerGetStats(struct rx_securityClass *aobj, struct rx_connection *aconn,
     return 0;
 }
 
-/*
- * Get some information about this connection, in particular the security
- * level, expiry time, and the remote user's identity.
- */
-afs_int32
-rxgk_GetServerInfo(struct rx_connection *conn, RXGK_Level *level,
-		   struct afs_time64 *expiry, struct rx_identity **identity)
+static int
+rxgk_GetServerSecInfo(struct rx_securityClass *aobj, struct rx_connection *conn,
+		      rx_connSecLevel *a_level, struct afs_time64 *a_expires,
+		      struct rx_identity **a_id)
 {
     struct rxgk_sconn *sconn;
 
     if (rx_SecurityClassOf(conn) != RX_SECIDX_GK) {
-	return EINVAL;
+	return RXGK_INCONSISTENCY;
     }
 
     sconn = rx_GetSecurityData(conn);
-    if (sconn == NULL)
+    if (sconn == NULL) {
 	return RXGK_INCONSISTENCY;
-    if (identity != NULL) {
-	*identity = rx_identity_copy(sconn->client);
-	if (*identity == NULL)
-	    return RXGK_INCONSISTENCY;
     }
-    if (level != NULL)
-	*level = sconn->level;
-    if (expiry != NULL)
-	*expiry = sconn->expiration;
+
+    if (a_level != NULL) {
+	switch (sconn->level) {
+	case RXGK_LEVEL_CLEAR:
+	    *a_level = RX_LEVEL_CLEAR;
+	    break;
+	case RXGK_LEVEL_AUTH:
+	    *a_level = RX_LEVEL_AUTH;
+	    break;
+	case RXGK_LEVEL_CRYPT:
+	    *a_level = RX_LEVEL_CRYPT;
+	    break;
+	default:
+	    return RXGK_INCONSISTENCY;
+	}
+    }
+
+    if (a_expires != NULL) {
+	*a_expires = sconn->expiration;
+    }
+
+    if (a_id != NULL) {
+	*a_id = rx_identity_copy(sconn->client);
+	if (*a_id == NULL) {
+	    return RXGK_INCONSISTENCY;
+	}
+    }
+
     return 0;
 }
 
@@ -762,9 +779,9 @@ static struct rx_securityOps rxgk_server_ops = {
     rxgk_ServerCheckPacket,		/* check data packet */
     rxgk_DestroyServerConnection,
     rxgk_ServerGetStats,
-    0,
-    0,				/* spare 1 */
-    0,				/* spare 2 */
+    0,				/* SetConfiguration */
+    rxgk_GetServerSecInfo,
+    0,				/* spare */
 };
 
 /**
