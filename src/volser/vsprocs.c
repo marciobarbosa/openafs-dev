@@ -5085,38 +5085,27 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 {
     afs_int32 vcode;
     struct nvldbentry entry, storeEntry;
+    int islocked = 0, error = 0;
 
     vcode = ubik_VL_SetLock(cstruct, 0, volid, RWVOL, VLOP_ADDSITE);
     if (vcode) {
 	fprintf(STDERR, " Could not lock the VLDB entry for volume %lu \n",
 		(unsigned long)volid);
-	PrintError("", vcode);
-	return (vcode);
+	ERROR_EXIT(vcode);
     }
+    islocked = 1;
     vcode = VLDB_GetEntryByID(volid, RWVOL, &entry);
     if (vcode) {
 	fprintf(STDERR,
 		"Could not fetch the entry for volume number %lu from VLDB \n",
 		(unsigned long)volid);
-	PrintError("", vcode);
-	return (vcode);
+	ERROR_EXIT(vcode);
     }
     MapHostToNetwork(&entry);
     if (!Lp_ROMatch(server, part, &entry)) {
-	/*this site doesnot exist  */
+	/* this site does not exist */
 	fprintf(STDERR, "This site is not a replication site \n");
-	vcode =
-	    ubik_VL_ReleaseLock(cstruct, 0, volid, RWVOL,
-		      LOCKREL_OPCODE | LOCKREL_AFSID | LOCKREL_TIMESTAMP);
-	if (vcode) {
-	    fprintf(STDERR, "Could not update entry for volume %lu \n",
-		    (unsigned long)volid);
-	    PrintError("", vcode);
-	    ubik_VL_ReleaseLock(cstruct, 0, volid, RWVOL,
-		      LOCKREL_OPCODE | LOCKREL_AFSID | LOCKREL_TIMESTAMP);
-	    return (vcode);
-	}
-	return VOLSERBADOP;
+	ERROR_EXIT(VOLSERBADOP);
     } else {			/*remove the rep site */
 	Lp_SetROValue(&entry, server, part, 0, 0);
 	entry.nServers--;
@@ -5130,10 +5119,10 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 		fprintf(STDERR,
 			"Could not delete VLDB entry for volume %lu \n",
 			(unsigned long)volid);
-		PrintError("", vcode);
-		return (vcode);
+		ERROR_EXIT(vcode);
 	    }
 	    VDONE;
+	    return 0;
 	}
 	MapNetworkToHost(&entry, &storeEntry);
 	fprintf(STDOUT, "Deleting the replication site for volume %lu ...",
@@ -5147,14 +5136,26 @@ UV_RemoveSite(afs_uint32 server, afs_int32 part, afs_uint32 volid)
 	    fprintf(STDERR,
 		    "Could not release lock on volume entry for %lu \n",
 		    (unsigned long)volid);
-	    PrintError("", vcode);
-	    ubik_VL_ReleaseLock(cstruct, 0, volid, RWVOL,
-		      LOCKREL_OPCODE | LOCKREL_AFSID | LOCKREL_TIMESTAMP);
-	    return (vcode);
+	    ERROR_EXIT(vcode);
 	}
-	VDONE;
+	islocked = 0;
     }
-    return 0;
+    VDONE;
+
+  error_exit:
+    PrintError("", error);
+    if (islocked) {
+	vcode = ubik_VL_ReleaseLock(cstruct, 0, volid, RWVOL,
+				    (LOCKREL_OPCODE | LOCKREL_AFSID |
+				    LOCKREL_TIMESTAMP));
+	if (vcode) {
+	    fprintf(STDERR,
+		    "Could not release lock on volume entry for %lu \n",
+		    (unsigned long)volid);
+	    PrintError("", vcode);
+	}
+    }
+    return (error);
 }
 
 /*sets <server> <part> as read/write site for <volid> in the vldb */
