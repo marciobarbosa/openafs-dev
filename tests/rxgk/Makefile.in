@@ -11,12 +11,19 @@ LIBS = $(abs_top_builddir)/tests/common/libafstest_common.la \
        $(abs_top_builddir)/src/rx/liboafs_rx.la \
        $(abs_top_builddir)/src/rxgk/liboafs_rxgk.la
 
-tests = derive-t
+tests = conv-t derive-t krb5gss-t
 
 all check test tests: $(tests)
 
+conv-t: conv-t.o $(LIBS)
+	$(LT_LDRULE_static) conv-t.o $(LIBS) $(LIB_roken) $(XLIBS)
+
 derive-t: derive-t.o $(LIBS)
 	$(LT_LDRULE_static) derive-t.o $(LIBS) $(LIB_roken) $(XLIBS)
+
+krb5gss-t: krb5gss-t.o $(LIBS)
+	$(LT_LDRULE_static) krb5gss-t.o $(LIBS) $(LIB_roken) $(XLIBS)
+
 install:
 
 clean distclean:

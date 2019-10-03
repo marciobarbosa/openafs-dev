@@ -71,6 +71,10 @@
 #include "ptprototypes.h"
 #include "afs/audit.h"
 
+#ifdef AFS_RXGK_ENV
+# include <rx/rxgk.h>
+#endif
+
 extern int restricted;
 extern int restrict_anonymous;
 extern struct ubik_dbase *dbase;
@@ -78,6 +82,7 @@ extern int pr_noAuth;
 extern int prp_group_default;
 extern int prp_user_default;
 extern struct afsconf_dir *prdir;
+extern int pr_disableDotCheck;
 
 static afs_int32 iNewEntry(struct rx_call *call, char aname[], afs_int32 aid,
 			   afs_int32 oid, afs_int32 *cid);
@@ -2047,6 +2052,79 @@ addWildCards(struct ubik_trans *tt, prlist *alist, afs_uint32 host)
     return 0;
 }
 
+static int
+WhoIsThisIdentity(struct rx_identity *rxid, struct ubik_trans *at,
+		  afs_int32 *aid, int *a_isforeign, char *fname,
+		  size_t fname_len)
+{
+    afs_int32 code = PRINTERNAL;
+
+#ifdef AFS_RXGK_ENV
+    struct rx_identity *k4id = NULL;
+    if (rxid->kind == RX_ID_GSS) {
+	/* If we were given a GSS id, convert it to an old-style krb4 id, and
+	 * then proceed as if we were given the krb4 id. */
+	afs_uint32 conv_flags = 0;
+	if (pr_disableDotCheck) {
+	    conv_flags |= RXGK_524CONV_DISABLE_DOTCHECK;
+	}
+
+	code = rxgk_524_conv_id(rxid, conv_flags, &k4id);
+	if (code != 0) {
+	    goto done;
+	}
+
+	code = afsconf_Krb4LocalIdentity(prdir, &k4id);
+	if (code != 0) {
+	    goto done;
+	}
+
+	/* Now pretend 'k4id' is the id we were originally given. */
+	rxid = k4id;
+    }
+#endif
+
+    if (rxid->kind == RX_ID_SUPERUSER) {
+	*aid = SYSADMINID;
+	code = 0;
+	goto done;
+    }
+
+    if (rxid->kind == RX_ID_KRB4) {
+	char vname[256];
+	size_t len = strlen(rxid->displayName);
+	if (len >= sizeof(vname)) {
+	    code = PRINTERNAL;
+	    goto done;
+	}
+	lcstring(vname, rxid->displayName, sizeof(vname));
+	if (strchr(vname, '@') != NULL) {
+	    /* Our calling user is a foreign user. */
+	    if (a_isforeign) {
+		*a_isforeign = 1;
+	    }
+	    if (fname != NULL) {
+		if (len + 1 > fname_len) {
+		    code = PRINTERNAL;
+		    goto done;
+		}
+		strlcpy(fname, vname, fname_len);
+	    }
+	}
+	code = lookup_id_from_name(at, vname, aid);
+
+    } else {
+	/* We don't understand the identity of our caller. */
+	code = PRINTERNAL;
+    }
+
+ done:
+#ifdef AFS_RXGK_ENV
+    rx_identity_free(&k4id);
+#endif
+    return code;
+}
+
 /**
  * Figure out the ptdb id number for the user running the given Rx call, and
  * (optionally) return some info about foreign users.
@@ -2095,37 +2173,7 @@ WhoIsThisForeign(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
 	goto error;
     }
 
-    if (rxid->kind == RX_ID_SUPERUSER) {
-	*aid = SYSADMINID;
-	goto done;
-    }
-
-    if (rxid->kind == RX_ID_KRB4) {
-	char vname[256];
-	size_t len = strlen(rxid->displayName);
-	if (len >= sizeof(vname)) {
-	    goto error;
-	}
-	lcstring(vname, rxid->displayName, sizeof(vname));
-	if (strchr(vname, '@') != NULL) {
-	    /* Our calling user is a foreign user. */
-	    if (a_isforeign) {
-		*a_isforeign = 1;
-	    }
-	    if (fname != NULL) {
-		if (len + 1 > fname_len) {
-		    goto error;
-		}
-		strlcpy(fname, vname, fname_len);
-	    }
-	}
-	code = lookup_id_from_name(at, vname, aid);
-
-    } else {
-	/* We don't understand the identity of our caller. */
-	goto error;
-	*aid = ANONYMOUSID;
-    }
+    code = WhoIsThisIdentity(rxid, at, aid, a_isforeign, fname, fname_len);
 
     if (code) {
 	goto error;
