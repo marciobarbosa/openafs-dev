@@ -140,4 +140,14 @@ afs_int32 rxgk_print_token_and_key(struct rx_opaque *out,
                                    afs_int32 kvno, afs_int32 enctype,
                                    rxgk_key *k0_out) AFS_NONNULL();
 
+/* rxgk_util.c */
+
+/* flags for rxgk_524_conv_id */
+#define RXGK_524CONV_DISABLE_DOTCHECK (0x1)
+
+afs_int32 rxgk_524_conv_id(struct rx_identity *gss_id, afs_uint32 flags,
+			   struct rx_identity **a_k4id) AFS_NONNULL();
+afs_int32 rxgk_krb5_to_gss(char *krb5_princ, struct rx_opaque *gss_data)
+			   AFS_NONNULL();
+
 #endif /* OPENAFS_RXGK_H */

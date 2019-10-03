@@ -154,7 +154,7 @@ int restricted = 0;
 int restrict_anonymous = 0;
 int rxMaxMTU = -1;
 int rxBind = 0;
-int rxkadDisableDotCheck = 0;
+int pr_disableDotCheck = 0;
 
 #define ADDRSPERSITE 16         /* Same global is in rx/rx_user.c */
 afs_uint32 SHostAddrs[ADDRSPERSITE];
@@ -462,7 +462,7 @@ main(int argc, char **argv)
     cmd_OptionAsInt(opts, OPT_rxmaxmtu, &rxMaxMTU);
 
     /* rxkad options */
-    cmd_OptionAsFlag(opts, OPT_dotted, &rxkadDisableDotCheck);
+    cmd_OptionAsFlag(opts, OPT_dotted, &pr_disableDotCheck);
 
     /* rxgk options */
     if (cmd_OptionAsString(opts, OPT_s2s_crypt, &s2s_crypt_behavior) == 0) {
@@ -620,7 +620,7 @@ main(int argc, char **argv)
     }
     rx_SetMinProcs(tservice, 2);
     rx_SetMaxProcs(tservice, lwps);
-    if (rxkadDisableDotCheck) {
+    if (pr_disableDotCheck) {
 	code = rx_SetSecurityConfiguration(tservice, RXS_CONFIG_FLAGS,
 					   (void *)RXS_CONFIG_FLAGS_DISABLE_DOTCHECK);
 	if (code) {
