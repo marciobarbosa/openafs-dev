@@ -257,6 +257,78 @@ VInitPartition(char *path, char *devname, Device dev)
 }
 
 #ifndef AFS_NT40_ENV
+
+#if defined(AFS_DEMAND_ATTACH_FS) && defined(AFS_NAMEI_ENV)
+/**
+ * Check if partition is empty.
+ *
+ * This function checks if the partition in question does not have any volume.
+ * To do so, VPartIsEmpty tries to find *.vol files. If at least one *.vol
+ * file is found, this function assumes that the partition is not empty.
+ *
+ * @param[in] part  partition name
+ *
+ * @return 1 if empty; 0 otherwise.
+ */
+static int
+VPartIsEmpty(char *part)
+{
+    DIR *dir;
+    char *ext;
+    struct dirent *dent;
+
+    if ((dir = opendir(part)) == NULL) {
+	Log("VPartIsEmpty: Error opening directory.\n");
+	return 0;
+    }
+    while ((dent = readdir(dir))) {
+	ext = strrchr(dent->d_name, '.');
+	if (ext == NULL) {
+	    continue;
+	}
+	if (strcmp(ext, ".vol") == 0) {
+	    break;
+	}
+    }
+    closedir(dir);
+    if (dent != NULL) {
+	Log("VPartIsEmpty: %s is not empty.\n", part);
+	return 0;
+    }
+    return 1;
+}
+
+/**
+ * Check if partition can be dynamically attached.
+ *
+ * @param[in]  part  partition name
+ * @param[out] err   1 if a problem was found
+ *
+ * @return 1 if can be attached; 0 otherwise.
+ */
+static int
+VPartIsDynamicAttachOK(char *part, int *err)
+{
+    *err = 0;
+    /* check if the partition is already attached */
+    if(VGetPartition(part, 0) != NULL) {
+	return 0;
+    }
+    /* check if the partition is empty */
+    if (VPartIsEmpty(part) == 0) {
+	Log("VPartIsDynamicAttachOK: skipping %s.\n", part);
+	*err = 1;
+	return 0;
+    }
+    return 1;
+}
+#else
+static int
+VPartIsDynamicAttachOK(char *part, int *err)
+{
+    return 0;
+}
+#endif
 /* VAttachPartitions() finds the vice partitions on this server. Calls
  * VCheckPartition() to do some basic checks on the partition. If the partition
  * is a valid vice partition, VCheckPartition will add it to the DiskPartition
@@ -272,12 +344,13 @@ VInitPartition(char *path, char *devname, Device dev)
  * Use partition name as devname.
  */
 static int
-VCheckPartition(char *part, char *devname, int logging)
+VCheckPartition(char *part, char *devname, int logging, int dyn_attach)
 {
     struct afs_stat_st status;
 #if !defined(AFS_LINUX20_ENV) && !defined(AFS_NT40_ENV)
     char AFSIDatPath[MAXPATHLEN];
 #endif
+    int err = 0;
 
     /* Only keep track of "/vicepx" partitions since it can get hairy
      * when NFS mounts are involved.. */
@@ -300,6 +373,15 @@ VCheckPartition(char *part, char *devname, int logging)
 	    "mount the partition without logging, or use the namei "
 	    "fileserver backend. Aborting...\n", part);
 	return -1;
+    }
+
+    if (dyn_attach) {
+	if(VPartIsDynamicAttachOK(part, &err) == 0) {
+	    if (err) {
+		return -1;
+	    }
+	    return 0;
+	}
     }
 #ifndef AFS_AIX32_ENV
     if (programType == fileServer) {
@@ -421,7 +503,7 @@ VIsNeverAttach(char *part)
  * partitions, in the NAMEI fileserver.
  */
 static void
-VAttachPartitions2(void)
+VAttachPartitions2(int dyn_attach)
 {
 #ifdef AFS_NAMEI_ENV
     DIR *dirp;
@@ -438,7 +520,7 @@ VAttachPartitions2(void)
 	/* Only keep track of "/vicepx" partitions since automounter
 	 * may hose us */
 	if (VIsAlwaysAttach(pname, &wouldattach)) {
-	    VCheckPartition(pname, "", 0);
+	    VCheckPartition(pname, "", 0, dyn_attach);
 	} else {
 	    struct afs_stat_st st;
 	    if (wouldattach && VGetPartition(pname, 0) == NULL &&
@@ -470,7 +552,7 @@ VAttachPartitions2(void)
 
 #ifdef AFS_SUN5_ENV
 int
-VAttachPartitions(void)
+VAttachPartitions(int dyn_attach)
 {
     int errors = 0;
     struct mnttab mnt;
@@ -509,14 +591,14 @@ VAttachPartitions(void)
 	}
 #endif /* !AFS_NAMEI_ENV */
 
-	if (VCheckPartition(mnt.mnt_mountp, mnt.mnt_special, logging) < 0)
+	if (VCheckPartition(mnt.mnt_mountp, mnt.mnt_special, logging, dyn_attach) < 0)
 	    errors++;
     }
 
     (void)fclose(mntfile);
 
     /* Process the always-attach partitions, if any. */
-    VAttachPartitions2();
+    VAttachPartitions2(dyn_attach);
 
     return errors;
 }
@@ -524,7 +606,7 @@ VAttachPartitions(void)
 #endif /* AFS_SUN5_ENV */
 #if defined(AFS_SGI_ENV) || (defined(AFS_SUN_ENV) && !defined(AFS_SUN5_ENV)) || defined(AFS_HPUX_ENV)
 int
-VAttachPartitions(void)
+VAttachPartitions(int dyn_attach)
 {
     int errors = 0;
     FILE *mfd;
@@ -546,14 +628,14 @@ VAttachPartitions(void)
 	if (VIsAlwaysAttach(mntent->mnt_dir, NULL))
 	    continue;
 
-	if (VCheckPartition(mntent->mnt_dir, mntent->mnt_fsname, 0) < 0)
+	if (VCheckPartition(mntent->mnt_dir, mntent->mnt_fsname, 0, dyn_attach) < 0)
 	    errors++;
     }
 
     endmntent(mfd);
 
     /* Process the always-attach partitions, if any. */
-    VAttachPartitions2();
+    VAttachPartitions2(dyn_attach);
 
     return errors;
 }
@@ -606,7 +688,7 @@ getmount(struct vmount **vmountpp)
 }
 
 int
-VAttachPartitions(void)
+VAttachPartitions(int dyn_attach)
 {
     int errors = 0;
     int nmounts;
@@ -653,19 +735,19 @@ VAttachPartitions(void)
 	if (VIsAlwaysAttach(part, NULL))
 	    continue;
 
-	if (VCheckPartition(part, vmt2dataptr(vmountp, VMT_OBJECT), 0) < 0)
+	if (VCheckPartition(part, vmt2dataptr(vmountp, VMT_OBJECT), 0, dyn_attach) < 0)
 	    errors++;
     }
 
     /* Process the always-attach partitions, if any. */
-    VAttachPartitions2();
+    VAttachPartitions2(dyn_attach);
 
     return errors;
 }
 #endif
 #if defined(AFS_DARWIN_ENV) || defined(AFS_XBSD_ENV)
 int
-VAttachPartitions(void)
+VAttachPartitions(int dyn_attach)
 {
     int errors = 0;
     struct fstab *fsent;
@@ -687,13 +769,13 @@ VAttachPartitions(void)
 	if (VIsAlwaysAttach(fsent->fs_file, NULL))
 	    continue;
 
-	if (VCheckPartition(fsent->fs_file, fsent->fs_spec, 0) < 0)
+	if (VCheckPartition(fsent->fs_file, fsent->fs_spec, 0, dyn_attach) < 0)
 	    errors++;
     }
     endfsent();
 
     /* Process the always-attach partitions, if any. */
-    VAttachPartitions2();
+    VAttachPartitions2(dyn_attach);
 
     return errors;
 }
@@ -852,7 +934,7 @@ VAttachPartitions(void)
 
 #ifdef AFS_LINUX22_ENV
 int
-VAttachPartitions(void)
+VAttachPartitions(int dyn_attach)
 {
     int errors = 0;
     FILE *mfd;
@@ -873,13 +955,13 @@ VAttachPartitions(void)
 	if (VIsAlwaysAttach(mntent->mnt_dir, NULL))
 	    continue;
 
-	if (VCheckPartition(mntent->mnt_dir, mntent->mnt_fsname, 0) < 0)
+	if (VCheckPartition(mntent->mnt_dir, mntent->mnt_fsname, 0, dyn_attach) < 0)
 	    errors++;
     }
     endmntent(mfd);
 
     /* Process the always-attach partitions, if any. */
-    VAttachPartitions2();
+    VAttachPartitions2(dyn_attach);
 
     return errors;
 }
@@ -1447,6 +1529,97 @@ AddPartitionToTable_r(struct DiskPartition64 *dp)
 {
     opr_Assert(dp->index >= 0 && dp->index <= VOLMAXPARTS);
     DiskPartitionTable[dp->index] = dp;
+}
+
+static void
+DeletePartitionFromTable_r(struct DiskPartition64 *dp)
+{
+    opr_Assert(dp->index >= 0 && dp->index <= VOLMAXPARTS);
+    DiskPartitionTable[dp->index] = NULL;
+}
+
+/**
+ * Add new partitions to the running server.
+ *
+ * @param[out] parts      ids of the new partitions
+ * @param[in]  parts_len  length of parts
+ * @param[out] n_parts    number of new partitions
+ *
+ * @return operation status
+ *   @retval 0 success
+ */
+int
+VAttachNewPartitions(int *parts, int parts_len, int *n_parts)
+{
+    int i;
+    int code, id;
+
+    int existed[VOLMAXPARTS + 1];
+
+    *n_parts = 0;
+    memset(existed, 0, sizeof(existed));
+
+    VOL_LOCK;
+    /* remember partitions already attached */
+    for (i = 0; i < VOLMAXPARTS + 1; i++) {
+	if (DiskPartitionTable[i]) {
+	    id = DiskPartitionTable[i]->index;
+	    existed[id] = 1;
+	}
+    }
+    VOL_UNLOCK;
+
+    code = VAttachPartitions(1);
+
+    VOL_LOCK;
+    for (i = 0; i < VOLMAXPARTS + 1; i++) {
+	if (!DiskPartitionTable[i]) {
+	    continue;
+	}
+	id = DiskPartitionTable[i]->index;
+	if (!existed[id] && *n_parts < parts_len) {
+	    parts[*n_parts] = DiskPartitionTable[i]->index;
+	    *n_parts += 1;
+	}
+    }
+    VOL_UNLOCK;
+
+    return code;
+}
+
+/**
+ * Delete partition object indexed by id.
+ *
+ * Removes partition object from the partition liked list and from the partition
+ * table. The partition in question must be empty.
+ *
+ * @param[in] id partition index number
+ *
+ * @return none
+ */
+void
+VDeletePartitionById(int id)
+{
+    struct DiskPartition64 *curr;
+    struct DiskPartition64 *prev = DiskPartitionList;
+
+    VOL_LOCK;
+    for (curr = DiskPartitionList; curr; curr = curr->next) {
+	if (curr && curr->index == id) {
+	    break;
+	}
+	prev = curr;
+    }
+    if (curr && !curr->vol_list.len) {
+	if (curr == prev) {
+	    DiskPartitionList = curr->next;
+	} else {
+	    prev->next = curr->next;
+	}
+	DeletePartitionFromTable_r(curr);
+	free(curr);
+    }
+    VOL_UNLOCK;
 }
 
 #endif /* AFS_DEMAND_ATTACH_FS */
