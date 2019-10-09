@@ -850,6 +850,51 @@ afscombine1_key(krb5_data *pre_key, afs_int32 combined_enctype, rxgk_key k1,
 }
 
 /**
+ * Derive the raw combined key for the single-token AFSCombineTokens operation.
+ *
+ * @param[out] combined_keydata	The derived combined key.
+ * @param[in] combined_enctype	Enctype for 'combined_keydata'.
+ * @param[in] k1_keydata    The key for the user's token.
+ * @param[in] k1_enctype    Enctype for 'k1_keydata'.
+ * @param[in] destination   The UUID for the destination fileserver.
+ *
+ * @return rxgk error codes.
+ */
+afs_int32
+rxgk_afscombine1_keydata(struct rx_opaque *combined_keydata,
+			 afs_int32 combined_enctype,
+			 struct rx_opaque *k1_keydata, afs_int32 k1_enctype,
+			 afsUUID *destination)
+{
+    afs_int32 code;
+    rxgk_key k1;
+    krb5_data pre_key;
+
+    memset(&pre_key, 0, sizeof(pre_key));
+    memset(combined_keydata, 0, sizeof(*combined_keydata));
+
+    code = rxgk_make_key(&k1, k1_keydata->val, k1_keydata->len, k1_enctype);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = afscombine1_key(&pre_key, combined_enctype, k1, destination);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = rx_opaque_populate(combined_keydata, pre_key.data, pre_key.length);
+    if (code != 0) {
+	goto done;
+    }
+
+ done:
+    rxi_Free(pre_key.data, pre_key.length);
+    rxgk_release_key(&k1);
+    return code;
+}
+
+/**
  * Derive the combined key for the single-token AFSCombineTokens operation.
  *
  * @param[out] combined_key	The derived combined key.

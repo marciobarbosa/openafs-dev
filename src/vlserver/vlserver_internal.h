@@ -10,6 +10,8 @@
 #ifndef _VLSERVER_INTERNAL_H
 #define _VLSERVER_INTERNAL_H
 
+#include <rx/rxgk_types.h>
+
 /**
  * context for a transaction of a single VL operation.
  */
@@ -64,4 +66,8 @@ extern afs_int32 NextEntry(struct vl_ctx *ctx, afs_int32 blockindex,
 extern int FreeBlock(struct vl_ctx *ctx, afs_int32 blockindex);
 extern int vlsetcache(struct vl_ctx *ctx, int locktype);
 extern int vlsynccache(void);
+
+extern afs_int32 vl_rxgk_getfskey(void *rock, afsUUID *destination,
+				  afs_int32 *kvno, afs_int32 *enctype,
+				  rxgk_key *key);
 #endif

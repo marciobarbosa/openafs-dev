@@ -39,4 +39,9 @@
  * of a key.  It has (at least) the keyblock and length, and enctype. */
 typedef struct rxgk_key_s * rxgk_key;
 
+/* Callback function to get a fileserver-specific token-encrypting key. */
+typedef afs_int32 (*rxgk_getfskey_func)(void *rock, afsUUID *destination,
+					afs_int32 *kvno, afs_int32 *enctype,
+					rxgk_key *key);
+
 #endif /* OPENAFS_RXGK_TYPES_H */

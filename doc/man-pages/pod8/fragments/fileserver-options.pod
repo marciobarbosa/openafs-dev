@@ -516,3 +516,13 @@ Set the location of the configuration directory used to configure this
 service.  In a typical configuration this will be F</usr/afs/etc> - this
 option allows the use of alternative configuration locations for testing
 purposes.
+
+=item B<-s2scrypt> (rxgk-crypt | never)
+
+Specify C<rxgk-crypt> to use encrypted rxgk connections for server-to-server
+(s2s) communication. Using rxgk s2s connections will cause the vlserver to
+advertise to clients that this fileserver is rxgk-capable, allowing clients to
+use rxgk credentials to access this fileserver.
+
+Specify C<never> to use rxkad connections instead. The default is currently
+C<never>.

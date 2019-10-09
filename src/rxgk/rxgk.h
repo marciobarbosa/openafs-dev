@@ -92,6 +92,10 @@ afs_int32 rxgk_decrypt_in_key(rxgk_key key, afs_int32 usage, RXGK_Data *in,
 afs_int32 rxgk_derive_tk(rxgk_key *tk, rxgk_key k0, afs_uint32 epoch,
 			 afs_uint32 cid, struct afs_time64 *start_time,
 			 afs_uint32 key_number) AFS_NONNULL();
+afs_int32 rxgk_afscombine1_keydata(struct rx_opaque *combined_keydata,
+				   afs_int32 combined_enctype, struct rx_opaque
+				   *k1_keydata, afs_int32 k1_enctype,
+				   afsUUID *destination) AFS_NONNULL();
 afs_int32 rxgk_afscombine1_key(rxgk_key *combined_key,
 			       afs_int32 combined_enctype, rxgk_key k1,
 			       afsUUID *destination) AFS_NONNULL();
@@ -121,6 +125,10 @@ struct rxgk_gss_service_info {
     rxgk_getkey_func getkey;
     void *getkey_rock;
 
+    /* Callback to get the fileserver-specific key to use for encrypting tokens
+     * for AFSCombineTokens. */
+    rxgk_getfskey_func getfskey;
+    void *getfskey_rock;
 };
 afs_int32 rxgk_setup_gss_service(struct rx_service *svc,
 				 struct rxgk_gss_service_info *info)

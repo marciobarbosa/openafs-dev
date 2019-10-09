@@ -136,6 +136,11 @@ afs_int32 SGSSNegotiate(struct rx_call *z_call, RXGK_StartParams *client_start,
 			u_int *gss_major_status, u_int *gss_minor_status,
 			RXGK_Data *rxgk_info);
 
+afs_int32 SAFSCombineTokens(struct rx_call *call, RXGK_Data *user_tok,
+			    RXGK_Data *cm_tok, RXGK_CombineOptions *options,
+			    afsUUID *destination, RXGK_Data *new_token,
+			    RXGK_TokenInfo *info);
+
 /* rxgk_token.c */
 afs_int32 rxgk_extract_token(RXGK_Data *tc, RXGK_Token *out,
 			     rxgk_getkey_func getkey, void *rock)

@@ -2371,6 +2371,67 @@ append_addr(char *buffer, afs_uint32 addr, size_t buffer_size)
     }
 }
 
+static int
+mh_is_rxgk(struct extentaddr *exp)
+{
+    if ((exp->ex_srvflags & VL_MHFLAG_RXGK_CELLWIDE)) {
+	return 1;
+    }
+    return 0;
+}
+
+static int
+conn_is_rxgk(struct rx_connection *rxconn)
+{
+#ifdef AFS_RXGK_ENV
+    if (rx_SecurityClassOf(rxconn) == RX_SECIDX_GK) {
+	return 1;
+    }
+#endif
+    return 0;
+}
+
+static afs_int32
+RegisterAddrs_rxgk(struct rx_connection *rxconn, struct extentaddr *exp, afsUUID *uuidp)
+{
+    int db_rxgk = mh_is_rxgk(exp);
+    int conn_rxgk = conn_is_rxgk(rxconn);
+    struct uuid_fmtbuf uuid_buf;
+
+    if (conn_rxgk && !db_rxgk) {
+	/*
+	 * The vldb says the fileserver doesn't support rxgk, but the incoming
+	 * connection says it does. Update the entry; flag the fileserver as
+	 * now support rxgk (with the cell-wide key).
+	 */
+	VLog(0, ("Flagging fileserver %s in the VLDB as supporting rxgk with "
+		 "the cell-wide key.\n",
+		 afsUUID_to_string(uuidp, &uuid_buf)));
+	exp->ex_srvflags |= VL_MHFLAG_RXGK_CELLWIDE;
+    }
+
+    if (!conn_rxgk && db_rxgk) {
+	/*
+	 * The vldb says the fileserver does support rxgk, but the incoming
+	 * connection is not an rxgk conn. The rxgk spec says to prohibit this
+	 * (to avoid downgrade attacks), and fail the request with an error.
+	 * For now, though, we let these through with a warning, while rxgk
+	 * stuff is still experimental. In the future, this should cause an
+	 * error, or maybe the behavior could be configurable with a runtime
+	 * flag.
+	 */
+	VLog(0, ("Downgrading fileserver %s from an rxgk cell-wide key "
+		 "fileserver to a non-rxgk fileserver. This is not secure, and "
+		 "will be prohibited in the future! If you did not expect this "
+		 "to happen, it is recommended to figure out what went "
+		 "wrong.\n",
+		 afsUUID_to_string(uuidp, &uuid_buf)));
+	exp->ex_srvflags &= ~VL_MHFLAG_RXGK_CELLWIDE;
+    }
+
+    return 0;
+}
+
 afs_int32
 SVL_RegisterAddrs(struct rx_call *rxcall, afsUUID *uuidp, afs_int32 spare1,
 		  bulkaddrs *addrsp)
@@ -2570,6 +2631,13 @@ SVL_RegisterAddrs(struct rx_call *rxcall, afsUUID *uuidp, afs_int32 spare1,
 		change = 1;
 	}
 	if (!change) {
+	    int db_rxgk = mh_is_rxgk(exp);
+	    int conn_rxgk = conn_is_rxgk(rx_ConnectionOf(rxcall));
+	    if (db_rxgk != conn_rxgk) {
+		change = 1;
+	    }
+	}
+	if (!change) {
 	    return (ubik_EndTrans(ctx.trans));
 	}
     }
@@ -2645,6 +2713,11 @@ SVL_RegisterAddrs(struct rx_call *rxcall, afsUUID *uuidp, afs_int32 spare1,
 		code = VL_IO;
 	    goto abort;
 	}
+    }
+
+    code = RegisterAddrs_rxgk(rx_ConnectionOf(rxcall), exp, uuidp);
+    if (code != 0) {
+	goto abort;
     }
 
     /* Now we have a mh entry to fill in. Update the uuid, bump the
@@ -3699,4 +3772,63 @@ afs_int32
 SVL_ProbeServer(struct rx_call *rxcall)
 {
     return 0;
+}
+
+afs_int32
+vl_rxgk_getfskey(void *rock, afsUUID *destination, afs_int32 *a_kvno,
+		 afs_int32 *a_enctype, rxgk_key *a_key)
+{
+#ifdef AFS_RXGK_ENV
+    struct afsconf_dir *dir = rock;
+    struct vl_ctx ctx;
+    afs_int32 code;
+    int has_rxgk = 0;
+    struct extentaddr *exp = NULL;
+    afs_int32 base;
+
+    /* Don't actually record countRequest/countAbort counters for this; we
+     * don't have an Rx opcode associated with this request. */
+    int this_op = 0;
+
+    countRequest(this_op);
+    code = Init_VLdbase(&ctx, LOCKREAD, this_op);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = FindExtentBlock(&ctx, destination, 0, -1, &exp, &base);
+    if (code != 0) {
+	goto abort;
+    }
+
+    if (mh_is_rxgk(exp)) {
+	has_rxgk = 1;
+    }
+
+    code = ubik_EndTrans(ctx.trans);
+    if (code != 0) {
+	goto done;
+    }
+
+    if (has_rxgk) {
+	/* The requested fileserver does support rxgk. Give back the cell-wide
+	 * rxgk key. */
+	code = afsconf_GetRXGKKey(dir, a_kvno, a_enctype, a_key);
+	goto done;
+    }
+
+    /* The requested fileserver does not support rxgk. Give back a NULL key. */
+    *a_kvno = *a_enctype = 0;
+    *a_key = NULL;
+
+ done:
+    return code;
+
+ abort:
+    countAbort(this_op);
+    ubik_AbortTrans(ctx.trans);
+    return code;
+#else
+    return AFSCONF_NOTFOUND;
+#endif
 }

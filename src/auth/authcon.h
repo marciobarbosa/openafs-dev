@@ -46,6 +46,8 @@ struct afsconf_bsso_info {
     void (*logger)(const char *format, ...);
 
     afs_uint32 host;
+    rxgk_getfskey_func getfskey;
+    void *getfskey_rock;
 };
 
 int afsconf_BuildServerSecurityObjects_int(struct afsconf_bsso_info *info,

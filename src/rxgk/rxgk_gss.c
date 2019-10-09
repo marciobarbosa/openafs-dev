@@ -837,6 +837,10 @@ struct rxgk_gss_server_ctx {
     /* Callback to get our long-term key to use for encrypting tokens. */
     rxgk_getkey_func getkey;
     void *getkey_rock;
+
+    /* Callback to get fileserver-specific keys to use for encrypting tokens. */
+    rxgk_getfskey_func getfskey;
+    void *getfskey_rock;
 };
 
 #if HAVE_KRB5_GSS_REGISTER_ACCEPTOR_IDENTITY
@@ -956,6 +960,9 @@ rxgk_setup_gss_service(struct rx_service *svc,
 
     gk->getkey = info->getkey;
     gk->getkey_rock = info->getkey_rock;
+
+    gk->getfskey = info->getfskey;
+    gk->getfskey_rock = info->getfskey_rock;
 
     rx_SetServiceSpecific(svc, RXGK_SSPECIFIC_GSSNEGO, gk);
     gk = NULL;
@@ -1598,6 +1605,121 @@ SGSSNegotiate(struct rx_call *call, RXGK_StartParams *client_start,
     (void)gss_release_name(&dummy, &asc_res.client_name);
     xdrfree_RXGK_ClientInfo(&info);
 
+    return code;
+}
+
+static afs_int32
+CombineTokens_single(struct rxgk_gss_server_ctx *gk, RXGK_Data *user_tok,
+		     RXGK_CombineOptions *options, afsUUID *destination,
+		     rxgk_key fskey, afs_int32 fskey_kvno, afs_int32 fskey_enctype,
+		     RXGK_Data *new_token, RXGK_TokenInfo *info)
+{
+    afs_int32 code;
+    RXGK_Token token;
+    RXGK_Data combo_keydata;
+    rxgk_key combo_key = NULL;
+
+    memset(&token, 0, sizeof(token));
+    memset(info, 0, sizeof(*info));
+
+    code = rxgk_choose_enctype(&options->enctypes, &info->enctype);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = rxgk_choose_level(options->levels.val, options->levels.len,
+			     &info->level);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = rxgk_extract_token(user_tok, &token, gk->getkey, gk->getkey_rock);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = rxgk_afscombine1_keydata(&combo_keydata, info->enctype, &token.K0,
+				    token.enctype, destination);
+    if (code != 0) {
+	goto done;
+    }
+
+    info->lifetime = token.lifetime;
+    info->bytelife = token.bytelife;
+    info->expiration = token.expirationtime;
+
+    code = rxgk_make_token(new_token, info, &combo_keydata,
+			   token.identities.val, token.identities.len,
+			   fskey, fskey_kvno, fskey_enctype);
+    if (code != 0) {
+	goto done;
+    }
+
+ done:
+    xdrfree_RXGK_Token(&token);
+    rxgk_release_key(&combo_key);
+    return code;
+}
+
+afs_int32
+SAFSCombineTokens(struct rx_call *call, RXGK_Data *user_tok,
+		  RXGK_Data *cm_tok, RXGK_CombineOptions *options,
+		  afsUUID *destination, RXGK_Data *new_token,
+		  RXGK_TokenInfo *info)
+{
+    afs_int32 code;
+    struct rx_connection *conn;
+    struct rxgk_gss_server_ctx *gk = NULL;
+    struct rxgk_sconn *sc;
+    afs_int32 idx;
+    rxgk_key fskey = NULL;
+    afs_int32 enctype = 0;
+    afs_int32 kvno = 0;
+
+    conn = rx_ConnectionOf(call);
+    idx = rx_SecurityClassOf(conn);
+    if (idx != RX_SECIDX_GK) {
+	/* For non-rxgk conns, just pretend this RPC doesn't exist. */
+	return RXGEN_OPCODE;
+    }
+
+    sc = rx_GetSecurityData(conn);
+    if (sc->level == RXGK_LEVEL_CLEAR) {
+	/* The rxgk spec prohibits AFSCombineTokens calls over CLEAR conns. */
+	return RXGK_NOTAUTH;
+    }
+
+    if (cm_tok->len != 0) {
+	/* We don't support combining with cache manager tokens yet. */
+	return RXGK_NOTAUTH;
+    }
+
+    code = get_ctx(call, &gk);
+    if (code != 0) {
+	return code;
+    }
+
+    if (gk->getfskey == NULL) {
+	return misc_error();
+    }
+
+    code = (*gk->getfskey)(gk->getfskey_rock, destination, &kvno, &enctype,
+			   &fskey);
+    if (code != 0) {
+	return code;
+    }
+
+    if (fskey == NULL) {
+	/* The destination fileserver doesn't support rxgk. Indicate this to
+	 * the caller by returning an empty token, and blanked tokeninfo. */
+	memset(new_token, 0, sizeof(*new_token));
+	memset(info, 0, sizeof(*info));
+	return 0;
+    }
+
+    code = CombineTokens_single(gk, user_tok, options, destination, fskey,
+				kvno, enctype, new_token, info);
+    rxgk_release_key(&fskey);
     return code;
 }
 

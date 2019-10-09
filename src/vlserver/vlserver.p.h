@@ -128,6 +128,11 @@ struct extentaddr {
 #define	ex_uniquifier	_ex_un._ex_addrentry.uniquifier
 #define ex_srvflags	_ex_un._ex_addrentry.flags
 
+/* Flag bits for ex_srvflags */
+
+#define VL_MHFLAG_RXGK_CELLWIDE (0x1) /* Server supports rxgk using the
+				       * cell-wide key */
+
 #define VLog(level, str)   ViceLog(level, str)
 
 #endif /* _VLSERVER_ */
