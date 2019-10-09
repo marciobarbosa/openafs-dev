@@ -80,6 +80,7 @@
 # include "sys/lock.h"
 #endif
 #include <rx/rx_globals.h>
+#include <rx/rxgk_int.h>
 
 extern int etext;
 
@@ -185,6 +186,7 @@ afs_uint32 FS_HostAddr_HBO;
 afs_uint32 FS_HostAddrs[ADDRSPERSITE], FS_HostAddr_cnt = 0, FS_registered = 0;
 /* All addresses in FS_HostAddrs are in NBO */
 afsUUID FS_HostUUID;
+static int s2s_rxgk;
 
 #ifdef AFS_DEMAND_ATTACH_FS
 /*
@@ -948,7 +950,8 @@ enum optionsList {
     OPT_dotted,
     OPT_realm,
     OPT_sync,
-    OPT_transarc_logs
+    OPT_transarc_logs,
+    OPT_s2s_crypt
 };
 
 static int
@@ -964,6 +967,7 @@ ParseArgs(int argc, char *argv[])
     char *auditIface = NULL;
     struct cmd_item *auditLogList = NULL;
     char *sync_behavior = NULL;
+    char *s2s_crypt_behavior = NULL;
 
 #if defined(AFS_AIX32_ENV)
     extern int aixlow_water;
@@ -1131,6 +1135,11 @@ ParseArgs(int argc, char *argv[])
 			CMD_LIST, CMD_OPTIONAL, "local realm");
     cmd_AddParmAtOffset(opts, OPT_sync, "-sync",
 			CMD_SINGLE, CMD_OPTIONAL, "always | onclose | never");
+
+    /* rxgk options */
+    cmd_AddParmAtOffset(opts, OPT_s2s_crypt, "-s2scrypt",
+			CMD_SINGLE, CMD_OPTIONAL,
+			"rxgk-crypt | never");
 
     /* testing options */
     cmd_AddParmAtOffset(opts, OPT_logfile, "-logfile", CMD_SINGLE,
@@ -1420,6 +1429,22 @@ ParseArgs(int argc, char *argv[])
 	}
     }
 
+    /* rxgk options */
+    if (cmd_OptionAsString(opts, OPT_s2s_crypt, &s2s_crypt_behavior) == 0) {
+	if (strcmp(s2s_crypt_behavior, "never") == 0) {
+	    /* noop; this is the default */
+#ifdef AFS_RXGK_ENV
+	} else if (strcmp(s2s_crypt_behavior, "rxgk-crypt") == 0) {
+	    s2s_rxgk = 1;
+#endif
+	} else {
+	    printf("Invalid argument for -s2scrypt: %s\n", s2s_crypt_behavior);
+	    return -1;
+	}
+	free(s2s_crypt_behavior);
+	s2s_crypt_behavior = NULL;
+    }
+
     /* anything setting rxpackets must come before this */
     if (cmd_OptionAsInt(opts, OPT_busyat, &optval) == 0) {
 	if (optval < 10) {
@@ -1482,12 +1507,19 @@ afs_int32
 InitPR(void)
 {
     int code;
+    int rxgk_level = RXGK_LEVEL_BOGUS;
+
+#ifdef AFS_RXGK_ENV
+    if (s2s_rxgk) {
+	rxgk_level = RXGK_LEVEL_CRYPT;
+    }
+#endif
 
     /*
      * If this fails, it's because something major is wrong, and is not
      * likely to be time dependent.
      */
-    code = pr_Initialize(2, AFSDIR_SERVER_ETC_DIRPATH, 0);
+    code = pr_Initialize2(2, AFSDIR_SERVER_ETC_DIRPATH, 0, rxgk_level);
     if (code != 0) {
 	ViceLog(0,
 		("Couldn't initialize protection library; code=%d.\n", code));
@@ -1536,7 +1568,11 @@ vl_Initialize(struct afsconf_dir *dir)
     struct rx_connection *serverconns[MAXSERVERS];
 
     memset(serverconns, 0, sizeof(serverconns));
-    code = afsconf_ClientAuth(dir, &sc, &scIndex);
+    if (s2s_rxgk) {
+	code = afsconf_ClientAuthRXGKCrypt(dir, &sc, &scIndex);
+    } else {
+	code = afsconf_ClientAuth(dir, &sc, &scIndex);
+    }
     if (code) {
 	ViceLog(0, ("Could not get security object for localAuth\n"));
 	exit(1);

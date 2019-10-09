@@ -78,7 +78,7 @@ main(void)
     int test_i;
     afs_int32 code;
 
-    plan(4*2);
+    plan(6*2);
 
     for (test_i = 0; test_i < n_tests; test_i++) {
 	rxgk_key k1 = NULL;
@@ -91,6 +91,15 @@ main(void)
 	rxgk_key got_key = NULL;
 	afs_int32 got_enctype;
 	struct rx_opaque got_keydata = RX_EMPTY_OPAQUE;
+
+	code = rxgk_afscombine1_keydata(&got_keydata, combined_enctype,
+					k1_keydata, k1_enctype, destination);
+	is_int(0, code,
+	       "[%d] rxgk_afscombine1_keydata returns success", test_i);
+	is_opaque(combined_keydata, &got_keydata,
+		  "[%d] rxgk_afscombine1_keydata gives correct key data", test_i);
+
+	rx_opaque_freeContents(&got_keydata);
 
 	code = rxgk_make_key(&k1, k1_keydata->val, k1_keydata->len, k1_enctype);
 	is_int(0, code, "[%d] rxgk_make_key returns success", test_i);

@@ -53,3 +53,4 @@ B<fileserver>
     S<<< [B<-offline-shutdown-timeout> <I<timeout in seconds>>] >>>
     S<<< [B<-sync> <I<sync behavior>>] >>>
     S<<< [B<-logfile <I<log file>>] >>> S<<< [B<-config <I<configuration path>>] >>>
+    S<< [B<-s2scrypt> (rxgk-crypt | never)] >>

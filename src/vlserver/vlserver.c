@@ -533,6 +533,8 @@ main(int argc, char **argv)
     bsso.dir = tdir;
     bsso.logger = FSLog;
     bsso.host = host;
+    bsso.getfskey = vl_rxgk_getfskey;
+    bsso.getfskey_rock = tdir;
     code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
 						  &numClasses);
     if (code) {

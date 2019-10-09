@@ -577,6 +577,8 @@ afsconf_BuildServerSecurityObjects_int(struct afsconf_bsso_info *info,
 	gss_info.keytab = keytab;
 	gss_info.getkey = afsconf_GetRXGKKey;
 	gss_info.getkey_rock = dir;
+	gss_info.getfskey = info->getfskey;
+	gss_info.getfskey_rock = info->getfskey_rock;
 
 	code = rxgk_setup_gss_service(service, &gss_info);
 	if (code != 0) {

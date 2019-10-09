@@ -78,36 +78,8 @@ SRXGK_AFSCombineTokens(struct rx_call *z_call, RXGK_Data *user_tok,
 		       afsUUID *destination, RXGK_Data *new_token,
 		       RXGK_TokenInfo *info)
 {
-    struct rx_connection *conn;
-    struct rxgk_sconn *sc;
-    afs_int32 idx;
-
-    conn = rx_ConnectionOf(z_call);
-    idx = rx_SecurityClassOf(conn);
-    if (idx != RX_SECIDX_GK) {
-	/* For non-rxgk conns, just pretend this RPC doesn't exist. */
-	return RXGEN_OPCODE;
-    }
-
-    sc = rx_GetSecurityData(conn);
-    if (sc->level == RXGK_LEVEL_CLEAR) {
-	/* The rxgk spec prohibits AFSCombineTokens calls over CLEAR conns. */
-	return RXGK_NOTAUTH;
-    }
-
-    if (cm_tok->len != 0) {
-	/* We don't support combining with cache manager tokens yet. */
-	return RXGK_NOTAUTH;
-    }
-
-    /*
-     * For now, just always report that the destination fileserver doesn't
-     * support rxgk. We indicate this by returning an empty token, and blanked
-     * tokeninfo.
-     */
-    memset(new_token, 0, sizeof(*new_token));
-    memset(info, 0, sizeof(*info));
-    return 0;
+    return SAFSCombineTokens(z_call, user_tok, cm_tok, options, destination,
+			     new_token, info);
 }
 
 #endif /* AFS_RXGK_GSS_ENV */
