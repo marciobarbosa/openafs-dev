@@ -53,13 +53,16 @@ dnl Check for the characteristics of whatever GSSAPI we found, if we found one
 
 dnl Determine if we should build rxgk
   BUILD_RXGK=no
+  RXGK_BUILD_ONLY="#"
   AS_IF([test x"$BUILD_GSSAPI" = xyes],
     [BUILD_RXGK=yes
+     RXGK_BUILD_ONLY=""
 dnl At this point, we're not using any GSS-API bits yet, but we'll need
 dnl gss_pseudo_random() in the future
      AS_IF([test x"$ac_cv_func_gss_pseudo_random" != xyes],
        [AC_MSG_NOTICE([GSS-API does not have gss_pseudo_random, this may break in the future])])])
   AC_SUBST([BUILD_RXGK])
+  AC_SUBST([RXGK_BUILD_ONLY])
   AS_IF([test x"$BUILD_RXGK" = xyes],
         [AC_DEFINE([BUILD_RXGK], [1], [Build rxgk])])
 

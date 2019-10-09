@@ -112,6 +112,15 @@ CFLAGS_crypto-random.o = $(RFC3961_INCLUDES)
 CFLAGS_crypto-algs.o = $(RFC3961_INCLUDES)
 CFLAGS_n-fold.o = $(RFC3961_INCLUDES)
 
+RXGK_INCLUDES = -I$(TOP_SRCDIR)/rxgk -I$(TOP_OBJDIR)/src/rxgk
+
+CFLAGS_rxgk_client.o = $(RXGK_INCLUDES)
+CFLAGS_Krxgk_int.cs.o = $(RXGK_INCLUDES)
+CFLAGS_Krxgk_int.xdr.o = $(RXGK_INCLUDES)
+CFLAGS_rxgk_util.o = $(RXGK_INCLUDES)
+CFLAGS_rxgk_packet.o = $(RXGK_INCLUDES)
+CFLAGS_rxgk_crypto_rfc3961.o = $(RXGK_INCLUDES)
+
 # System specific build commands and flags
 <linux26 linux_26>
 # All the platform-specific and kernel-related things are provided by

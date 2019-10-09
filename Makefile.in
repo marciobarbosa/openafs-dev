@@ -483,7 +483,7 @@ ${DEST}/bin/dedebug: dedebug
 #
 libafs: config export rfc3961 hcrypto lwp_depinstall \
 	rx_depinstall vlserver_depinstall tvlserver_depinstall \
-	rxkad_depinstall fsint_depinstall \
+	rxgk_depinstall rxkad_depinstall fsint_depinstall \
 	libacl_depinstall afs_depinstall dir_depinstall \
 	rxstat_depinstall sys_depinstall auth_depinstall \
 	rxosdsrc
@@ -491,9 +491,10 @@ libafs: config export rfc3961 hcrypto lwp_depinstall \
 	+${COMPILE_PART1} libafs ${COMPILE_PART2}
 
 libafs_tree: export lwp_depinstall rx_depinstall vlserver_depinstall \
-		tvlserver_depinstall rxkad_depinstall fsint_depinstall \
-		libacl_depinstall afs_depinstall dir_depinstall \
-		rxstat_depinstall sys_depinstall auth_depinstall
+		tvlserver_depinstall rxgk_depinstall rxkad_depinstall \
+		fsint_depinstall libacl_depinstall afs_depinstall \
+		dir_depinstall rxstat_depinstall sys_depinstall \
+		auth_depinstall
 	${TOP_SRCDIR}/config/make_libafs_tree.pl \
 		-sn $(SYS_NAME) \
 		-os $(MKAFS_OSTYPE) \

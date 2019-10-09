@@ -147,6 +147,14 @@ extern struct afs_conn *afs_ConnByMHosts(struct server *ahosts[],
 				     afs_int32 locktype,
 				     afs_int32 replicated,
 				     unsigned short service,
+				     struct rx_connection **rxconn)
+				     AFS_NONNULL();
+extern struct afs_conn *afs_ConnByMHostsUser(struct server *ahosts[],
+				     unsigned short aport,
+				     struct unixuser *tu,
+				     afs_int32 locktype,
+				     afs_int32 replicated,
+				     unsigned short service,
 				     struct rx_connection **rxconn);
 extern struct afs_conn *afs_ConnByHost(struct server *aserver,
 				   unsigned short aport, afs_int32 acell,
@@ -155,6 +163,14 @@ extern struct afs_conn *afs_ConnByHost(struct server *aserver,
 				   afs_int32 replicated,
 				   unsigned short service,
 				   struct rx_connection **rxconn);
+extern struct afs_conn *afs_ConnByHostUser(struct server *aserver,
+				   unsigned short aport,
+				   struct unixuser *tu, int aforce,
+				   afs_int32 locktype,
+				   afs_int32 replicated,
+				   unsigned short service,
+				   struct rx_connection **rxconn)
+				   AFS_NONNULL();
 extern void afs_PutConn(struct afs_conn *ac, struct rx_connection *rxconn,
                         afs_int32 locktype);
 extern void afs_ReleaseConns(struct sa_conn_vector *tcv);

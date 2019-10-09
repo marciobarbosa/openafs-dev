@@ -68,6 +68,11 @@ struct rx_securityClass *rxgk_NewClientSecurityObject(RXGK_Level level,
 						      afs_int32 enctype,
 						      rxgk_key k0,
 						      RXGK_Data *token);
+afs_int32 rxgk_CombineSingleClientSecObj(struct rx_connection *vl_rxconn,
+					 afsUUID *client_uuid,
+					 afsUUID *server_uuid,
+					 struct rx_securityClass **a_sc)
+					 AFS_NONNULL((1,3,4));
 
 /* rxgk_crypto_IMPL.c (currently rfc3961 is the only IMPL) */
 afs_int32 rxgk_make_key(rxgk_key *key_out, void *raw_key, afs_uint32 length,
@@ -87,6 +92,9 @@ afs_int32 rxgk_decrypt_in_key(rxgk_key key, afs_int32 usage, RXGK_Data *in,
 afs_int32 rxgk_derive_tk(rxgk_key *tk, rxgk_key k0, afs_uint32 epoch,
 			 afs_uint32 cid, struct afs_time64 *start_time,
 			 afs_uint32 key_number) AFS_NONNULL();
+afs_int32 rxgk_afscombine1_key(rxgk_key *combined_key,
+			       afs_int32 combined_enctype, rxgk_key k1,
+			       afsUUID *destination) AFS_NONNULL();
 afs_int32 rxgk_cipher_expansion(rxgk_key k0, afs_uint32 *len_out) AFS_NONNULL();
 afs_int32 rxgk_nonce(RXGK_Data *nonce, afs_uint32 len) AFS_NONNULL();
 int rxgk_enctype_better(afs_int32 old_enctype, afs_int32 new_enctype);

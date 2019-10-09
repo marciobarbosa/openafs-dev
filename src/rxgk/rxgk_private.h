@@ -107,6 +107,9 @@ struct rxgk_cprivate {
     afs_int32 enctype;
     RXGK_Level level;
     RXGK_Data token;
+    int has_uuid;
+    afsUUID client_uuid;
+    afsUUID server_uuid;
 };
 /**
  * Per-connection security data for client.
