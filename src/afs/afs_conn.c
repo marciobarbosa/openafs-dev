@@ -41,6 +41,10 @@
 #include <inet/ip.h>
 #endif
 
+#ifdef AFS_RXGK_ENV
+# include <rx/rxgk.h>
+#endif
+
 /* Exported variables */
 afs_rwlock_t afs_xconn;		/* allocation lock for new things */
 afs_rwlock_t afs_xinterface;	/* for multiple client address */
@@ -215,48 +219,225 @@ release_conns_vector(struct sa_conn_vector *tcv)
 
 unsigned int VNOSERVERS = 0;
 
+#ifdef AFS_RXGK_ENV
+static afs_int32
+pickSecurityObject_rxgk_fs(struct srvAddr *sap, struct unixuser *tu,
+			   struct rx_securityClass **a_secObj)
+{
+    struct cell *cell;
+    afsUUID fsuuid;
+    struct vrequest *treq = NULL;
+    afs_int32 code;
+    afsUUID myuuid;
+    struct afs_conn *vl_conn;
+    struct rx_connection *rxconn = NULL;
+
+    *a_secObj = NULL;
+
+    if (!(sap->server->flags & SRVR_MULTIHOMED)) {
+	/*
+	 * Server doesn't have a UUID; assume it doesn't support rxgk (after
+	 * all, we have no UUID to provide to the AFSCombineTokens operation).
+	 */
+	return 0;
+    }
+
+    code = afs_CreateReq(&treq, afs_osi_credp);
+    if (code != 0) {
+	return code;
+    }
+
+    myuuid = afs_cb_interface.uuid;
+    fsuuid = sap->server->sr_uuid;
+    cell = sap->server->cell;
+
+    do {
+	vl_conn = afs_ConnByMHostsUser(cell->cellHosts, cell->vlport, tu,
+				       SHARED_LOCK, 0, RXGK_SERVICE_ID, &rxconn);
+	if (vl_conn) {
+	    AFS_GUNLOCK();
+	    code = rxgk_CombineSingleClientSecObj(rxconn, &myuuid, &fsuuid, a_secObj);
+	    AFS_GLOCK();
+	} else {
+	    code = -1;
+	}
+    } while (afs_Analyze(vl_conn, rxconn, code, NULL, treq, -1, SHARED_LOCK,
+			 cell));
+
+    code = afs_CheckCode(code, treq, 66);
+    afs_DestroyReq(treq);
+
+    if (code != 0) {
+	return code;
+    }
+
+    if (*a_secObj == NULL) {
+	char procname[256];
+	/*
+	 * The target fileserver doesn't support RXGK (according to the
+	 * vlserver). This is not an error; we're just telling the caller that
+	 * RXGK is not appropriate for this connection, so choose a different
+	 * security class.
+	 */
+	osi_procname(procname, sizeof(procname));
+	afs_warn("afs: rxgk: Falling back to non-rxgk auth for pid %d (%s), "
+		 "since the vldb reports the target fileserver does not "
+		 "support rxgk.\n",
+		 MyPidxx2Pid(MyPidxx), procname);
+    }
+
+    return 0;
+}
+
+static afs_int32
+pickSecurityObject_rxgk_vl(struct rxgkToken *rxgk_token,
+			   struct rx_securityClass **a_secObj)
+{
+    struct ClearTokenRXGK *clearToken = &rxgk_token->clearToken;
+    rxgk_key k0;
+    afs_int32 code;
+
+    /*
+     * When we support per-CM tokens, this should possibly use the CM tokens
+     * for vlserver conns. For now, just use the user's tokens for vlserver
+     * conns.
+     */
+    code = rxgk_make_key(&k0, clearToken->k0.val, clearToken->k0.len,
+			 clearToken->enctype);
+    if (code != 0) {
+	return code;
+    }
+    *a_secObj = rxgk_NewClientSecurityObject(clearToken->level,
+					     clearToken->enctype,
+					     k0,
+					     &rxgk_token->token);
+    osi_Assert(*a_secObj != NULL);
+    rxgk_release_key(&k0);
+    return 0;
+}
+
+static afs_int32
+pickSecurityObject_rxgk(struct srvAddr *sap, unsigned short aport,
+			struct unixuser *tu, struct rx_securityClass
+			**a_secObj, int *a_secLevel, int *need_net)
+{
+    union tokenUnion *tokenU;
+    struct rxgkToken *rxgk_token;
+    afs_int32 code;
+
+    tokenU = afs_FindToken(tu->tokens, RX_SECIDX_GK);
+    if (tokenU == NULL) {
+	/* We don't have rxgk tokens; tell the caller to use a different
+	 * security class. */
+	*a_secObj = NULL;
+	return 0;
+    }
+
+    rxgk_token = &tokenU->rxgk;
+
+    if (aport == sap->server->cell->fsport) {
+	/*
+	 * This for a fileserver conn; we need to call combinetokens etc to get
+	 * our fs-specific tokens.
+	 */
+	if (need_net != NULL) {
+	    *need_net = 1;
+	    return 0;
+	}
+	code = pickSecurityObject_rxgk_fs(sap, tu, a_secObj);
+    } else {
+	code = pickSecurityObject_rxgk_vl(rxgk_token, a_secObj);
+    }
+
+    if (*a_secObj != NULL) {
+	*a_secLevel = RX_SECIDX_GK;
+    }
+    return code;
+}
+#endif /* AFS_RXGK_ENV */
+
 /**
  * Pick a security object to use for a connection to a given server,
  * by a given user
  *
- * @param[in] conn
- *	The AFS connection for which the security object is required
+ * @param[in] sap
+ *	The srvAddr for the server we're trying to contact.
+ * @param[in] aport
+ *	The port we're trying to contact.
+ * @param[in] tu
+ *	The user we're obtaining a security object for.
+ * @param[out] secObj
+ *	The rx security object to use.
  * @param[out] secLevel
- *	The security level of the returned object
+ *	The security level of the returned object.
+ * @param[out] need_net
+ *	If called with NULL, afs_xconn is not held, and we can hit the net to
+ *	calculate the security object. If non-NULL, afs_xconn is held and we
+ *	can't (shouldn't) hit the net. If we need to hit the net to calculate
+ *	the security object, '*need_net' is set to 1, and no security object is
+ *	returned.
  *
- * @return
- *	An rx security object. This function is guaranteed to return
- *	an object, although that object may be rxnull (with a secLevel
- *	of 0)
+ * @return error codes
  */
-static struct rx_securityClass *
-afs_pickSecurityObject(struct afs_conn *conn, int *secLevel)
+static afs_int32
+afs_pickSecurityObject(struct srvAddr *sap, unsigned short aport,
+		       struct unixuser *tu, struct rx_securityClass **secObj,
+		       int *secLevel, int *need_net)
 {
-    struct rx_securityClass *secObj = NULL;
     union tokenUnion *token;
 
     /* Do we have tokens ? */
-    if (conn->parent->user->states & UHasTokens) {
-	token = afs_FindToken(conn->parent->user->tokens, RX_SECIDX_KAD);
+    if (tu->states & UHasTokens) {
+#ifdef AFS_RXGK_ENV
+	afs_int32 code = pickSecurityObject_rxgk(sap, aport, tu, secObj, secLevel,
+						 need_net);
+	if (code != 0) {
+	    char procname[256];
+	    /*
+	     * We encountered an error during rxgk token negotiation. The rxgk
+	     * spec says we must not fallback to rxkad for such errors (to
+	     * prevent downgrade attacks). But for now, we fallback to rxkad
+	     * anyway while rxgk support is still experimental. In the future,
+	     * we should not fallback here.
+	     */
+	    osi_procname(procname, sizeof(procname));
+	    afs_warn("afs: rxgk: Falling back to non-rxgk auth for pid %d (%s), "
+		     "due to error %d during rxgk token negotiation.\n",
+		     MyPidxx2Pid(MyPidxx), procname, code);
+	    *secObj = NULL;
+	    code = 0;
+	}
+	if (*secObj != NULL) {
+	    /* If we successfully got a security object, return it. Otherwise,
+	     * we fallback below. */
+	    return 0;
+	}
+	if (need_net != NULL && *need_net) {
+	    /* We need to hit the net; we can't get secObj yet. */
+	    return 0;
+	}
+#endif
+
+	token = afs_FindToken(tu->tokens, RX_SECIDX_KAD);
 	if (token) {
 	    *secLevel = RX_SECIDX_KAD;
 	    /* kerberos tickets on channel 2 */
-	    secObj = rxkad_NewClientSecurityObject(
+	    *secObj = rxkad_NewClientSecurityObject(
 			 cryptall ? rxkad_crypt : rxkad_clear,
                          (struct ktc_encryptionKey *)
 			       token->rxkad.clearToken.HandShakeKey,
 		         token->rxkad.clearToken.AuthHandle,
 		         token->rxkad.ticketLen, token->rxkad.ticket);
 	    /* We're going to use this token, so populate the viced */
-	    conn->parent->user->viceId = token->rxkad.clearToken.ViceId;
+	    tu->viceId = token->rxkad.clearToken.ViceId;
 	}
      }
-     if (secObj == NULL) {
+     if (*secObj == NULL) {
 	*secLevel = 0;
-	secObj = rxnull_NewClientSecurityObject();
+	*secObj = rxnull_NewClientSecurityObject();
      }
 
-     return secObj;
+     return 0;
 }
 
 
@@ -388,15 +569,17 @@ afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
     int foundvec;
     struct afs_conn *tc = NULL;
     struct sa_conn_vector *tcv = NULL;
-    struct rx_securityClass *csec; /*Security class object */
-    int isec; /*Security index */
+    struct rx_securityClass *csec = NULL; /*Security class object */
+    int isec = 0; /*Security index */
     int isrep = (replicated > 0)?CONN_REPLICATED:0;
+
+ retry:
 
     *rxconn = NULL;
 
     if (!sap || ((sap->sa_flags & SRVR_ISDOWN) && !force_if_down)) {
 	/* sa is known down, and we don't want to force it.  */
-	return NULL;
+	goto error;
     }
 
     /* find cached connection */
@@ -419,13 +602,13 @@ afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
     if (!tc && !create) {
         /* Not found and can't create a new one. */
         ReleaseSharedLock(&afs_xconn);
-        return NULL;
+	goto error;
     }
 
     if (AFS_IS_DISCONNECTED && !AFS_IN_SYNC) {
         afs_warnuser("afs_ConnBySA: disconnected\n");
         ReleaseSharedLock(&afs_xconn);
-        return NULL;
+	goto error;
     }
 
     if (!foundvec && create) {
@@ -458,7 +641,7 @@ afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
     if (!tc) {
         /* Not found and no alternatives. */
         ReleaseSharedLock(&afs_xconn);
-        return NULL;
+	goto error;
     }
 
     if (tc->refCount > 10000) {
@@ -488,20 +671,46 @@ afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
     }
 
     if (tc->forceConnectFS) {
+	int need_net = 0;
 	UpgradeSToWLock(&afs_xconn, 38);
+
+	if (csec == NULL) {
+	    afs_int32 code;
+	    code = afs_pickSecurityObject(sap, aport, tu, &csec, &isec,
+					  &need_net);
+	    if (code != 0) {
+		ReleaseWriteLock(&afs_xconn);
+		goto error;
+	    }
+	    if (need_net) {
+		/*
+		 * We need to hit the net to pick a security object. Call
+		 * pickSecurityObject again with afs_xconn dropped, and jump to
+		 * 'retry' (in case something changed while our locks were
+		 * dropped).
+		 */
+		ReleaseWriteLock(&afs_xconn);
+		code = afs_pickSecurityObject(sap, aport, tu, &csec, &isec,
+					      NULL);
+		if (code != 0) {
+		    goto error;
+		}
+		osi_Assert(csec != NULL);
+		goto retry;
+	    }
+	    osi_Assert(csec != NULL);
+	}
+
 	if (tc->id) {
 	    if (sap->natping == tc)
 		sap->natping = NULL;
 	    AFS_GUNLOCK();
             rx_SetConnSecondsUntilNatPing(tc->id, 0);
             rx_DestroyConnection(tc->id);
-	    AFS_GLOCK();
+	} else {
+	    AFS_GUNLOCK();
 	}
-	isec = 0;
 
-	csec = afs_pickSecurityObject(tc, &isec);
-
-	AFS_GUNLOCK();
 	tc->id = rx_NewConnection(sap->sa_ip, aport, service, csec, isec);
 	AFS_GLOCK();
 	if (service != RXAFS_SERVICE_ID) {
@@ -526,8 +735,6 @@ afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
 	}
 
 	tc->forceConnectFS = 0;	/* apparently we're appropriately connected now */
-	if (csec)
-	    rxs_Release(csec);
 	ConvertWToSLock(&afs_xconn);
     } /* end of if (tc->forceConnectFS)*/
 
@@ -537,7 +744,15 @@ afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
     AFS_GLOCK();
 
     ReleaseSharedLock(&afs_xconn);
+
+    if (csec)
+	rxs_Release(csec);
     return tc;
+
+ error:
+    if (csec)
+	rxs_Release(csec);
+    return NULL;
 }
 
 /**
@@ -549,8 +764,7 @@ afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
  *
  * @param aserver Server to connect to.
  * @param aport Connection port.
- * @param acell The cell where all of this happens.
- * @param areq The request.
+ * @param tu The calling user.
  * @param aforce Force connection?
  * @param locktype Type of lock to be used.
  * @param replicated
@@ -559,12 +773,11 @@ afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
  * @return The established connection.
  */
 struct afs_conn *
-afs_ConnByHost(struct server *aserver, unsigned short aport, afs_int32 acell,
-	       struct vrequest *areq, int aforce, afs_int32 locktype,
-	       afs_int32 replicated, unsigned short service,
-	       struct rx_connection **rxconn)
+afs_ConnByHostUser(struct server *aserver, unsigned short aport,
+		   struct unixuser *tu, int aforce, afs_int32 locktype,
+		   afs_int32 replicated, unsigned short service,
+		   struct rx_connection **rxconn)
 {
-    struct unixuser *tu;
     struct afs_conn *tc = NULL;
     struct srvAddr *sa = NULL;
 
@@ -582,8 +795,6 @@ afs_ConnByHost(struct server *aserver, unsigned short aport, afs_int32 acell,
   2.  create a connection at an address believed to be up
       (if aforce is true, create a connection at the first address)
 */
-
-    tu = afs_GetUser(areq->uid, acell, SHARED_LOCK);
 
     for (sa = aserver->addr; sa; sa = sa->next_sa) {
 	tc = afs_ConnBySA(sa, aport, tu, aforce,
@@ -603,11 +814,23 @@ afs_ConnByHost(struct server *aserver, unsigned short aport, afs_int32 acell,
 	}
     }
 
+    return tc;
+}				/*afs_ConnByHostUser */
+
+struct afs_conn *
+afs_ConnByHost(struct server *aserver, unsigned short aport, afs_int32 acell,
+	       struct vrequest *areq, int aforce, afs_int32 locktype,
+	       afs_int32 replicated, unsigned short service,
+	       struct rx_connection **rxconn)
+{
+    struct afs_conn *tc;
+    struct unixuser *tu;
+    tu = afs_GetUser(areq->uid, acell, SHARED_LOCK);
+    tc = afs_ConnByHostUser(aserver, aport, tu, aforce, locktype, replicated,
+			    service, rxconn);
     afs_PutUser(tu, SHARED_LOCK);
     return tc;
-
-}				/*afs_ConnByHost */
-
+}
 
 /**
  * Connect by multiple hosts.
@@ -649,6 +872,33 @@ afs_ConnByMHosts(struct server *ahosts[], unsigned short aport,
     return NULL;
 
 }				/*afs_ConnByMHosts */
+
+struct afs_conn *
+afs_ConnByMHostsUser(struct server *ahosts[], unsigned short aport,
+		     struct unixuser *tu, afs_int32 locktype,
+		     afs_int32 replicated, unsigned short service,
+		     struct rx_connection **rxconn)
+{
+    afs_int32 i;
+    struct afs_conn *tconn;
+    struct server *ts;
+
+    *rxconn = NULL;
+
+    /* try to find any connection from the set */
+    AFS_STATCNT(afs_ConnByMHosts);
+    for (i = 0; i < AFS_MAXCELLHOSTS; i++) {
+	if ((ts = ahosts[i]) == NULL)
+	    break;
+	tconn = afs_ConnByHostUser(ts, aport, tu, 0, locktype,
+				   replicated, service, rxconn);
+	if (tconn) {
+	    return tconn;
+	}
+    }
+    return NULL;
+
+}				/*afs_ConnByMHostsUser */
 
 
 /**

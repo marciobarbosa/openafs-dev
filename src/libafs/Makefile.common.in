@@ -71,6 +71,14 @@ single_destdir_libafs: dest_libafs
 # placeholder for any sources that are built prior to compiling libafs
 depsrcs: 
 
+@RXGK_BUILD_ONLY@AFS_RXGK_OBJS= \
+@RXGK_BUILD_ONLY@	rxgk_client.o \
+@RXGK_BUILD_ONLY@	Krxgk_int.cs.o \
+@RXGK_BUILD_ONLY@	Krxgk_int.xdr.o \
+@RXGK_BUILD_ONLY@	rxgk_util.o \
+@RXGK_BUILD_ONLY@	rxgk_packet.o \
+@RXGK_BUILD_ONLY@	rxgk_crypto_rfc3961.o
+
 AFSAOBJS = \
 	sha256-kernel.o \
 	rand-timer-kernel.o \
@@ -196,7 +204,7 @@ AFSAOBJS = \
 	crypto-keyblock.o \
 	crypto-store-int.o \
 	crypto-random.o	\
-	afs_uuid.o $(AFS_OS_OBJS)
+	afs_uuid.o $(AFS_OS_OBJS) $(AFS_RXGK_OBJS)
 
 # These next two allow nfs and nonfs builds to occur in the same directory.
 AFSNFSOBJS = \
@@ -644,6 +652,32 @@ CFLAGS-crypto-context.o = $(RFC3961_INCLUDES)
 crypto-ct.o: $(TOP_SRCDIR)/external/heimdal/roken/ct.c
 	$(CRULE_OPT) $(TOP_SRCDIR)/external/heimdal/roken/ct.c
 CFLAGS-crypto-ct.o = $(RFC3961_INCLUDES)
+
+RXGK_INCLUDES = -I$(TOP_SRCDIR)/rxgk -I$(TOP_OBJDIR)/src/rxgk
+
+rxgk_client.o: $(TOP_SRCDIR)/rxgk/rxgk_client.c
+	$(CRULE_OPT) $(TOP_SRCDIR)/rxgk/rxgk_client.c
+CFLAGS-rxgk_client.o = $(RXGK_INCLUDES)
+
+Krxgk_int.cs.o: $(TOP_OBJDIR)/src/rxgk/Krxgk_int.cs.c
+	$(CRULE_OPT) $(TOP_OBJDIR)/src/rxgk/Krxgk_int.cs.c
+CFLAGS-Krxgk_int.cs.o = $(RXGK_INCLUDES)
+
+Krxgk_int.xdr.o: $(TOP_OBJDIR)/src/rxgk/Krxgk_int.xdr.c
+	$(CRULE_OPT) $(TOP_OBJDIR)/src/rxgk/Krxgk_int.xdr.c
+CFLAGS-Krxgk_int.xdr.o = $(RXGK_INCLUDES)
+
+rxgk_util.o: $(TOP_SRCDIR)/rxgk/rxgk_util.c
+	$(CRULE_OPT) $(TOP_SRCDIR)/rxgk/rxgk_util.c
+CFLAGS-rxgk_util.o = $(RXGK_INCLUDES)
+
+rxgk_packet.o: $(TOP_SRCDIR)/rxgk/rxgk_packet.c
+	$(CRULE_OPT) $(TOP_SRCDIR)/rxgk/rxgk_packet.c
+CFLAGS-rxgk_packet.o = $(RXGK_INCLUDES)
+
+rxgk_crypto_rfc3961.o: $(TOP_SRCDIR)/rxgk/rxgk_crypto_rfc3961.c
+	$(CRULE_OPT) $(TOP_SRCDIR)/rxgk/rxgk_crypto_rfc3961.c
+CFLAGS-rxgk_crypto_rfc3961.o = $(RXGK_INCLUDES)
 
 # Files which are specific to particular architectures/targets
 # but have common build rules. Place here instead of duplicating

@@ -11,9 +11,12 @@ LIBS = $(abs_top_builddir)/tests/common/libafstest_common.la \
        $(abs_top_builddir)/src/rx/liboafs_rx.la \
        $(abs_top_builddir)/src/rxgk/liboafs_rxgk.la
 
-tests = conv-t derive-t krb5gss-t
+tests = combine-t conv-t derive-t krb5gss-t
 
 all check test tests: $(tests)
+
+combine-t: combine-t.o $(LIBS)
+	$(LT_LDRULE_static) combine-t.o $(LIBS) $(LIB_roken) $(XLIBS)
 
 conv-t: conv-t.o $(LIBS)
 	$(LT_LDRULE_static) conv-t.o $(LIBS) $(LIB_roken) $(XLIBS)

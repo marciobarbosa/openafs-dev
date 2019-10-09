@@ -50,6 +50,8 @@
 
 #include "rxgk_private.h"
 
+static const afsUUID empty_uuid;
+
 static void
 cprivate_destroy(struct rxgk_cprivate *cp)
 {
@@ -181,6 +183,44 @@ rxgk_ClientPreparePacket(struct rx_securityClass *aobj, struct rx_call *acall,
  * Helpers for GetResponse.
  */
 
+static int
+pack_appdata(struct rx_opaque *out, RXGK_Authenticator_AFSAppData *appdata)
+{
+    XDR xdrs;
+    u_int len;
+    int code;
+
+    memset(&xdrs, 0, sizeof(xdrs));
+    memset(out, 0, sizeof(*out));
+
+    xdrlen_create(&xdrs);
+    if (!xdr_RXGK_Authenticator_AFSAppData(&xdrs, appdata)) {
+	code = RXGEN_CC_MARSHAL;
+	goto done;
+    }
+    len = xdr_getpos(&xdrs);
+    code = rx_opaque_alloc(out, len);
+    if (code != 0) {
+	code = RXGEN_CC_MARSHAL;
+	goto done;
+    }
+    xdr_destroy(&xdrs);
+    xdrmem_create(&xdrs, out->val, len, XDR_ENCODE);
+    if (!xdr_RXGK_Authenticator_AFSAppData(&xdrs, appdata)) {
+	code = RXGEN_CC_MARSHAL;
+	goto done;
+    }
+
+ done:
+    if (code != 0) {
+	rx_opaque_freeContents(out);
+    }
+    if (xdrs.x_ops) {
+	xdr_destroy(&xdrs);
+    }
+    return code;
+}
+
 /*
  * Populate the RXGK_Authenticator structure.
  * The caller is responsible for pre-zeroing the structure and freeing
@@ -214,6 +254,19 @@ fill_authenticator(RXGK_Authenticator *authenticator, RXGK_Challenge *challenge,
     authenticator->call_numbers.len = RX_MAXCALLS;
     for (call_i = 0; call_i < RX_MAXCALLS; call_i++)
 	authenticator->call_numbers.val[call_i] = (afs_uint32)call_numbers[call_i];
+
+    if (cp->has_uuid) {
+	RXGK_Authenticator_AFSAppData appdata;
+	memset(&appdata, 0, sizeof(appdata));
+
+	appdata.client_uuid = cp->client_uuid;
+	appdata.target_uuid = cp->server_uuid;
+
+	ret = pack_appdata(&authenticator->appdata, &appdata);
+	if (ret != 0) {
+	    return ret;
+	}
+    }
     return 0;
 }
 
@@ -522,20 +575,10 @@ static struct rx_securityOps rxgk_client_ops = {
     0,					/* spare */
 };
 
-/*
- * Create an rxgk client security object
- *
- * @param[in] level	The security level of the token; this must be the
- *			level used for all connections using this security
- *			object.
- * @param[in] enctype	The RFC 3961 enctype of k0.
- * @param[in] k0	The master key of the token.
- * @param[in] token	The rxgk token used to authenticate the connection.
- * @return NULL on failure, and a pointer to the security object on success.
- */
-struct rx_securityClass *
-rxgk_NewClientSecurityObject(RXGK_Level level, afs_int32 enctype, rxgk_key k0,
-			     RXGK_Data *token)
+static struct rx_securityClass *
+NewClientSecurityObject(RXGK_Level level, afs_int32 enctype, rxgk_key k0,
+			     RXGK_Data *token, afsUUID *client_uuid,
+			     afsUUID *server_uuid)
 {
     struct rx_securityClass *sc = NULL;
     struct rxgk_cprivate *cp = NULL;
@@ -558,10 +601,140 @@ rxgk_NewClientSecurityObject(RXGK_Level level, afs_int32 enctype, rxgk_key k0,
     if (rx_opaque_copy(&cp->token, token) != 0)
 	goto error;
 
+    if (client_uuid != NULL) {
+	cp->client_uuid = *client_uuid;
+	if (memcmp(client_uuid, &empty_uuid, sizeof(empty_uuid)) != 0) {
+	    cp->has_uuid = 1;
+	}
+    }
+    if (server_uuid != NULL) {
+	cp->server_uuid = *server_uuid;
+	if (memcmp(server_uuid, &empty_uuid, sizeof(empty_uuid)) != 0) {
+	    cp->has_uuid = 1;
+	}
+    }
+
     return sc;
 
  error:
     rxi_Free(sc, sizeof(*sc));
     cprivate_destroy(cp);
     return NULL;
+}
+
+/*
+ * Create an rxgk client security object
+ *
+ * @param[in] level	The security level of the token; this must be the
+ *			level used for all connections using this security
+ *			object.
+ * @param[in] enctype	The RFC 3961 enctype of k0.
+ * @param[in] k0	The master key of the token.
+ * @param[in] token	The rxgk token used to authenticate the connection.
+ * @return NULL on failure, and a pointer to the security object on success.
+ */
+struct rx_securityClass *
+rxgk_NewClientSecurityObject(RXGK_Level level, afs_int32 enctype, rxgk_key k0,
+			     RXGK_Data *token)
+{
+    return NewClientSecurityObject(level, enctype, k0, token, NULL, NULL);
+}
+
+/**
+ * Generate a per-fileserver rxgk client security object from an authenticated
+ * vlserver conn, using the single-token AFSCombineTokens operation.
+ *
+ * @param[in] vl_rxconn	    An rx_connection to the vlserver, authenticated
+ *			    with the rxgk token to use with the
+ *			    AFSCombineTokens operation.
+ * @param[in] client_uuid   The uuid of the client. (Optional)
+ * @param[in] server_uuid   The uuid of the fileserver we're generating a
+ *			    security object for.
+ * @param[out] a_sc	    On success, set to security object to use for the
+ *			    given fileserver. If the vlserver reports that the
+ *			    fileserver does not support rxgk, set to NULL on
+ *			    success.
+ * @return rxgk error codes.
+ */
+afs_int32
+rxgk_CombineSingleClientSecObj(struct rx_connection *vl_rxconn,
+			       afsUUID *client_uuid, afsUUID *server_uuid,
+			       struct rx_securityClass **a_sc)
+{
+    afs_int32 code;
+    struct rx_securityClass *sc;
+    struct rxgk_cprivate *cp;
+    RXGK_CombineOptions opts;
+    RXGK_Data combined_tokblob = RX_EMPTY_OPAQUE;
+    rxgk_key combined_key = NULL;
+    RXGK_TokenInfo combined_tokinfo;
+
+    /* This is for the single-token 'combine' op; we have no CM token. */
+    RXGK_Data cm_tok = RX_EMPTY_OPAQUE;
+
+    memset(&opts, 0, sizeof(opts));
+    memset(&combined_tokinfo, 0, sizeof(combined_tokinfo));
+
+    *a_sc = NULL;
+
+    sc = rx_SecurityObjectOf(vl_rxconn);
+
+    /* Basic sanity checks. Check that we have a client conn to the rxgk
+     * service, with an rxgk security object. */
+    if (rx_SecurityClassOf(vl_rxconn) != RX_SECIDX_GK ||
+	rx_ServiceIdOf(vl_rxconn) != RXGK_SERVICE_ID ||
+	!rx_IsClientConn(vl_rxconn) || sc == NULL) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+    cp = sc->privateData;
+    if (cp == NULL) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+    if (cp->level == RXGK_LEVEL_CLEAR) {
+	/* rxgk spec prohibits AFSCombineTokens over CLEAR conns. The server
+	 * should reject it, but make sure we don't even try to do this. */
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+    opts.enctypes.len = 1;
+    opts.enctypes.val = &cp->enctype;
+    opts.levels.len = 1;
+    opts.levels.val = &cp->level;
+
+    code = RXGK_AFSCombineTokens(vl_rxconn, &cp->token, &cm_tok, &opts, server_uuid,
+				 &combined_tokblob, &combined_tokinfo);
+    if (code != 0) {
+	goto done;
+    }
+
+    if (combined_tokblob.len == 0) {
+	/* vlserver says the given uuid doesn't support rxgk. To indicate this
+	 * to our caller, return success with *a_sc set to NULL. */
+	goto done;
+    }
+
+    code = rxgk_afscombine1_key(&combined_key, combined_tokinfo.enctype,
+				cp->k0, server_uuid);
+    if (code != 0) {
+	goto done;
+    }
+
+    *a_sc = NewClientSecurityObject(combined_tokinfo.level,
+				    combined_tokinfo.enctype,
+				    combined_key, &combined_tokblob,
+				    client_uuid, server_uuid);
+    if (*a_sc == NULL) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+ done:
+    xdrfree_RXGK_Data(&combined_tokblob);
+    rxgk_release_key(&combined_key);
+    return code;
 }

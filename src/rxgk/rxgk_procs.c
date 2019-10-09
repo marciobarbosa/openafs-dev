@@ -70,7 +70,7 @@ SRXGK_CombineTokens(struct rx_call *z_call, RXGK_Data *token0,
 afs_int32
 SRXGK_AFSCombineTokens(struct rx_call *z_call, RXGK_Data *user_tok,
 		       RXGK_Data *cm_tok, RXGK_CombineOptions *options,
-		       afsUUID destination, RXGK_Data *new_token,
+		       afsUUID *destination, RXGK_Data *new_token,
 		       RXGK_TokenInfo *info)
 {
     return RXGEN_OPCODE;

@@ -599,12 +599,16 @@ rxgk_decrypt_in_key(rxgk_key key, afs_int32 usage, RXGK_Data *in,
 }
 
 /*
- * Helper for derive_tk.
+ * Helper for derive_tk/combine_afs_keys.
  * Assumes the caller has already allocated space in 'out'.
+ *
+ * 'char_counter' indicates whether the counter in the PRF+ function is encoded
+ * as a one-octet integer (RFC6113), or as a 32-bit unsigned integer in
+ * network-byte-order (RFC4402).
  */
 static afs_int32
 PRFplus(krb5_data *out, krb5_enctype enctype, rxgk_key k0,
-	void *seed, size_t seed_len)
+	void *seed, size_t seed_len, int char_counter)
 {
     krb5_context ctx = NULL;
     krb5_crypto crypto = NULL;
@@ -614,7 +618,8 @@ PRFplus(krb5_data *out, krb5_enctype enctype, rxgk_key k0,
     unsigned char *pre_key = NULL;
     size_t block_len;
     size_t desired_len = out->length;
-    afs_uint32 n_iter, iterations = 0, dummy;
+    afs_uint32 n_iter, iterations = 0;
+    size_t counter_len;
 
     memset(&prf_in, 0, sizeof(prf_in));
     memset(&prf_out, 0, sizeof(prf_out));
@@ -626,13 +631,18 @@ PRFplus(krb5_data *out, krb5_enctype enctype, rxgk_key k0,
     ret = krb5_crypto_init(ctx, &keyblock->key, enctype, &crypto);
     if (ret != 0)
 	goto done;
-    prf_in.length = sizeof(n_iter) + seed_len;
+    if (char_counter) {
+	counter_len = 1;
+    } else {
+	counter_len = sizeof(n_iter);
+    }
+    prf_in.length = counter_len + seed_len;
     prf_in.data = rxi_Alloc(prf_in.length);
     if (prf_in.data == NULL) {
 	ret = RXGK_INCONSISTENCY;
 	goto done;
     }
-    memcpy((unsigned char *)prf_in.data + sizeof(n_iter), seed, seed_len);
+    memcpy((unsigned char *)prf_in.data + counter_len, seed, seed_len);
     ret = krb5_crypto_prf_length(ctx, enctype, &block_len);
     if (ret != 0)
 	goto done;
@@ -645,8 +655,13 @@ PRFplus(krb5_data *out, krb5_enctype enctype, rxgk_key k0,
     }
 
     for (n_iter = 1; n_iter <= iterations; ++n_iter) {
-	dummy = htonl(n_iter);
-	memcpy(prf_in.data, &dummy, sizeof(dummy));
+	if (char_counter) {
+	    char c = n_iter;
+	    memcpy(prf_in.data, &c, sizeof(c));
+	} else {
+	    afs_uint32 dummy = htonl(n_iter);
+	    memcpy(prf_in.data, &dummy, sizeof(dummy));
+	}
 	krb5_data_free(&prf_out);
 	ret = krb5_crypto_prf(ctx, crypto, &prf_in, &prf_out);
 	if (ret != 0)
@@ -667,6 +682,22 @@ PRFplus(krb5_data *out, krb5_enctype enctype, rxgk_key k0,
     if (pre_key != NULL)
 	rxi_Free(pre_key, iterations * block_len);
     return ktor(ret);
+}
+
+/* PRF+ from RFC 4402. */
+static afs_int32
+PRFplus_4402(krb5_data *out, krb5_enctype enctype, rxgk_key k0,
+	     void *seed, size_t seed_len)
+{
+    return PRFplus(out, enctype, k0, seed, seed_len, 0);
+}
+
+/* PRF+ from RFC 6113. */
+static afs_int32
+PRFplus_6113(krb5_data *out, krb5_enctype enctype, rxgk_key k0,
+	     void *seed, size_t seed_len)
+{
+    return PRFplus(out, enctype, k0, seed, seed_len, 1);
 }
 
 struct seed_data {
@@ -733,7 +764,7 @@ rxgk_derive_tk(rxgk_key *tk, rxgk_key k0, afs_uint32 epoch, afs_uint32 cid,
 	goto done;
     }
     pre_key.length = ell;
-    ret = PRFplus(&pre_key, enctype, k0, &seed, sizeof(seed));
+    ret = PRFplus_4402(&pre_key, enctype, k0, &seed, sizeof(seed));
     if (ret != 0)
 	goto done;
 
@@ -744,6 +775,115 @@ rxgk_derive_tk(rxgk_key *tk, rxgk_key k0, afs_uint32 epoch, afs_uint32 cid,
  done:
     rxi_Free(pre_key.data, ell);
     return ret;
+}
+
+#define PEPPER0_PREFIX ("rxgkAFS")
+
+/* XDR serializes an afsUUID by encoding 11 32-bit integers. */
+#define AFSUUID_XDR_SIZE (11*4)
+
+struct pepper0_data {
+    char prefix[sizeof(PEPPER0_PREFIX)];
+    char uuid[AFSUUID_XDR_SIZE];
+    afs_int32 enctype_n;
+} __attribute__((packed));
+#define PEPPER0_SIZE (56)
+
+static afs_int32
+afscombine1_key(krb5_data *pre_key, afs_int32 combined_enctype, rxgk_key k1,
+		afsUUID *destination)
+{
+    afs_int32 code;
+    struct pepper0_data pepper;
+    XDR xdrs;
+    struct rxgk_keyblock *k1_keyblock = key2keyblock(k1);
+    afs_int32 k1_enctype = deref_keyblock_enctype(&k1_keyblock->key);
+
+    /* Make sure the pepper struct is packed to our expected size. */
+    opr_StaticAssert(sizeof(pepper) == PEPPER0_SIZE);
+
+    memset(&pepper, 0, sizeof(pepper));
+    memset(&xdrs, 0, sizeof(xdrs));
+
+    /* Prepare our output buffer for PRF+. */
+
+    pre_key->length = rxgk_etype_to_len(combined_enctype);
+    if (pre_key->length <= 0) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+    pre_key->data = rxi_Alloc(pre_key->length);
+    if (pre_key->data == NULL) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+    /* Populate our pepper for PRF+. */
+
+    memcpy(pepper.prefix, PEPPER0_PREFIX, sizeof(PEPPER0_PREFIX));
+
+    xdrmem_create(&xdrs, pepper.uuid, AFSUUID_XDR_SIZE, XDR_ENCODE);
+    if (!xdr_afsUUID(&xdrs, destination)) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+    /* Make sure we encoded exactly AFSUUID_XDR_SIZE bytes for the UUID. */
+    if (xdr_getpos(&xdrs) != AFSUUID_XDR_SIZE) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+    pepper.enctype_n = htonl(combined_enctype);
+
+    code = PRFplus_6113(pre_key, k1_enctype, k1, &pepper, sizeof(pepper));
+    if (code != 0) {
+	goto done;
+    }
+
+ done:
+    if (xdrs.x_ops) {
+	xdr_destroy(&xdrs);
+    }
+    return code;
+}
+
+/**
+ * Derive the combined key for the single-token AFSCombineTokens operation.
+ *
+ * @param[out] combined_key	The derived combined key.
+ * @param[in] combined_enctype	Enctype for 'combined_key'.
+ * @param[in] k1	    The key for the user's token.
+ * @param[in] destination   The UUID for the destination fileserver.
+ *
+ * @return rxgk error codes.
+ */
+afs_int32
+rxgk_afscombine1_key(rxgk_key *combined_key, afs_int32 combined_enctype,
+		     rxgk_key k1, afsUUID *destination)
+{
+    afs_int32 code;
+    krb5_data pre_key;
+
+    memset(&pre_key, 0, sizeof(pre_key));
+    *combined_key = NULL;
+
+    code = afscombine1_key(&pre_key, combined_enctype, k1, destination);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = rxgk_make_key(combined_key, pre_key.data, pre_key.length,
+			 combined_enctype);
+    if (code != 0) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+ done:
+    rxi_Free(pre_key.data, pre_key.length);
+    return code;
 }
 
 /**

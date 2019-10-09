@@ -53,6 +53,11 @@
 
 #include "rxgk_private.h"
 
+#ifdef KERNEL
+/* FIXME: we only get this via roken.h in userspace. */
+int ct_memcmp(const void *p1, const void *p2, size_t len);
+#endif
+
 /**
  * Fill in an rxgk_header structure from a packet
  *
