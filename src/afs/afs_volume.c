@@ -871,7 +871,7 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
     do {
 	tconn =
 	    afs_ConnByMHosts(tcell->cellHosts, tcell->vlport, tcell->cellNum,
-			     treq, SHARED_LOCK, 0, &rxconn);
+			     treq, SHARED_LOCK, 0, VL_SERVICE_ID, &rxconn);
 	if (tconn) {
 	    if (tconn->parent->srvr->server->flags & SNO_LHOSTS) {
 		type = 0;
@@ -1202,7 +1202,7 @@ LockAndInstallUVolumeEntry(struct volume *av, struct uvldbentry *ve, int acell,
 		    tconn =
 			afs_ConnByMHosts(tcell->cellHosts, tcell->vlport,
 					 tcell->cellNum, areq, SHARED_LOCK,
-					 0, &rxconn);
+					 0, VL_SERVICE_ID, &rxconn);
 		    if (tconn) {
 			RX_AFS_GUNLOCK();
 			code =

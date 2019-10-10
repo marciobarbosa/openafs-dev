@@ -126,6 +126,8 @@ extern struct cell *afs_GetRealCellByIndex(afs_int32 cellindex,
 					   afs_int32 refresh);
 
 /* afs_conn.c */
+#define VL_SERVICE_ID (52)
+#define RXAFS_SERVICE_ID (1)
 extern afs_int32 cryptall;
 extern afs_rwlock_t afs_xinterface;
 extern afs_rwlock_t afs_xconn;
@@ -134,21 +136,24 @@ extern struct afs_conn *afs_Conn(struct VenusFid *afid,
 			     afs_int32 locktype,
                              struct rx_connection **rxconn);
 extern struct afs_conn *afs_ConnBySA(struct srvAddr *sap, unsigned short aport,
-				 afs_int32 acell, struct unixuser *tu,
+				 struct unixuser *tu,
 				 int force_if_down, afs_int32 create,
 				 afs_int32 locktype, afs_int32 replicated,
+				 unsigned short service,
 				 struct rx_connection **rxconn);
 extern struct afs_conn *afs_ConnByMHosts(struct server *ahosts[],
 				     unsigned short aport, afs_int32 acell,
 				     struct vrequest *areq,
 				     afs_int32 locktype,
 				     afs_int32 replicated,
+				     unsigned short service,
 				     struct rx_connection **rxconn);
 extern struct afs_conn *afs_ConnByHost(struct server *aserver,
 				   unsigned short aport, afs_int32 acell,
 				   struct vrequest *areq, int aforce,
 				   afs_int32 locktype,
 				   afs_int32 replicated,
+				   unsigned short service,
 				   struct rx_connection **rxconn);
 extern void afs_PutConn(struct afs_conn *ac, struct rx_connection *rxconn,
                         afs_int32 locktype);
