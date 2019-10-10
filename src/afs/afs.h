@@ -460,6 +460,7 @@ struct sa_conn_vector {
     struct srvAddr *srvr;	/* server associated with this conn */
     short refCount;		/* reference count for allocation */
     unsigned short port;	/* port associated with this connection */
+    unsigned short service;	/* service id associated with this conn */
     int flags;
 
     /* next connection to return when all in cvec are fully utilized */

@@ -5282,8 +5282,9 @@ DECL_PIOCTL(PCallBackAddr)
 
 	/* get a connection, even if host is down; bumps conn ref count */
 	tu = afs_GetUser(areq->uid, ts->cell->cellNum, SHARED_LOCK);
-	tc = afs_ConnBySA(sa, ts->cell->fsport, ts->cell->cellNum, tu,
-			  1 /*force */ , 1 /*create */ , SHARED_LOCK, 0, &rxconn);
+	tc = afs_ConnBySA(sa, ts->cell->fsport, tu,
+			  1 /*force */ , 1 /*create */ , SHARED_LOCK, 0,
+			  RXAFS_SERVICE_ID, &rxconn);
 	afs_PutUser(tu, SHARED_LOCK);
 	if (!tc)
 	    continue;
