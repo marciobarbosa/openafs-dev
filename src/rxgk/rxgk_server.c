@@ -333,7 +333,7 @@ rxgk_GetChallenge(struct rx_securityClass *aobj, struct rx_connection *aconn,
  */
 
 /**
- * The XDR token format uses the XDR PrAuthName type to store identities.
+ * The XDR token format uses the XDR RXGK_PrAuthName type to store identities.
  * However, there is an existing rx_identity type used in libauth, so
  * we convert from the wire type to the internal type as soon as possible
  * in order to be able to use the most library code. 'a_identity' will contain
@@ -342,7 +342,7 @@ rxgk_GetChallenge(struct rx_securityClass *aobj, struct rx_connection *aconn,
  * @return rxgk error codes
  */
 static int
-prnames_to_identity(struct rx_identity **a_identity, PrAuthName *namelist,
+prnames_to_identity(struct rx_identity **a_identity, RXGK_PrAuthName *namelist,
 		    size_t nnames)
 {
     rx_identity_kind kind;

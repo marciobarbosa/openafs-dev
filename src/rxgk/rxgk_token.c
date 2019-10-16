@@ -348,7 +348,7 @@ rxgk_extract_token(RXGK_Data *tc, RXGK_Token *out, rxgk_getkey_func getkey,
  * rxgk_make_token for info about our arguments. */
 static afs_int32
 make_token(struct rx_opaque *out, RXGK_TokenInfo *info,
-	   struct rx_opaque *k0, PrAuthName *identities,
+	   struct rx_opaque *k0, RXGK_PrAuthName *identities,
 	   int nids, rxgk_key key, afs_int32 kvno, afs_int32 enctype)
 {
     RXGK_Token token;
@@ -410,7 +410,7 @@ make_token(struct rx_opaque *out, RXGK_TokenInfo *info,
  */
 afs_int32
 rxgk_make_token(struct rx_opaque *out, RXGK_TokenInfo *info,
-		struct rx_opaque *k0, PrAuthName *identities,
+		struct rx_opaque *k0, RXGK_PrAuthName *identities,
 		int nids, rxgk_key key, afs_int32 kvno, afs_int32 enctype)
 {
     if (nids == 0 || identities == NULL) {
