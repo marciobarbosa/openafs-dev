@@ -408,6 +408,20 @@ hpr_NameToId(namelist *names, idlist *ids)
     return code;
 }
 
+#ifdef AFS_RXGK_ENV
+static int
+hpr_AuthNameToId(authnamelist *names, nidlist *ids)
+{
+    afs_int32 code;
+    struct ubik_client *uclient;
+    code = getThreadClient(&uclient);
+    if (code != 0) {
+	return code;
+    }
+    return ubik_PR_AuthNameToIDFallback(uclient, 0, names, ids);
+}
+#endif
+
 int
 hpr_IdToName(idlist *ids, namelist *names)
 {
@@ -2459,6 +2473,62 @@ MapName_r(char *uname, afs_int32 * aval)
 
 /*MapName*/
 
+#ifdef AFS_RXGK_ENV
+static afs_int32
+MapId_r(struct rx_identity *rxid, afs_int64 *a_viceid)
+{
+    PrAuthName name;
+    authnamelist lnames;
+    nidlist lids;
+    afs_int32 code;
+
+    memset(&name, 0, sizeof(name));
+    memset(&lnames, 0, sizeof(lnames));
+    memset(&lids, 0, sizeof(lids));
+
+    *a_viceid = AnonymousID;
+
+    switch (rxid->kind) {
+    case RX_ID_KRB4:
+	name.kind = PRAUTHTYPE_KRB4;
+	break;
+    case RX_ID_GSS:
+	name.kind = PRAUTHTYPE_GSS;
+	break;
+    default:
+	ViceLog(0, ("MapId_r given unknown rxid type %d\n", rxid->kind));
+	return -1;
+    }
+    name.data.data_val = rxid->exportedName.val;
+    name.data.data_len = rxid->exportedName.len;
+    name.display.display_val = rxid->displayName;
+    name.display.display_len = strlen(rxid->displayName)+1;
+
+    lnames.authnamelist_len = 1;
+    lnames.authnamelist_val = &name;
+
+    H_UNLOCK;
+    code = hpr_AuthNameToId(&lnames, &lids);
+    H_LOCK;
+
+    if (code == 0) {
+	if (lids.nidlist_val != NULL) {
+	    *a_viceid = lids.nidlist_val[0];
+	    if (*a_viceid == AnonymousID) {
+		ViceLog(2, ("MapId_r: AuthNameToId on %s returns "
+			    "anonymousID\n", rxid->displayName));
+	    }
+	    xdrfree_nidlist(&lids);
+	} else {
+	    ViceLog(0, ("MapId_r: AuthNameToId on '%s' is unknown\n",
+			rxid->displayName));
+	    code = -1;
+	}
+    }
+    return code;
+}
+#endif
+
 
 static int
 PerHost_EnumerateClient(struct host *host, void *arock)
@@ -2556,6 +2626,25 @@ getPeerDetails(struct rx_connection *conn,
 	}
 
 	goto success;
+
+#ifdef AFS_RXGK_ENV
+    } else if (rxid->kind == RX_ID_GSS) {
+	afs_int64 lviceid;
+	code = MapId_r(rxid, &lviceid);
+	if (code) {
+	    ViceLog(1, ("failed to map name=%s -> code=%d\n",
+		    rxid->displayName, code));
+	    goto fail; /* Actually flag this is a failure */
+	}
+	if (lviceid > MAX_AFS_INT32 || lviceid < MIN_AFS_INT32) {
+	    ViceLog(0, ("Mapped identity '%s' to unrepresentable viceid "
+			"%lld\n", rxid->displayName, lviceid));
+	    code = ERANGE;
+	    goto fail;
+	}
+	*viceid = lviceid;
+	goto success;
+#endif
     }
 
     ViceLog(1, ("Unable to understand caller identity\n"));
