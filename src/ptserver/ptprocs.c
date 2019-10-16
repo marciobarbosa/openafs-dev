@@ -2190,3 +2190,34 @@ WhoIsThisForeign(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
     }
     return -1;
 }
+
+afs_int32
+SPR_GetCapabilities(struct rx_call *call, PrCapabilities *prcapabilities)
+{
+    return RXGEN_OPCODE;
+}
+
+afs_int32
+SPR_AuthNameToID(struct rx_call *call, authnamelist *alist, nidlist *ilist)
+{
+    return RXGEN_OPCODE;
+}
+
+afs_int32
+SPR_AuthNameToIDFallback(struct rx_call *call, authnamelist *alist,
+			 nidlist *ilist)
+{
+    return RXGEN_OPCODE;
+}
+
+afs_int32
+SPR_ListAuthNames(struct rx_call *call, afs_int64 aid, authnamelist *alist)
+{
+    return RXGEN_OPCODE;
+}
+
+afs_int32
+SPR_WhoAmI(struct rx_call *call, afs_int64 *id, PrAuthName *pran)
+{
+    return RXGEN_OPCODE;
+}
