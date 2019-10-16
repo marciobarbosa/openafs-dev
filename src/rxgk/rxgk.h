@@ -145,7 +145,7 @@ afs_int32 ubik_rxgk_NegotiateClientToken(struct ubik_client *uclient,
 
 /* rxgk_token.c */
 afs_int32 rxgk_make_token(struct rx_opaque *out, RXGK_TokenInfo *info,
-			  struct rx_opaque *k0, PrAuthName *identities,
+			  struct rx_opaque *k0, RXGK_PrAuthName *identities,
 			  int nids, rxgk_key key, afs_int32 kvno,
 			  afs_int32 enctype) AFS_NONNULL((1,2,3,6));
 afs_int32 rxgk_print_token(struct rx_opaque *out, RXGK_TokenInfo *input_info,

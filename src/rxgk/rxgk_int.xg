@@ -127,9 +127,12 @@ struct RXGK_Authenticator {
 
 /* RPC-L from draft-brashear-afs3-pts-extended-names-09 (final). */
 
+/* We rename PrAuthname to RXGK_PrAuthName, to avoid colliding with the
+ * PrAuthName in ptint.xg. */
+
 #define AUTHDATAMAX 2048
 #define AUTHPRINTABLEMAX 2048
-struct PrAuthName {
+struct RXGK_PrAuthName {
     afs_int32 kind;
     opaque data<AUTHDATAMAX>;
     opaque display<AUTHPRINTABLEMAX>;
@@ -167,7 +170,7 @@ struct RXGK_Token {
     afs_uint32 lifetime;
     afs_uint32 bytelife;
     rxgkTime expirationtime;
-    struct PrAuthName identities<>;
+    struct RXGK_PrAuthName identities<>;
 };
 
 /* Begin definitions for AFSCombineTokens. */
