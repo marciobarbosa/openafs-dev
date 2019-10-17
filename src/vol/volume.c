@@ -659,7 +659,7 @@ VInitAttachVolumes(ProgramType pt)
     if (pt == fileServer) {
 	struct DiskPartition64 *diskP;
 	/* Attach all the volumes in this partition */
-	for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	for (VScanPartList(diskP)) {
 	    int nAttached = 0, nUnattached = 0;
 	    opr_Verify(VAttachVolumesByPartition(diskP,
 						 &nAttached, &nUnattached)
@@ -702,11 +702,13 @@ VInitAttachVolumes(ProgramType pt)
 	params.n_threads_complete = 0;
 
 	/* create partition work queue */
-	for (parts=0, diskP = DiskPartitionList; diskP; diskP = diskP->next, parts++) {
+	parts = 0;
+	for (VScanPartList(diskP)) {
 	    dpq = malloc(sizeof(struct diskpartition_queue_t));
 	    opr_Assert(dpq != NULL);
 	    dpq->diskP = diskP;
 	    queue_Append(&params,dpq);
+	    parts++;
 	}
 
 	threads = min(parts, vol_attach_threads);
@@ -826,12 +828,14 @@ VInitAttachVolumes(ProgramType pt)
         queue_Init(&pq);
 	opr_cv_init(&pq.cv);
 	opr_mutex_init(&pq.mutex);
-	for (parts = 0, diskP = DiskPartitionList; diskP; diskP = diskP->next, parts++) {
+	parts = 0;
+	for (VScanPartList(diskP)) {
 	    struct diskpartition_queue_t *dp;
 	    dp = malloc(sizeof(struct diskpartition_queue_t));
 	    opr_Assert(dp != NULL);
 	    dp->diskP = diskP;
 	    queue_Append(&pq, dp);
+	    parts++;
 	}
 
         /* number of worker threads; at least one, not to exceed the number of partitions */
@@ -1413,7 +1417,7 @@ ShutdownController(vshutdown_thread_t * params)
 	    shadow.schedule_version, shadow.vol_remaining, shadow.pass);
 	Log("ShutdownController:  n_threads_complete=%d, n_parts_done_pass=%d\n",
 	    shadow.n_threads_complete, shadow.n_parts_done_pass);
-	for (diskP = DiskPartitionList; diskP; diskP=diskP->next) {
+	for (VScanPartList(diskP)) {
 	    id = diskP->index;
 	    Log("ShutdownController:  part[%d] : (len=%d, thread_target=%d, done_pass=%d, pass_head=%p)\n",
 		id,

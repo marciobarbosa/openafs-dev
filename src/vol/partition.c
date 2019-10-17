@@ -1327,6 +1327,31 @@ VUnlockPartition(char *name)
     VOL_UNLOCK;
 }
 
+/**
+ * Get next element of DiskPartitionList.
+ *
+ * Only called by VScanPartList. This function gets the VOL_LOCK to make
+ * sure that the elements of DiskPartitionList will not be read while a
+ * new element is being added to this list (by VInitPartition). As a
+ * result, we do not take the risk of reading a new but uninitialized
+ * partition.
+ *
+ * @param[in]  cursor  current element
+ *
+ * @return next element
+ */
+struct DiskPartition64 *
+VGetNextPartition(struct DiskPartition64 *cursor)
+{
+    VOL_LOCK;
+    if (cursor != NULL) {
+	cursor = cursor->next;
+    }
+    VOL_UNLOCK;
+
+    return cursor;
+}
+
 #ifdef AFS_DEMAND_ATTACH_FS
 
 /* new-style partition locks; these are only to have some mutual exclusion

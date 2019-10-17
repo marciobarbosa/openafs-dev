@@ -1329,8 +1329,11 @@ inode_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
 
     /* now do the work */
 
-    for (partP = DiskPartitionList; partP && strcmp(partP->name, pname);
-         partP = partP->next);
+    for (VScanPartList(partP)) {
+	if (strcmp(partP->name, pname) == 0) {
+	    break;
+	}
+    }
     if (!partP) {
         Log("1 inode_ConvertROtoRWvolume: Couldn't find DiskPartition for %s\n", pname);
         code = EIO;

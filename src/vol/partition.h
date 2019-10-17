@@ -193,4 +193,13 @@ extern int VDiskUsage(struct Volume *vp, afs_sfsize_t blocks);
 extern void VPrintDiskStats(void);
 extern int VInitPartitionPackage(void);
 
+extern struct DiskPartition64 *VGetNextPartition(struct DiskPartition64 *cursor);
+/**
+ * In order to enforce mutual exclusion between VInitPartition and accesses to
+ * the DiskPartitionList, use this macro to go through the nodes of this list.
+ * This macro is unnecessary and should not be used if VOL_LOCK is already held.
+ */
+#define VScanPartList(cursor) \
+    cursor = DiskPartitionList; cursor; cursor = VGetNextPartition(cursor)
+
 #endif /* AFS_VOL_PARTITION_H */

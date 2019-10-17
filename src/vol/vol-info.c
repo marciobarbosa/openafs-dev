@@ -811,7 +811,7 @@ HandleAllPart(struct VolInfoOpt *opt)
 {
     struct DiskPartition64 *partP;
 
-    for (partP = DiskPartitionList; partP; partP = partP->next) {
+    for (VScanPartList(partP)) {
 	if (opt->dumpInfo || opt->saveInodes || opt->showSizes) {
 	    printf("Processing Partition %s:\n", partP->name);
 	}
