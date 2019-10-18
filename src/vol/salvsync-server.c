@@ -113,6 +113,7 @@ static afs_int32 SALVSYNC_com_Cancel(SALVSYNC_command * com, SALVSYNC_response *
 static afs_int32 SALVSYNC_com_Query(SALVSYNC_command * com, SALVSYNC_response * res);
 static afs_int32 SALVSYNC_com_CancelAll(SALVSYNC_command * com, SALVSYNC_response * res);
 static afs_int32 SALVSYNC_com_Link(SALVSYNC_command * com, SALVSYNC_response * res);
+static afs_int32 SALVSYNC_com_AttachPart(SALVSYNC_command * com, SALVSYNC_response * res);
 
 
 extern int VInit;
@@ -441,6 +442,10 @@ SALVSYNC_com(osi_socket fd)
     case SALVSYNC_OP_LINK:
 	/* link a clone to its parent in the scheduler */
 	res.hdr.response = SALVSYNC_com_Link(&scom, &sres);
+	break;
+    case SALVSYNC_ATTACH_PART:
+	/* attach new partitions */
+	res.hdr.response = SALVSYNC_com_AttachPart(&scom, &sres);
 	break;
     default:
 	res.hdr.response = SYNC_BAD_COMMAND;
@@ -1323,6 +1328,37 @@ SALVSYNC_doneWorkByPid(int pid, int status)
 	    }
 	}
     }
+}
+
+/**
+ * Add new partitions to the running server.
+ *
+ * @param[in]  com  inbound command object
+ * @param[out] res  outbound response object
+ *
+ * @return operation status
+ *   @retval 0         success
+ *   @retval non-zero  failure
+ */
+static int
+SALVSYNC_com_AttachPart(SALVSYNC_command * com, SALVSYNC_response * res)
+{
+    int code;
+
+    int newparts[VOLMAXPARTS + 1];
+    int n_newparts;
+
+    VOL_UNLOCK;
+    /* attach new partitions on salvager */
+    code = VAttachNewPartitions(newparts, VOLMAXPARTS + 1, &n_newparts);
+
+    if (code != 0) {
+	Log("SALVSYNC_com_AttachPart: did not finish successfully.\n");
+	code = SYNC_FAILED;
+    }
+    VOL_LOCK;
+
+    return code;
 }
 
 #endif /* AFS_DEMAND_ATTACH_FS */

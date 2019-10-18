@@ -585,7 +585,7 @@ volinfo_ScanPartitions(struct VolInfoOpt *opt, char *partNameOrId, VolumeId volu
 	}
     }
 
-    err = VAttachPartitions();
+    err = VAttachPartitions(0);
     if (err) {
 	fprintf(stderr, "%s: %d partitions had errors during attach.\n",
 		progname, err);
