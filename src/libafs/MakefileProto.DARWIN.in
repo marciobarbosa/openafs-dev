@@ -39,6 +39,7 @@ AFS_OS_NONFSOBJS = osi_vfsops.o
 # System specific build commands and flags
 KDEFS=
 DBUG = 
+KROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk
 DEFINES= -D_KERNEL -DKERNEL -DKERNEL_PRIVATE -DDIAGNOSTIC -DUSE_SELECT -DMACH_USER_API -DMACH_KERNEL
 KINCLUDES=-I${KROOT}/System/Library/Frameworks/Kernel.framework/Headers
 

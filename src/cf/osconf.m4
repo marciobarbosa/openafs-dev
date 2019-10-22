@@ -355,7 +355,7 @@ case $AFS_SYSNAME in
 		AFSD_LDFLAGS="-F/System/Library/PrivateFrameworks -framework DiskArbitration -framework SystemConfiguration -framework IOKit -framework CoreFoundation"
 		MT_CFLAGS="-D_REENTRANT"
 		MT_LIBS='${XLIBS}'
-		KROOT=
+		KROOT='/Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk'
 		KINCLUDES='-I$(KROOT)/System/Library/Frameworks/Kernel.framework/Headers'
 		LD="cc"
 		KERN_OPTMZ="-Os"
