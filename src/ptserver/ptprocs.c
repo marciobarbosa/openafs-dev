@@ -2194,30 +2194,353 @@ WhoIsThisForeign(struct rx_call *acall, struct ubik_trans *at, afs_int32 *aid,
 afs_int32
 SPR_GetCapabilities(struct rx_call *call, PrCapabilities *prcapabilities)
 {
-    return RXGEN_OPCODE;
+    static const afs_uint32 caps[] = {
+	PTS_CAPABILITY_AUTHNAMEMAPPING,
+    };
+    static const size_t n_caps = sizeof(caps)/sizeof(caps[0]);
+
+    afs_int32 code = 0;
+    int cap_i;
+
+    prcapabilities->PrCapabilities_val =
+	xdr_alloc(n_caps * sizeof(prcapabilities->PrCapabilities_val[0]));
+    if (prcapabilities->PrCapabilities_val == NULL) {
+	code = PRNOMEM;
+	goto done;
+    }
+    prcapabilities->PrCapabilities_len = n_caps;
+
+    for (cap_i = 0; cap_i < n_caps; cap_i++) {
+	prcapabilities->PrCapabilities_val[cap_i] = caps[cap_i];
+    }
+
+ done:
+    osi_auditU(call, PTS_GetCapsEvent, code, AUD_END);
+    return code;
+}
+
+static afs_int32
+fill_pran(PrAuthName *pran, rx_identity_kind kind, char *display, void *data,
+	  size_t data_len)
+{
+    afs_int32 code;
+    size_t display_len;
+
+    switch (kind) {
+    case RX_ID_KRB4:
+	pran->kind = PRAUTHTYPE_KRB4;
+	break;
+    case RX_ID_GSS:
+	pran->kind = PRAUTHTYPE_GSS;
+	break;
+    default:
+	return PRBADNAM;
+    }
+
+    display_len = strlen(display) + 1;
+
+    pran->display.display_val = xdr_alloc(display_len);
+    if (pran->display.display_val == NULL) {
+	code = PRNOMEM;
+	goto error;
+    }
+    pran->display.display_len = display_len;
+    memcpy(pran->display.display_val, display, display_len);
+
+    pran->data.data_val = xdr_alloc(data_len);
+    if (pran->data.data_val == NULL) {
+	code = PRNOMEM;
+	goto error;
+    }
+    pran->data.data_len = data_len;
+    memcpy(pran->data.data_val, data, data_len);
+
+    return 0;
+
+ error:
+    xdrfree_PrAuthName(pran);
+    memset(pran, 0, sizeof(*pran));
+    return code;
+}
+
+/**
+ * Translate a PrAuthName into an rx_identity.
+ *
+ * @param[out] rxid The translated rx identity.
+ * @param[in] pran  PrAuthName to translate.
+ *
+ * @return PR status codes
+ */
+static afs_int32
+pran_to_identity(struct rx_identity *rxid, PrAuthName *pran)
+{
+    rx_identity_kind kind;
+    size_t len;
+    char *display;
+
+    switch (pran->kind) {
+    case PRAUTHTYPE_KRB4:
+	kind = RX_ID_KRB4;
+	break;
+#ifdef AFS_RXGK_ENV
+    case PRAUTHTYPE_GSS:
+	kind = RX_ID_GSS;
+	break;
+#endif
+    default:
+	return PRBADNAM;
+    }
+
+    len = pran->display.display_len;
+
+    /* +1 for the trailing NUL, to make sure our display name is
+     * NUL-terminated. */
+    display = calloc(1, len + 1);
+    if (display == NULL) {
+	return PRNOMEM;
+    }
+
+    memcpy(display, pran->display.display_val, len);
+
+    rx_identity_populate(rxid, kind, display, pran->data.data_val, pran->data.data_len);
+
+    free(display);
+
+    return 0;
+}
+
+static afs_int32
+pranToID(struct rx_call *call, authnamelist *alist, nidlist *ilist,
+	 int fallback)
+{
+    afs_int32 code;
+    struct ubik_trans *tt = NULL;
+    size_t name_i;
+    char *audEvent;
+    afs_int32 cid;
+    size_t len = alist->authnamelist_len;
+
+    memset(ilist, 0, sizeof(*ilist));
+
+    if (fallback) {
+	audEvent = PTS_AuthNmToIdFallEvent;
+    } else {
+	audEvent = PTS_AuthNmToIdEvent;
+    }
+
+    if (len == 0) {
+	return 0;
+    }
+
+    ilist->nidlist_val = xdr_alloc(sizeof(ilist->nidlist_val[0]) * len);
+    if (ilist->nidlist_val == NULL) {
+	return PRNOMEM;
+    }
+    ilist->nidlist_len = len;
+
+    code = ReadPreamble(&tt);
+    if (code != 0) {
+	return code;
+    }
+
+    code = WhoIsThisLocal(call, tt, &cid);
+    if (code != 0) {
+	ABORT_WITH(tt, PRPERM);
+    }
+    if (!pr_noAuth && restrict_anonymous && cid == ANONYMOUSID) {
+	ABORT_WITH(tt, PRPERM);
+    }
+
+    for (name_i = 0; name_i < len; name_i++) {
+	PrAuthName *pran = &alist->authnamelist_val[name_i];
+	afs_int32 tmpid = ANONYMOUSID;
+	struct rx_identity rxid;
+	memset(&rxid, 0, sizeof(rxid));
+
+	code = pran_to_identity(&rxid, pran);
+
+	if (code == 0 && (fallback || rxid.kind == RX_ID_KRB4)) {
+	    /*
+	     * If we're the "fallback" variant, do our automatic identity
+	     * conversions etc, handled in WhoIsThisIdentity.
+	     *
+	     * If we're the non-fallback variant, we don't do the automatic
+	     * conversions, and only lookup explicit mappings. The only
+	     * explicit mappings that we handle right now are the old
+	     * krb4-style mappings. So if we are a krb4 identity, we can run
+	     * WhoIsThisIdentity, too.
+	     */
+	    code = WhoIsThisIdentity(&rxid, tt, &tmpid, NULL, NULL, 0);
+	    if (code != 0) {
+		tmpid = ANONYMOUSID;
+	    }
+	}
+
+	ilist->nidlist_val[name_i] = tmpid;
+
+	osi_audit(audEvent, code, AUD_INT, pran->kind,
+		  AUD_NAME, rxid.displayName,
+		  AUD_ID, tmpid, AUD_END);
+
+	rx_identity_freeContents(&rxid);
+    }
+
+    return ubik_EndTrans(tt);
 }
 
 afs_int32
 SPR_AuthNameToID(struct rx_call *call, authnamelist *alist, nidlist *ilist)
 {
-    return RXGEN_OPCODE;
+    afs_int32 code;
+
+    code = pranToID(call, alist, ilist, 0);
+    osi_auditU(call, PTS_AuthNmToIdEvent, code, AUD_END);
+    ViceLog(125, ("PTS_AuthNameToID: code %d\n", code));
+    return code;
 }
 
 afs_int32
 SPR_AuthNameToIDFallback(struct rx_call *call, authnamelist *alist,
 			 nidlist *ilist)
 {
-    return RXGEN_OPCODE;
+    afs_int32 code;
+
+    code = pranToID(call, alist, ilist, 1);
+    osi_auditU(call, PTS_AuthNmToIdFallEvent, code, AUD_END);
+    ViceLog(125, ("PTS_AuthNameToIDFallback: code %d\n", code));
+    return code;
+}
+
+static afs_int32
+idToPran(struct rx_call *call, afs_int64 aid, PrAuthName *pran)
+{
+    struct ubik_trans *tt;
+    char name[PR_MAXNAMELEN];
+    afs_int32 cid;
+    afs_int32 code;
+
+    if (aid > MAX_AFS_INT32 || aid < MIN_AFS_INT32) {
+	return PRNOENT;
+    }
+
+    code = ReadPreamble(&tt);
+    if (code != 0) {
+	return code;
+    }
+
+    code = WhoIsThisLocal(call, tt, &cid);
+    if (code) {
+	ABORT_WITH(tt, PRPERM);
+    }
+    if (!pr_noAuth && restrict_anonymous && cid == ANONYMOUSID) {
+	ABORT_WITH(tt, PRPERM);
+    }
+
+    memset(name, 0, sizeof(name));
+    code = lookup_name_from_id(tt, aid, name);
+    if (code != 0) {
+	ABORT_WITH(tt, code);
+    }
+
+    code = fill_pran(pran, RX_ID_KRB4, name, name, strlen(name)+1);
+    if (code != 0) {
+	ABORT_WITH(tt, code);
+    }
+
+    return ubik_EndTrans(tt);
 }
 
 afs_int32
 SPR_ListAuthNames(struct rx_call *call, afs_int64 aid, authnamelist *alist)
 {
-    return RXGEN_OPCODE;
+    afs_int32 code;
+    PrAuthName *pran = xdr_alloc(sizeof(*pran));
+    if (pran == NULL) {
+	return PRNOMEM;
+    }
+
+    memset(pran, 0, sizeof(*pran));
+
+    alist->authnamelist_len = 1;
+    alist->authnamelist_val = pran;
+
+    code = idToPran(call, aid, pran);
+    osi_auditU(call, PTS_LstAuthNmEvent, code, AUD_ID64, aid,
+	       AUD_INT, pran->kind,
+	       AUD_NAME, pran->display.display_val,
+	       AUD_END);
+    ViceLog(125, ("PTS_ListAuthNames: code %d aid %lld kind %d name %s\n",
+		  code, aid, pran->kind,
+		  pran->display.display_val ? "<null>" : pran->display.display_val));
+    return code;
+}
+
+afs_int32
+whoAmI(struct rx_call *call, afs_int64 *a_id, PrAuthName *aname)
+{
+    afs_int32 code;
+    afs_int32 tmpid;
+    struct ubik_trans *tt = NULL;
+    struct rx_identity *rxid = NULL;
+
+    code = rx_GetConnSecId(rx_ConnectionOf(call), &rxid);
+    if (code != 0) {
+	code = PRPERM;
+	goto done;
+    }
+
+    code = afsconf_Krb4LocalIdentity(prdir, &rxid);
+    if (code != 0) {
+	code = PRPERM;
+	goto done;
+    }
+
+    code = ReadPreamble(&tt);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = WhoIsThisIdentity(rxid, tt, &tmpid, NULL, NULL, 0);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = fill_pran(aname, rxid->kind, rxid->displayName,
+		     rxid->exportedName.val, rxid->exportedName.len);
+    if (code != 0) {
+	goto done;
+    }
+
+    *a_id = tmpid;
+
+ done:
+    rx_identity_free(&rxid);
+    if (tt != NULL) {
+	if (code != 0) {
+	    ubik_AbortTrans(tt);
+	} else {
+	    code = ubik_EndTrans(tt);
+	}
+    }
+    return code;
 }
 
 afs_int32
 SPR_WhoAmI(struct rx_call *call, afs_int64 *id, PrAuthName *pran)
 {
-    return RXGEN_OPCODE;
+    afs_int32 code;
+
+    *id = ANONYMOUSID;
+    memset(pran, 0, sizeof(*pran));
+
+    code = whoAmI(call, id, pran);
+
+    osi_auditU(call, PTS_WhoAmIEvent, code, AUD_ID64, *id,
+	       AUD_INT, pran->kind,
+	       AUD_NAME, pran->display.display_val,
+	       AUD_END);
+    ViceLog(125, ("PTS_WhoAmI: code %d id %lld kind %d name %s\n",
+		  code, *id, pran->kind,
+		  pran->display.display_val ? "<null>" : pran->display.display_val));
+    return code;
 }

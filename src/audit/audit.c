@@ -175,6 +175,7 @@ audmakebuf(char *audEvent, va_list vaList)
     afs_int32 vaLong;
     char *vaStr;
     struct AFSFid *vaFid;
+    afs_int64 vaInt64;
 
     vaEntry = va_arg(vaList, int);
     while (vaEntry != AUD_END) {
@@ -196,6 +197,11 @@ audmakebuf(char *audEvent, va_list vaList)
 	    vaInt = va_arg(vaList, int);
 	    *(int *)bufferPtr = vaInt;
 	    bufferPtr += sizeof(vaInt);
+	    break;
+	case AUD_ID64:          /* 64-bit id */
+	    va_Int64 = va_arg(vaList, afs_int64);
+	    *(afs_int64*)bufferPtr = vaInt64;
+	    bufferPtr += sizeof(afs_int64);
 	    break;
 	case AUD_DATE:		/* Date    */
 	case AUD_HOST:		/* Host ID */
@@ -346,6 +352,7 @@ printbuf(int rec, char *audEvent, char *afsName, afs_int32 hostId,
     int vaInt;
     afs_int32 vaLong;
     char *vaStr;
+    afs_int64 vaInt64;
     struct AFSFid *vaFid;
     struct AFSCBFids *vaFids;
     struct tc_tapeLabel *vaLabel;
@@ -413,6 +420,10 @@ printbuf(int rec, char *audEvent, char *afsName, afs_int32 hostId,
 	case AUD_ID:		/* ViceId */
 	    vaInt = va_arg(vaList, int);
 	    append_msg(msg, "ID %d ", vaInt);
+	    break;
+	case AUD_ID64:		/* 64-bit id */
+	    vaInt64 = va_arg(vaList, afs_int64);
+	    append_msg(msg, "ID64 %lld ", vaInt64);
 	    break;
 	case AUD_DATE:		/* Date    */
 	    vaLong = va_arg(vaList, afs_int32);
