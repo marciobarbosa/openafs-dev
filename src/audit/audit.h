@@ -24,6 +24,7 @@
 #define AUD_NAME 9              /* Name */
 #define AUD_ID   10             /* Id (Vice, PTS, ...) */
 #define AUD_ACL  11             /* ACL */
+#define AUD_ID64 12             /* 64-bit id */
 /* next 3 lines on behalf of MR-AFS */
 #define AUD_RESID 20		/* resid         in variable list */
 #define AUD_RSSIZERANGE 21	/* rssizerange   in variable list */
@@ -110,6 +111,11 @@
 #define PTS_IsMemOfEvent   "AFS_PTS_IsMemOf"
 #define PTS_UpdEntEvent    "AFS_PTS_UpdEnt"
 #define PTS_LstSGrps       "AFS_PTS_LstSGrps"
+#define PTS_GetCapsEvent   "AFS_PTS_GetCaps"
+#define PTS_AuthNmToIdEvent     "AFS_PTS_AuthNmToId"
+#define PTS_AuthNmToIdFallEvent "AFS_PTS_AuthNmToIdFall"
+#define PTS_LstAuthNmEvent "AFS_PTS_LstAuthNm"
+#define PTS_WhoAmIEvent    "AFS_PTS_WhoAmI"
 
 #define BUDB_StartEvent    "AFS_BUDB_Start"
 #define BUDB_FinishEvent   "AFS_BUDB_Finish"
