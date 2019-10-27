@@ -23,9 +23,14 @@
 #include <afs/afsutil.h>
 #include <afs/com_err.h>
 #include <afs/cmd.h>
+#include <afs/opr.h>
 #include <rx/rx.h>
 #include <rx/xdr.h>
 #include <rx/rxgk_int.h>
+#ifdef AFS_RXGK_ENV
+# include <rx/rxgk.h>
+#endif
+#include <base64.h>
 
 #include "ptclient.h"
 #include "ptuser.h"
@@ -761,6 +766,317 @@ CheckEntry(struct cmd_syndesc *as, void *arock)
     return (rcode);
 }
 
+static char *
+pran2str_display(PrAuthName *pran)
+{
+    int code;
+    char *str;
+
+    code = asprintf(&str, "%.*s", pran->display.display_len,
+		    pran->display.display_val);
+    if (code < 0) {
+	return NULL;
+    }
+    return str;
+}
+
+static char *
+pran2str_data(PrAuthName *pran)
+{
+    int code;
+    char *str = NULL;
+    char *b64_name = NULL;
+    const char *kind_descr;
+
+    switch (pran->kind) {
+    case PRAUTHTYPE_KRB4:
+	kind_descr = "krb4";
+	break;
+    case PRAUTHTYPE_GSS:
+	kind_descr = "gss";
+	break;
+    default:
+	kind_descr = "unknown";
+	break;
+    }
+
+    code = base64_encode(pran->data.data_val, pran->data.data_len, &b64_name);
+    if (code < 0) {
+	return NULL;
+    }
+
+    code = asprintf(&str, "type %d (%s), base64 %s", pran->kind, kind_descr, b64_name);
+    free(b64_name);
+    if (code < 0) {
+	return NULL;
+    }
+    return str;
+}
+
+static int
+pts_Capabilities(struct cmd_syndesc *as, void *arock)
+{
+    PrCapabilities caps;
+    afs_int32 code;
+    int cap_i;
+
+    memset(&caps, 0, sizeof(caps));
+
+    code = pr_GetCapabilities(&caps);
+    if (code != 0) {
+	afs_com_err(whoami, code, "while getting ptserver capabilities");
+	return code;
+    }
+
+    printf("ptserver capabilities:\n");
+
+    for (cap_i = 0; cap_i < caps.PrCapabilities_len; cap_i++) {
+	afs_uint32 cap = caps.PrCapabilities_val[cap_i];
+	int bit_i;
+
+	if (cap_i == 0) {
+	    if ((cap & PTS_CAPABILITY_AUTHNAMEMAPPING)) {
+		cap &= ~PTS_CAPABILITY_AUTHNAMEMAPPING;
+		printf("  capability[%u] 0x%08x = authenticated name mapping\n",
+		       cap_i, PTS_CAPABILITY_AUTHNAMEMAPPING);
+	    }
+	}
+
+	for (bit_i = 0; bit_i < 32; bit_i++) {
+	    afs_uint32 bit = 1 << bit_i;
+	    if ((cap & bit)) {
+		printf("  capability[%u] 0x%08x = unknown\n", cap_i, bit);
+	    }
+	}
+    }
+
+    xdrfree_PrCapabilities(&caps);
+
+    return 0;
+}
+
+static void
+alloc_pran(PrAuthName *pran, afs_int32 kind, char *display_val,
+	   size_t display_len, void *data_val, size_t data_len)
+{
+    pran->kind = kind;
+
+    pran->display.display_val = xdr_alloc(display_len);
+    opr_Assert(pran->display.display_val);
+    memcpy(pran->display.display_val, display_val, display_len);
+    pran->display.display_len = display_len;
+
+    pran->data.data_val = xdr_alloc(data_len);
+    opr_Assert(pran->data.data_val);
+    memcpy(pran->data.data_val, data_val, data_len);
+    pran->data.data_len = data_len;
+}
+
+#ifdef AFS_RXGK_ENV
+static void
+gssk5_to_pran(PrAuthName *pran, char *princ)
+{
+    struct rx_opaque data = RX_EMPTY_OPAQUE;
+    afs_int32 code;
+
+    code = rxgk_krb5_to_gss(princ, &data);
+    opr_Assert(code == 0);
+
+    alloc_pran(pran, PRAUTHTYPE_GSS, princ, strlen(princ)+1, data.val,
+	       data.len);
+
+    rx_opaque_freeContents(&data);
+}
+#endif
+
+static int
+parse_pran(char *str, PrAuthName *pran)
+{
+    char *colon;
+    char *prefix;
+    char *name;
+
+    colon = strchr(str, ':');
+    if (colon == NULL) {
+	prefix = NULL;
+	name = str;
+    } else {
+	*colon = '\0';
+	prefix = str;
+	name = &colon[1];
+    }
+
+    if (prefix == NULL || strcmp(prefix, "k4") == 0) {
+	size_t len = strlen(name);
+	alloc_pran(pran, PRAUTHTYPE_KRB4, name, len+1, name, len);
+	return 0;
+
+    } else if (strcmp(prefix, "gssk5") == 0) {
+#ifdef AFS_RXGK_ENV
+	gssk5_to_pran(pran, name);
+	return 0;
+#else
+	fprintf(stderr, "Error: cannot specify gssk5 names: rxgk support is "
+			"not enabled\n");
+	return PRBADARG;
+#endif
+
+    } else {
+	goto bad;
+    }
+
+ bad:
+    fprintf(stderr, "Error: bad authname format; should look like "
+	    "\"princ\", \"k4:princ\" or \"gssk5:princ\"\n");
+    return PRBADARG;
+}
+
+static int
+pts_NameToID(struct cmd_syndesc *as, void *arock)
+{
+    struct cmd_item *optlist = NULL, *cur;
+    authnamelist namelist;
+    nidlist idlist;
+    int fallback = 0;
+    int name_i;
+    afs_int32 code;
+    size_t n_items;
+    size_t size;
+
+    memset(&namelist, 0, sizeof(namelist));
+    memset(&idlist, 0, sizeof(idlist));
+
+    if (cmd_OptionAsList(as, 0, &optlist) != 0) { /* -names */
+	return PRBADARG;
+    }
+
+    cmd_OptionAsFlag(as, 1, &fallback); /* -fallback */
+
+    n_items = 0;
+    for (cur = optlist; cur != NULL; cur = cur->next) {
+	n_items++;
+    }
+
+    size = sizeof(namelist.authnamelist_val[0]) * n_items;
+
+    namelist.authnamelist_len = n_items;
+    namelist.authnamelist_val = xdr_alloc(size);
+    opr_Assert(namelist.authnamelist_val);
+    memset(namelist.authnamelist_val, 0, size);
+
+    name_i = 0;
+    for (cur = optlist; cur != NULL; cur = cur->next, name_i++) {
+	PrAuthName *pran;
+	char *str = strdup(cur->data);
+	pran = &namelist.authnamelist_val[name_i];
+
+	code = parse_pran(str, pran);
+	free(str);
+	if (code != 0) {
+	    goto done;
+	}
+    }
+
+    if (fallback) {
+	code = pr_AuthNameToIDFallback(&namelist, &idlist);
+    } else {
+	code = pr_AuthNameToID(&namelist, &idlist);
+    }
+    if (code != 0) {
+	afs_com_err(whoami, code, "while looking up ids");
+	goto done;
+    }
+
+    name_i = 0;
+    for (cur = optlist; cur != NULL; cur = cur->next, name_i++) {
+	afs_int64 id;
+	opr_Assert(name_i < idlist.nidlist_len);
+	id = idlist.nidlist_val[name_i];
+	if (id == ANONYMOUSID) {
+	    afs_com_err(whoami, PRNOENT, "so couldn't look up id for %s",
+			cur->data);
+	} else {
+	    printf("Name: %s, id: %lld\n", cur->data, id);
+	}
+    }
+
+ done:
+    xdrfree_authnamelist(&namelist);
+    xdrfree_nidlist(&idlist);
+
+    return code;
+}
+
+static int
+pts_ListNames(struct cmd_syndesc *as, void *arock)
+{
+    afs_int32 last_error = 0;
+    struct cmd_item *optlist = NULL, *cur;
+
+    if (cmd_OptionAsList(as, 0, &optlist) != 0) { /* -ids */
+	return PRBADARG;
+    }
+
+    for (cur = optlist; cur != NULL; cur = cur->next) {
+	afs_int64 id = strtol(cur->data, NULL, 10);
+	authnamelist namelist;
+	afs_int32 code;
+	size_t name_i;
+
+	memset(&namelist, 0, sizeof(namelist));
+
+	code = pr_ListAuthNames(id, &namelist);
+	if (code != 0) {
+	    afs_com_err(whoami, code, "while looking up names for id %lld", id);
+	    last_error = code;
+	    continue;
+	}
+
+	printf("Id %lld:\n", id);
+	for (name_i = 0; name_i < namelist.authnamelist_len; name_i++) {
+	    PrAuthName *pran = &namelist.authnamelist_val[name_i];
+	    char *str = pran2str_display(pran);
+	    printf("  name: %s\n", str);
+	    free(str);
+	    str = pran2str_data(pran);
+	    printf("  name data: %s\n", str);
+	    free(str);
+	}
+
+	xdrfree_authnamelist(&namelist);
+    }
+    return last_error;
+}
+
+static int
+pts_WhoAmI(struct cmd_syndesc *as, void *arock)
+{
+    afs_int32 code;
+    afs_int64 id = 0;
+    PrAuthName pran;
+    char *pran_str;
+
+    memset(&pran, 0, sizeof(pran));
+
+    code = pr_WhoAmI(&id, &pran);
+    if (code != 0) {
+	afs_com_err(whoami, code, "looking up my id");
+	return code;
+    }
+
+    pran_str = pran2str_display(&pran);
+    printf("Name: %s, id: %lld\n", pran_str, id);
+    free(pran_str);
+
+    pran_str = pran2str_data(&pran);
+    printf("Name data: %s\n", pran_str);
+    free(pran_str);
+
+    xdrfree_PrAuthName(&pran);
+
+    return 0;
+}
+
 static int
 ListEntries(struct cmd_syndesc *as, void *arock)
 {
@@ -1205,6 +1521,26 @@ main(int argc, char **argv)
 
     ts = cmd_CreateSyntax("sleep", pts_Sleep, NULL, 0, "pause for a bit");
     cmd_AddParm(ts, "-delay", CMD_SINGLE, 0, "seconds");
+    add_std_args(ts);
+
+    ts = cmd_CreateSyntax("capabilities", pts_Capabilities, NULL, 0,
+			  "list ptserver capabilities");
+    add_std_args(ts);
+
+    ts = cmd_CreateSyntax("authnametoid", pts_NameToID, NULL, 0,
+			  "resolve names to ids");
+    cmd_AddParm(ts, "-names", CMD_LIST, 0, "auth names to resolve");
+    cmd_AddParm(ts, "-fallback", CMD_FLAG, CMD_OPTIONAL,
+		"fallback to non-explicit mappings");
+    add_std_args(ts);
+
+    ts = cmd_CreateSyntax("listauthnames", pts_ListNames, NULL, 0,
+			  "list names associated with an id");
+    cmd_AddParm(ts, "-ids", CMD_LIST, 0, "ids to resolve");
+    add_std_args(ts);
+
+    ts = cmd_CreateSyntax("whoami", pts_WhoAmI, NULL, 0,
+			  "get entry for current caller");
     add_std_args(ts);
 
     cmd_SetBeforeProc(GetGlobals, &state);

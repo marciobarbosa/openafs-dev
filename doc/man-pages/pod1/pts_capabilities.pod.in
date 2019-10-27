@@ -1,0 +1,46 @@
+=head1 NAME
+
+pts_capablities - Display ptserver capabilities
+
+=head1 SYNOPSIS
+
+=for html
+<div class="synopsis">
+
+B<pts capabilities>
+    S<<< [B<-cell> <I<cell name>>] >>> [B<-noauth>] [B<-localauth>]
+    [B<-force>] [B<-auth>] [B<-rxgk> I<level>] [B<-help>]
+    [B<-encrypt>] S<<< [B<-config> <I<config directory>>] >>>
+
+=for html
+</div>
+
+=head1 DESCRIPTION
+
+The B<pts capabilities> command displays the protocol capability bits
+advertised by the ptserver.
+
+=head1 OUTPUT
+
+For each capability advertised by the ptserver, B<pts capabilities> prints the
+index of the capability integer, the bit of the capability (in hexadecimal),
+and a short description of that capability.
+
+=head1 EXAMPLES
+
+    % pts capabilities
+    ptserver capabilities:
+      capability[0] 0x00000001 = authenticated name mapping
+      capability[0] 0x00008000 = unknown
+      capability[1] 0x00000001 = unknown
+
+=head1 SEE ALSO
+
+L<pts(1)>,
+
+=head1 COPYRIGHT
+
+Copyright 2019 Sine Nomine Associates
+
+This documentation is covered by the BSD License as written in the doc/LICENSE
+file. This man page was written by Andrew Deason for OpenAFS.

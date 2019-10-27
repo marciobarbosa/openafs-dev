@@ -1,0 +1,58 @@
+=head1 NAME
+
+pts_listauthnames - Displays auth names associated with an AFS UID
+
+=head1 SYNOPSIS
+
+=for html
+<div class="synopsis">
+
+B<pts listauthnames> S<<< B<-ids> <I<ids to resolve>>+ >>>
+    S<<< [B<-cell> <I<cell name>>] >>> [B<-noauth>] [B<-localauth>]
+    [B<-force>] [B<-auth>] [B<-rxgk> I<level>] [B<-help>]
+    [B<-encrypt>] S<<< [B<-config> <I<config directory>>] >>>
+
+=for html
+</div>
+
+=head1 DESCRIPTION
+
+The B<pts listauthnames> command displays the auth names that explicitly map to
+the given AFS UIDs in the Protection Database.
+
+=head1 OUTPUT
+
+For each AFS UID given, B<pts listauthnames> displays the id on a line,
+followed by each of the auth names associated with that UID. For each auth
+name, B<pts listauthnames> displays the display name and raw name data on
+separate lines.
+
+=head1 EXAMPLES
+
+    % pts listauthnames 1045
+    Id 1045:
+      name: terry
+      name data: type 1 (krb4), base64 dGVycnkA
+
+    % pts listauthnames 1234
+    pts: User or group doesn't exist while looking up names for id 1234
+
+    % pts listauthnames 1046
+    Id 1046:
+      name: mike
+      name data: type 1 (krb4), base64 bWlrZQA=
+      name: mike@CELL.BOSTON.AMERICAS.EXAMPLE.COM
+      name data: type 2 (gss), base64 BAEACwYJKoZIhvcSAQICAAAAJW1pa2VAQ0VMTC5CT1NUT04uQU1FUklDQVMuRVhBTVBMRS5DT00=
+      name: mike@CELL.WASHDC.AMERICAS.EXAMPLE.COM
+      name data: type 2 (gss), base64 BAEACwYJKoZIhvcSAQICAAAAJW1pa2VAQ0VMTC5XQVNIREMuQU1FUklDQVMuRVhBTVBMRS5DT00=
+
+=head1 SEE ALSO
+
+L<pts(1)>,
+
+=head1 COPYRIGHT
+
+Copyright 2019 Sine Nomine Associates
+
+This documentation is covered by the BSD License as written in the doc/LICENSE
+file. This man page was written by Andrew Deason for OpenAFS.
