@@ -1,0 +1,70 @@
+=head1 NAME
+
+pts_whoami - Displays the identity of the caller
+
+=head1 SYNOPSIS
+
+=for html
+<div class="synopsis">
+
+B<pts whoami>
+    S<<< [B<-cell> <I<cell name>>] >>> [B<-noauth>] [B<-localauth>]
+    [B<-force>] [B<-auth>] [B<-rxgk> I<level>] [B<-help>]
+    [B<-encrypt>] S<<< [B<-config> <I<config directory>>] >>>
+
+=for html
+</div>
+
+=head1 DESCRIPTION
+
+The B<pts whoami> command displays the name and numerical id of the calling
+user from the Protection Database.
+
+=head1 OUTPUT
+
+The output includes the following fields:
+
+=over 4
+
+=item Name
+
+The name of the calling user; specifically, the "display" name of the calling
+user's identity.
+
+=item id
+
+The id number of the calling user's entry in the Protection Database.
+
+=item Name data
+
+Internal details of the calling user's name. This includes the type of the name
+(e.g. krb4 or gss), and the base64-encoded raw name data.
+
+=back
+
+=head1 EXAMPLES
+
+The following example displays the identity for the calling user C<terry> when
+using krb4-based rxkad authentication:
+
+   % pts whoami
+   Name: terry, id: 1045
+   Name data: type 1 (krb4), base64 dGVycnkA
+
+The following example shows the same user using rxgk authentication with a
+krb5-backed GSS identity:
+
+   % pts whoami -rxgk crypt
+   Name: terry@CELL.VEGAS.AMERICAS.EXAMPLE.COM, id: 1045
+   Name data: type 2 (gss), base64 BAEACwYJKoZIhvcSAQICAAAAJXRlcnJ5QENFTEwuVkVHQVMuQU1FUklDQVMuRVhBTVBMRS5DT00=
+
+=head1 SEE ALSO
+
+L<pts(1)>,
+
+=head1 COPYRIGHT
+
+Copyright 2019 Sine Nomine Associates
+
+This documentation is covered by the BSD License as written in the doc/LICENSE
+file. This man page was written by Andrew Deason for OpenAFS.

@@ -7,12 +7,15 @@
 /fs_setquota.pod
 /fs_setvol.pod
 /pts_adduser.pod
+/pts_authnametoid.pod
+/pts_capabilities.pod
 /pts_chown.pod
 /pts_creategroup.pod
 /pts_createuser.pod
 /pts_delete.pod
 /pts_examine.pod
 /pts_interactive.pod
+/pts_listauthnames.pod
 /pts_listentries.pod
 /pts_listmax.pod
 /pts_listowned.pod
@@ -24,6 +27,7 @@
 /pts_setmax.pod
 /pts_sleep.pod
 /pts_source.pod
+/pts_whoami.pod
 /vos.pod
 /vos_addsite.pod
 /vos_backup.pod

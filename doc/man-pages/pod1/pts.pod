@@ -48,11 +48,14 @@ and L<B<pts removeuser>|pts_removeuser(1)>.
 
 Commands to administer and display properties of user and group entries
 other than membership:
+L<B<pts authnametoid>|pts_authnametoid(1)>,
 L<B<pts chown>|pts_chown(1)>,
 L<B<pts examine>|pts_examine(1)>,
+L<B<pts listauthnames>|pts_listauthnames(1)>,
 L<B<pts listentries>|pts_listentries(1)>,
 L<B<pts rename>|pts_rename(1)>,
-and L<B<pts setfields>|pts_setfields(1)>.
+L<B<pts setfields>|pts_setfields(1)>,
+and L<B<pts whoami>|pts_whoami(1)>.
 
 =item *
 
@@ -60,6 +63,11 @@ Commands to set and examine the counters used when assigning IDs to users
 and groups:
 L<B<pts listmax>|pts_listmax(1)>
 and L<B<pts setmax>|pts_setmax(1)>.
+
+=item *
+
+Commands to examine the ptserver itself:
+L<B<pts capabilities>|pts_capabilities(1)>.
 
 =item *
 

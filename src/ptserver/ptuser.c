@@ -1122,3 +1122,51 @@ pr_ListSuperGroups(afs_int32 gid, namelist * lnames)
     xdr_free((xdrproc_t) xdr_prlist, &alist);
     return code;
 }
+
+int
+pr_GetCapabilities(PrCapabilities *caps)
+{
+    return ubik_PR_GetCapabilities(pruclient, 0, caps);
+}
+
+static int
+nametoid_check(int code, authnamelist *namelist, nidlist *idlist)
+{
+    if (code != 0) {
+	return code;
+    }
+    if (idlist->nidlist_len != namelist->authnamelist_len) {
+	xdrfree_nidlist(idlist);
+	memset(idlist, 0, sizeof(*idlist));
+	return PRINTERNAL;
+    }
+    return 0;
+}
+
+int
+pr_AuthNameToID(authnamelist *namelist, nidlist *idlist)
+{
+    int code;
+    code = ubik_PR_AuthNameToID(pruclient, 0, namelist, idlist);
+    return nametoid_check(code, namelist, idlist);
+}
+
+int
+pr_AuthNameToIDFallback(authnamelist *namelist, nidlist *idlist)
+{
+    int code;
+    code = ubik_PR_AuthNameToIDFallback(pruclient, 0, namelist, idlist);
+    return nametoid_check(code, namelist, idlist);
+}
+
+int
+pr_ListAuthNames(afs_int64 id, authnamelist *namelist)
+{
+    return ubik_PR_ListAuthNames(pruclient, 0, id, namelist);
+}
+
+int
+pr_WhoAmI(afs_int64 *aid, PrAuthName *aname)
+{
+    return ubik_PR_WhoAmI(pruclient, 0, aid, aname);
+}

@@ -60,5 +60,13 @@ extern afs_int32 pr_SetFieldsEntry(afs_int32 id, afs_int32 mask,
 extern int pr_ListSuperGroups(afs_int32 gid, namelist *lnames) AFS_NONNULL();
 extern int pr_IDListExpandedMembers(afs_int32 gid, namelist *lnames)
 				   AFS_NONNULL();
+extern int pr_GetCapabilities(PrCapabilities *caps) AFS_NONNULL();
+extern int pr_AuthNameToID(authnamelist *namelist, nidlist *idlist)
+			   AFS_NONNULL();
+extern int pr_AuthNameToIDFallback(authnamelist *namelist, nidlist *idlist)
+				   AFS_NONNULL();
+extern int pr_ListAuthNames(afs_int64 id, authnamelist *namelist)
+			    AFS_NONNULL();
+extern int pr_WhoAmI(afs_int64 *aid, PrAuthName *aname) AFS_NONNULL();
 
 #endif /* PTUSER_H */

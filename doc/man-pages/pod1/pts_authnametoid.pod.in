@@ -1,0 +1,103 @@
+=head1 NAME
+
+pts_authnametoid - Displays an authentication name mapping
+
+=head1 SYNOPSIS
+
+=for html
+<div class="synopsis">
+
+B<pts authnametoid> S<<< B<-names> <I<auth names>>+ >>>
+    [B<-fallback>]
+    S<<< [B<-cell> <I<cell name>>] >>> [B<-noauth>] [B<-localauth>]
+    [B<-force>] [B<-auth>] [B<-rxgk> I<level>] [B<-help>]
+    [B<-encrypt>] S<<< [B<-config> <I<config directory>>] >>>
+
+=for html
+</div>
+
+=head1 DESCRIPTION
+
+The B<pts authnametoid> command displays the AFS UID associated with an
+authentication name. Authentication names can be simple krb4-based principal
+names for use with rxkad (for example: C<terry> for the principal
+C<terry@EXAMPLE.COM>), or GSS names for use with rxgk.
+
+=head1 OPTIONS
+
+=over 4
+
+=item -names <I<auth names>>
+
+Specifies the auth names to resolve to AFS UIDs. Each auth name may be given
+with a type prefix and a colon, to indicate the type of auth name. The
+understood prefixes are:
+
+=over 4
+
+=item k4
+
+A krb4-style auth name. For local users, this is usually just the username
+portion of that user's principal, without the realm.
+
+=item gssk5
+
+A GSS auth name, backed by a krb5 principal. The name is just the full
+principal name.
+
+=back
+
+If no prefix is given, C<k4> is the default.
+
+=item -fallback
+
+By default, B<pts authnametoid> will only look up explicit mappings. If
+B<-fallback> is given, B<pts authnametoid> will make use of implicit mappings
+and automatic name type conversions. For example, when using implicit mappings,
+the ptserver will automatically convert krb5-backed GSS auth names to krb4 auth
+names, using a builtin 524 conversion algorithm.
+
+=back
+
+=head1 OUTPUT
+
+The output includes the following fields:
+
+=over 4
+
+=item Name
+
+The auth name that was resolved.
+
+=item id
+
+The AFS UID that corresponds to the given auth name.
+
+=back
+
+=head1 EXAMPLES
+
+    % pts authnametoid terry
+    Name: terry, id: 1045
+
+    % pts authnametoid gssk5:terry@EXAMPLE.COM
+    pts: User or group doesn't exist so couldn't look up id for gssk5:terry@EXAMPLE.COM
+
+    % pts authnametoid gssk5:terry@EXAMPLE.COM -fallback
+    Name: gssk5:terry@EXAMPLE.COM, id: 1045
+
+    % pts authnametoid terry gssk5:terry@EXAMPLE.COM k4:terry
+    Name: terry, id: 1045
+    pts: User or group doesn't exist so couldn't look up id for gssk5:terry@EXAMPLE.COM
+    Name: k4:terry, id: 1045
+
+=head1 SEE ALSO
+
+L<pts(1)>,
+
+=head1 COPYRIGHT
+
+Copyright 2019 Sine Nomine Associates
+
+This documentation is covered by the BSD License as written in the doc/LICENSE
+file. This man page was written by Andrew Deason for OpenAFS.
