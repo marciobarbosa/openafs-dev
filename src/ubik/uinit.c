@@ -34,11 +34,10 @@ internal_client_init(struct afsconf_dir *dir, struct afsconf_cell *info,
 		     int secFlags, struct ubik_client **uclientp,
 		     ugen_secproc_func secproc,
 		     int maxservers, int deadtime,
-		     afs_uint32 server, afs_uint32 port, afs_int32 usrvid)
+		     afs_uint32 server, afs_uint32 port, afs_int32 usrvid,
+		     struct rx_securityClass *sc, afs_int32 scIndex)
 {
     int code, i;
-    afs_int32 scIndex;
-    struct rx_securityClass *sc;
     /* This must change if VLDB_MAXSERVERS becomes larger than MAXSERVERS */
     static struct rx_connection *serverconns[MAXSERVERS];
     const char *progname;
@@ -56,17 +55,19 @@ internal_client_init(struct afsconf_dir *dir, struct afsconf_cell *info,
 	rx_SetRxDeadTime(deadtime);
     }
 
-    code = afsconf_PickClientSecObj(dir, secFlags, info, NULL, &sc,
-				    &scIndex, NULL);
-    if (code) {
-	fprintf(stderr, "%s: can't create client security object", progname);
-	return code;
-    }
+    if (sc == NULL) {
+	code = afsconf_PickClientSecObj(dir, secFlags, info, NULL, &sc,
+					&scIndex, NULL);
+	if (code) {
+	    fprintf(stderr, "%s: can't create client security object", progname);
+	    return code;
+	}
 
-    if (scIndex == RX_SECIDX_NULL && !(secFlags & AFSCONF_SECOPTS_NOAUTH)) {
-	fprintf(stderr,
-		"%s: Could not get afs tokens, running unauthenticated.\n",
-		progname);
+	if (scIndex == RX_SECIDX_NULL && !(secFlags & AFSCONF_SECOPTS_NOAUTH)) {
+	    fprintf(stderr,
+		    "%s: Could not get afs tokens, running unauthenticated.\n",
+		    progname);
+	}
     }
 
     if (secproc)	/* tell UV module about default authentication */
@@ -111,7 +112,9 @@ ugen_ClientInitCell(struct afsconf_dir *dir, struct afsconf_cell *info,
 {
     return internal_client_init(dir, info, secFlags, uclientp, NULL,
 				maxservers, deadtime, 0, 0,
-				USER_SERVICE_ID);
+				USER_SERVICE_ID,
+				NULL /* sc */,
+				0 /* scIndex */);
 }
 
 int
@@ -125,7 +128,26 @@ ugen_ClientInitService(struct afsconf_dir *dir, struct afsconf_cell *info,
 				0    /* deadtime */,
 				0    /* server */,
 				0    /* port */,
-				usrvid);
+				usrvid,
+				NULL /* sc */,
+				0    /* scIndex */);
+}
+
+int
+ugen_ClientInitSecObj(struct afsconf_dir *dir, struct afsconf_cell *info,
+		      afs_int32 usrvid, struct rx_securityClass *sc,
+		      afs_int32 scIndex, struct ubik_client **uclientp)
+{
+    return internal_client_init(dir, info, 0 /* secFlags */,
+				uclientp,
+				NULL /* secproc */,
+				0    /* maxservers */,
+				0    /* deadtime */,
+				0    /* server */,
+				0    /* port */,
+				usrvid,
+				sc,
+				scIndex);
 }
 
 static int
@@ -168,7 +190,7 @@ internal_client_init_dir(const char *confDir, char *cellName, int secFlags,
 
     code = internal_client_init(dir, &info, secFlags, uclientp, secproc,
 				maxservers, deadtime, server,
-				port, usrvid);
+				port, usrvid, NULL, 0);
 
     afsconf_Close(dir);
 

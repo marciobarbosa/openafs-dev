@@ -15,6 +15,7 @@ AFSLIBS= ${TOP_LIBDIR}/libafshcrypto.a \
 	 $(top_builddir)/src/util/liboafs_util.la \
 	 $(top_builddir)/src/auth/liboafs_auth.la \
 	 $(top_builddir)/src/rxgk/liboafs_rxgk.la \
+	 $(top_builddir)/src/ptserver/liboafs_prot.la \
 	 $(top_builddir)/src/ubik/liboafs_ubik.la
 
 OBJS=gklog.o
