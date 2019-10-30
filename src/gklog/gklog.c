@@ -47,6 +47,7 @@
 #include <afs/cellconfig.h>
 #include <afs/com_err.h>
 #include <afs/dirpath.h>
+#include <afs/ptserver.h>
 #include <ubik.h>
 
 #include <rx/rxgk.h>
@@ -93,6 +94,65 @@ get_cellconfig(struct afsconf_dir *configdir, char *cell,
     return(status);
 }
 
+static afs_int64
+get_viceid(struct afsconf_dir *configdir, char *cell,
+	   RXGK_TokenInfo *info, RXGK_Data *k0_data, RXGK_Data *token_blob)
+{
+    struct rx_securityClass *sc = NULL;
+    afs_int64 viceid = 0;
+    rxgk_key k0 = NULL;
+    afs_int32 code;
+    PrAuthName pran;
+    struct ubik_client *uclient = NULL;
+    struct afsconf_cell cellconf;
+
+    memset(&pran, 0, sizeof(pran));
+    memset(&cellconf, 0, sizeof(cellconf));
+
+    code = afsconf_GetCellInfo(configdir, cell, AFSCONF_PROTSERVICE, &cellconf);
+    if (code != 0) {
+	afs_com_err(progname, code,
+		    "while getting cell info while calculating viceid");
+	goto done;
+    }
+
+    code = rxgk_make_key(&k0, k0_data->val, k0_data->len, info->enctype);
+    if (code != 0) {
+	afs_com_err(progname, code,
+		    "while constructing k0 while calculating viceid");
+	goto done;
+    }
+
+    sc = rxgk_NewClientSecurityObject(info->level, info->enctype, k0,
+				      token_blob);
+    if (sc == NULL) {
+	afs_com_err(progname, ENOMEM,
+		    "while creating security object while calculating viceid");
+	goto done;
+    }
+
+    code = ugen_ClientInitSecObj(configdir, &cellconf, PRSRV, sc, RX_SECIDX_GK,
+				 &uclient);
+    if (code != 0) {
+	afs_com_err(progname, code,
+		    "while initializing ubik client while calculating viceid");
+	goto done;
+    }
+
+    code = ubik_PR_WhoAmI(uclient, 0, &viceid, &pran);
+    if (code != 0) {
+	afs_com_err(progname, code, "while calculating viceid");
+	viceid = 0;
+	goto done;
+    }
+
+ done:
+    ubik_ClientDestroy(uclient);
+    xdrfree_PrAuthName(&pran);
+    rxgk_release_key(&k0);
+    return viceid;
+}
+
 /*
  * Log to a cell.
  */
@@ -107,6 +167,7 @@ auth_to_cell(struct afsconf_dir *configdir, struct afsconf_cell *cellconf)
     RXGK_Data k0;
     char *target = NULL;
     struct ubik_client *uclient = NULL;
+    afs_int64 viceid = 0;
     int code;
 
     memset(&token, 0, sizeof(token));
@@ -149,8 +210,10 @@ auth_to_cell(struct afsconf_dir *configdir, struct afsconf_cell *cellconf)
 	goto done;
     }
 
+    viceid = get_viceid(configdir, cellconf->name, &info, &k0, &token_blob);
+
     rxgk_token = &token.ktc_tokenUnion_u.at_gk;
-    rxgk_token->gk_viceid = 0;
+    rxgk_token->gk_viceid = viceid;
     rxgk_token->gk_enctype = info.enctype;
     rxgk_token->gk_level = info.level;
     rxgk_token->gk_lifetime = info.lifetime;

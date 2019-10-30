@@ -36,4 +36,5 @@ ubik_dbase
 ubik_nBuffers
 ugen_ClientInit
 ugen_ClientInitFlags
+ugen_ClientInitSecObj
 ugen_ClientInitServer
