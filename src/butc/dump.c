@@ -165,9 +165,13 @@ Bind(afs_uint32 server)
     }
 
     if (server) {
-	curr_fromconn = UV_Bind(server, AFSCONF_VOLUMEPORT);	/* Establish new connection */
-	if (curr_fromconn)
+	int code;
+	code = UV_BindVolser(server, &curr_fromconn);	/* Establish new connection */
+	if (code == 0) {
 	    curr_bserver = server;
+	} else {
+	    ErrorLog(1, 0, code, 0, "Could not create volser connection.");
+	}
     }
 
     return (curr_fromconn);

@@ -18,7 +18,7 @@ extern void MapPartIdIntoName(afs_int32 partId, char *partName);
 
 extern void MapHostToNetwork(struct nvldbentry *entry);
 
-extern struct rx_connection *UV_Bind(afs_uint32 aserver, afs_int32 port);
+extern int UV_BindVolser(afs_uint32 aserver, struct rx_connection **a_conn);
 
 extern int UV_CreateVolume(afs_uint32 aserver, afs_int32 apart, char *aname,
 			   afs_uint32 * anewid);

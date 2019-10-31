@@ -5781,8 +5781,10 @@ EndTrans(struct cmd_syndesc *as, void *arock)
 	return code;
     }
 
-    aconn = UV_Bind(server, AFSCONF_VOLUMEPORT);
-    code = AFSVolEndTrans(aconn, tid, &rcode);
+    code = UV_BindVolser(server, &aconn);
+    if (!code) {
+	code = AFSVolEndTrans(aconn, tid, &rcode);
+    }
     if (!code) {
 	code = rcode;
     }

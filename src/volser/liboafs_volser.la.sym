@@ -17,7 +17,7 @@ StartAFSVolDump
 SubEnumerateEntry
 UV_AddSite2
 UV_BackupVolume
-UV_Bind
+UV_BindVolser
 UV_ChangeLocation
 UV_CloneVolume
 UV_ConvertRO
