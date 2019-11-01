@@ -621,7 +621,8 @@ extern int ubik_ParseServerList(int argc, char **argv, afs_uint32 *ahost,
 
 struct rx_securityClass;
 struct afsconf_dir;
-typedef int (*ugen_secproc_func)(struct rx_securityClass *, afs_int32);
+typedef int (*ugen_secproc_func)(struct rx_securityClass *, afs_int32,
+				 struct afsconf_dir *, struct afsconf_cell *);
 extern int ugen_ClientInitCell(struct afsconf_dir *dir,
 			       struct afsconf_cell *info,
 			       int secFlags,

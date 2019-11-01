@@ -71,7 +71,7 @@ internal_client_init(struct afsconf_dir *dir, struct afsconf_cell *info,
     }
 
     if (secproc)	/* tell UV module about default authentication */
-	(*secproc) (sc, scIndex);
+	(*secproc) (sc, scIndex, dir, info);
 
     if (server) {
 	serverconns[0] = rx_NewConnection(server, port,
