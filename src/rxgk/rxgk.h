@@ -142,6 +142,11 @@ afs_int32 ubik_rxgk_NegotiateClientToken(struct ubik_client *uclient,
 					 RXGK_Data *return_k0,
 					 RXGK_Data *return_token)
 					 AFS_NONNULL();
+afs_int32 ubik_rxgk_CombineSingleClientSecObj(struct ubik_client *uclient,
+					      afsUUID *client_uuid,
+					      afsUUID *server_uuid,
+					      struct rx_securityClass **a_sc)
+					      AFS_NONNULL((1,3,4));
 
 /* rxgk_token.c */
 afs_int32 rxgk_make_token(struct rx_opaque *out, RXGK_TokenInfo *info,

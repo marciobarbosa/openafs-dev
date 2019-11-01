@@ -178,7 +178,7 @@ InitThisModule(int a_noAuthFlag, char *a_confDir, char *a_cellName)
 #ifdef USS_VOL_DB
     printf("[%s] Setting UV security: obj 0x%x, index %d\n", rn, sc, scIndex);
 #endif /* USS_VOL_DB */
-    UV_SetSecurity(sc, scIndex);
+    UV_SetSecurity(sc, scIndex, tdir, &info);
     if (info.numServers > VLDB_MAXSERVERS) {
 	fprintf(stderr, "%s: info.numServers=%d (> VLDB_MAXSERVERS=%d)\n",
 		uss_whoami, info.numServers, VLDB_MAXSERVERS);

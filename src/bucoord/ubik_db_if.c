@@ -830,7 +830,7 @@ vldbClientInit(int noAuthFlag, int localauth, char *cellName,
 	afs_com_err(whoami, 0, "Can't get tokens - running unauthenticated");
 
     /* tell UV module about default authentication */
-    UV_SetSecurity(sc, scIndex);
+    UV_SetSecurity(sc, scIndex, acdir, &info);
 
     if (info.numServers > VLDB_MAXSERVERS) {
 	afs_com_err(whoami, 0,
