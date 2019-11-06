@@ -821,6 +821,47 @@ rxgk_NegotiateClientToken(struct rx_connection *conn, char *target,
     return code;
 }
 
+/**
+ * Use an rxnull connection to perform GSS negotiation to obtain an rxgk
+ * security object.
+ *
+ * This is a small convenience wrapper around rxgk_NegotiateClientToken, which
+ * just performs the additional step of converting the obtained token into an
+ * rx security object. See that function for more details.
+ */
+afs_int32
+rxgk_NegotiateClientSecObj(struct rx_connection *conn, char *target,
+			   RXGK_Level level, struct rx_securityClass **a_sc)
+{
+    afs_int32 code;
+    RXGK_TokenInfo tokinfo;
+    RXGK_Data k0_data;
+    RXGK_Data tokblob;
+    rxgk_key k0 = NULL;
+
+    memset(&tokinfo, 0, sizeof(tokinfo));
+    memset(&k0_data, 0, sizeof(k0_data));
+    memset(&tokblob, 0, sizeof(tokblob));
+
+    code = rxgk_NegotiateClientToken(conn, target, level, &tokinfo, &k0_data, &tokblob);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = rxgk_make_key(&k0, k0_data.val, k0_data.len, tokinfo.enctype);
+    if (code != 0) {
+	goto done;
+    }
+
+    *a_sc = rxgk_NewClientSecurityObject(level, tokinfo.enctype, k0, &tokblob);
+
+ done:
+    xdrfree_RXGK_Data(&k0_data);
+    xdrfree_RXGK_Data(&tokblob);
+    rxgk_release_key(&k0);
+    return code;
+}
+
 /*
  * Server-side routines.
  */

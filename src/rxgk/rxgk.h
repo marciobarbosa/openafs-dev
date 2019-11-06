@@ -64,6 +64,9 @@ struct rx_securityClass * rxgk_NewServerSecurityObject(afsUUID *server_uuid,
 						       void *getkey_rock,
 						       rxgk_getkey_func getkey)
 						       AFS_NONNULL((3));
+afs_int32 rxgk_make_ephemeral_getkey(afs_int32 kvno,
+				     rxgk_getkey_func *a_getkey,
+				     void **a_getkey_rock) AFS_NONNULL();
 
 afs_int32 rxgk_ServerGetPeerUUID(struct rx_connection *conn, afsUUID *uuid)
 				 AFS_NONNULL();
@@ -116,6 +119,10 @@ afs_int32 rxgk_NegotiateClientToken(struct rx_connection *conn, char *target,
 				    RXGK_TokenInfo *return_info,
 				    RXGK_Data *return_k0,
 				    RXGK_Data *return_token) AFS_NONNULL();
+afs_int32 rxgk_NegotiateClientSecObj(struct rx_connection *conn, char *target,
+				     RXGK_Level level,
+				     struct rx_securityClass **a_sc)
+				     AFS_NONNULL();
 
 struct rxgk_gss_service_info {
     /* The host-based service name that will be the GSS acceptor identity (e.g.

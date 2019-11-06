@@ -50,6 +50,12 @@
 
 #include "rxgk_private.h"
 
+struct ephemeral_key_info {
+    afs_int32 kvno;
+    afs_int32 enctype;
+    rxgk_key key;
+};
+
 /*
  * Increment the reference count on the security object secobj.
  */
@@ -914,4 +920,66 @@ rxgk_ServerGetPeerUUID(struct rx_connection *conn, afsUUID *client_uuid)
 
     *client_uuid = sconn->client_uuid;
     return 0;
+}
+
+static afs_int32
+getkey_ephemeral(void *rock, afs_int32 *kvno, afs_int32 *enctype,
+		 rxgk_key *a_key)
+{
+    struct ephemeral_key_info *ekinfo = rock;
+    if (ekinfo == NULL || kvno == NULL || enctype == NULL || a_key == NULL) {
+	return RXGK_INCONSISTENCY;
+    }
+
+    if (*kvno != 0 && *kvno != ekinfo->kvno) {
+	return RXGK_BADKEYNO;
+    }
+
+    if (*enctype != 0 && *enctype != ekinfo->enctype) {
+	return RXGK_BADETYPE;
+    }
+
+    *kvno = ekinfo->kvno;
+    *enctype = ekinfo->enctype;
+    return rxgk_copy_key(ekinfo->key, a_key);
+}
+
+/**
+ * Create an rxgk_getkey_func that is backed by a randomly-generated key.
+ *
+ * @param[in] kvno  The kvno to use for the generated key.
+ * @param[out] a_getkey		The getkey callback function.
+ * @param[out] a_getkey_rock	The rock to provide when calling 'a_getkey'.
+ *
+ * @returns rxgk error codes.
+ */
+afs_int32
+rxgk_make_ephemeral_getkey(afs_int32 kvno, rxgk_getkey_func *a_getkey,
+			   void **a_getkey_rock)
+{
+    afs_int32 code;
+    struct ephemeral_key_info *ekinfo;
+
+    ekinfo = rxi_Alloc(sizeof(*ekinfo));
+    if (ekinfo == NULL) {
+	code = RXGK_INCONSISTENCY;
+	goto done;
+    }
+
+    ekinfo->kvno = kvno;
+
+    code = rxgk_random_key(&ekinfo->enctype, &ekinfo->key);
+    if (code != 0) {
+	goto done;
+    }
+
+    *a_getkey = getkey_ephemeral;
+    *a_getkey_rock = ekinfo;
+
+    ekinfo = NULL;
+
+ done:
+    free(ekinfo);
+    return code;
+
 }
