@@ -1279,8 +1279,10 @@ main(int argc, char **argv, char **envp)
 
     afsconf_SetNoAuthFlag(tdir, noAuth);
 
+    bsso.type = AFSCONF_BSSO_BOSSERVER;
     bsso.dir = tdir;
     bsso.logger = FSLog;
+    bsso.host = host;
     code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses, &numClasses);
     if (code) {
 	ViceLog(0, ("Failed to create server security objects: code %d\n", code));

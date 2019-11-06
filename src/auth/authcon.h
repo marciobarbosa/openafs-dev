@@ -37,6 +37,7 @@
 enum afsconf_bsso_type {
     AFSCONF_BSSO_DEFAULT = 0,
     AFSCONF_BSSO_VLSERVER = 1,
+    AFSCONF_BSSO_BOSSERVER = 2,
 };
 
 struct afsconf_bsso_info {
