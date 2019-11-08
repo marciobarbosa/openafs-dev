@@ -46,6 +46,8 @@
 #include <rx/rx_packet.h>
 #include <rx/rxgk.h>
 
+#include <afs/afsutil.h>
+
 #include "rxgk_private.h"
 
 /*
@@ -525,12 +527,80 @@ check_authenticator(RXGK_Authenticator *authenticator,
     auth_got.calls_len = authenticator->call_numbers.len;
     auth_exp.calls_len = RX_MAXCALLS;
 
-    /* XXX We do nothing with the appdata for now. */
-
     if (ct_memcmp(&auth_got, &auth_exp, sizeof(auth_got)) != 0) {
 	return RXGK_BADCHALLENGE;
     }
     return 0;
+}
+
+static int
+unpack_appdata(struct rx_opaque *raw_data,
+	       RXGK_Authenticator_AFSAppData *appdata)
+{
+    XDR xdrs;
+    int code = 0;
+    memset(&xdrs, 0, sizeof(xdrs));
+    xdrmem_create(&xdrs, raw_data->val, raw_data->len, XDR_DECODE);
+    if (!xdr_RXGK_Authenticator_AFSAppData(&xdrs, appdata)) {
+	code = RXGK_SEALED_INCON;
+    }
+    xdr_destroy(&xdrs);
+    return code;
+}
+
+static int
+process_appdata(struct rxgk_sprivate *sp, struct rxgk_sconn *sc,
+		struct rx_opaque *raw_appdata)
+{
+    int code = 0;
+    RXGK_Authenticator_AFSAppData appdata;
+
+    memset(&appdata, 0, sizeof(appdata));
+    memset(&sc->client_uuid, 0, sizeof(sc->client_uuid));
+
+    if (raw_appdata->len != 0) {
+	code = unpack_appdata(raw_appdata, &appdata);
+	if (code != 0) {
+	    goto done;
+	}
+    }
+
+    if (appdata.cb_key.len != 0) {
+	/*
+	 * The client provided a key to use for secure callbacks, but we don't
+	 * yet support a secure callback channel. We could either silently
+	 * ignore the key, or we could throw an error. For now, we throw an
+	 * error, to make sure that the client doesn't miss callbacks because
+	 * it's expecting a secure callback channel that we do not provide.
+	 */
+	ViceLog_limit(0, ("rxgk: A client supplied a key for a secure callback "
+			  "channel. We do not yet support a secure callback "
+			  "channel, so rejecting the client.\n"));
+	code = RXGK_SEALED_INCON;
+	goto done;
+    }
+
+    if (sp->check_uuid &&
+	memcmp(&sp->server_uuid, &appdata.target_uuid, sizeof(sp->server_uuid)) != 0) {
+	struct uuid_fmtbuf server_str, target_str;
+
+
+	ViceLog_limit(0, ("rxgk: A client indicated it is trying to contact "
+			  "uuid %s, but we are uuid %s. Rejecting client.\n",
+			  afsUUID_to_string(&sp->server_uuid, &server_str),
+			  afsUUID_to_string(&appdata.target_uuid, &target_str)));
+	code = RXGK_SEALED_INCON;
+	goto done;
+    }
+
+    sc->client_uuid = appdata.client_uuid;
+
+    /* We ignore appdata.cb_tok for now. This is certainly okay to ignore; the
+     * spec clearly says the field is optional. */
+
+ done:
+    xdrfree_RXGK_Authenticator_AFSAppData(&appdata);
+    return code;
 }
 
 /* Process the response packet to a challenge */
@@ -608,6 +678,10 @@ rxgk_CheckResponse(struct rx_securityClass *aobj,
 	ret = RXGK_INCONSISTENCY;
 	goto done;
     }
+    ret = process_appdata(sp, sc, &authenticator.appdata);
+    if (ret != 0)
+	goto done;
+
     /* Success! */
     sc->auth = 1;
     sc->challenge_valid = 0;
@@ -794,7 +868,8 @@ static struct rx_securityOps rxgk_server_ops = {
  * data and such.
  */
 struct rx_securityClass *
-rxgk_NewServerSecurityObject(void *getkey_rock, rxgk_getkey_func getkey)
+rxgk_NewServerSecurityObject(afsUUID *server_uuid, void *getkey_rock,
+			     rxgk_getkey_func getkey)
 {
     struct rx_securityClass *sc;
     struct rxgk_sprivate *sp;
@@ -815,5 +890,28 @@ rxgk_NewServerSecurityObject(void *getkey_rock, rxgk_getkey_func getkey)
     sp->rock = getkey_rock;
     sp->getkey = getkey;
 
+    if (server_uuid != NULL) {
+	sp->server_uuid = *server_uuid;
+	sp->check_uuid = 1;
+    }
+
     return sc;
+}
+
+afs_int32
+rxgk_ServerGetPeerUUID(struct rx_connection *conn, afsUUID *client_uuid)
+{
+    struct rxgk_sconn *sconn;
+
+    if (rx_SecurityClassOf(conn) != RX_SECIDX_GK) {
+	return RXGK_INCONSISTENCY;
+    }
+
+    sconn = rx_GetSecurityData(conn);
+    if (sconn == NULL) {
+	return RXGK_INCONSISTENCY;
+    }
+
+    *client_uuid = sconn->client_uuid;
+    return 0;
 }

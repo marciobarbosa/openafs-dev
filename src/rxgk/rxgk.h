@@ -60,8 +60,13 @@ typedef afs_int32 (*rxgk_getkey_func)(void *rock, afs_int32 *kvno,
 #define RXGK_SSPECIFIC_GSSNEGO 2
 
 /* rxgk_server.c */
-struct rx_securityClass * rxgk_NewServerSecurityObject(void *getkey_rock,
-						       rxgk_getkey_func getkey);
+struct rx_securityClass * rxgk_NewServerSecurityObject(afsUUID *server_uuid,
+						       void *getkey_rock,
+						       rxgk_getkey_func getkey)
+						       AFS_NONNULL((3));
+
+afs_int32 rxgk_ServerGetPeerUUID(struct rx_connection *conn, afsUUID *uuid)
+				 AFS_NONNULL();
 
 /* rxgk_client.c */
 struct rx_securityClass *rxgk_NewClientSecurityObject(RXGK_Level level,

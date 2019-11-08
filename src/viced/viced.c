@@ -1839,20 +1839,10 @@ InitVL(struct afsconf_dir *dir)
 	return code;
     }
 
-    /* Read or create the sysid file and register the fileserver's
-     * IP addresses with the vlserver.
-     */
-    code = ReadSysIdFile();
-    if (code) {
-	/* Need to create the file */
-	ViceLog(0, ("Creating new SysID file\n"));
-	if ((code = afs_uuid_create(&FS_HostUUID))) {
-	    ViceLog(0, ("Failed to create new uuid: %d\n", code));
-	    exit(1);
-	}
-    }
-    /* A good sysid file exists; inform the vlserver. If any conflicts,
-     * we always use the latest interface available as the real truth.
+    /*
+     * Register the fileserver's IP address with the vlserver. If any
+     * conflicts, we always use the latest interface available as the real
+     * truth.
      */
 
     code = Do_VLRegisterRPC();
@@ -2067,10 +2057,23 @@ main(int argc, char *argv[])
     }
     rx_GetIFInfo();
     rx_SetRxDeadTime(30);
+
+    /* Read or create the sysid file. */
+    code = ReadSysIdFile();
+    if (code) {
+	/* Need to create the file */
+	ViceLog(0, ("Creating new SysID file\n"));
+	if ((code = afs_uuid_create(&FS_HostUUID))) {
+	    ViceLog(0, ("Failed to create new uuid: %d\n", code));
+	    exit(1);
+	}
+    }
+
     afsconf_SetSecurityFlags(confDir, AFSCONF_SECOPTS_ALWAYSENCRYPT);
 
     bsso.dir = confDir;
     bsso.logger = FSLog;
+    bsso.server_uuid = &FS_HostUUID;
     code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
 						  &numClasses);
     if (code) {

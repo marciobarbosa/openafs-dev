@@ -67,6 +67,8 @@ struct rxgk_header {
 struct rxgk_sprivate {
     void *rock;
     rxgk_getkey_func getkey;
+    int check_uuid;
+    afsUUID server_uuid;
 };
 /**
  * Per-connection security data for the server.
@@ -87,6 +89,7 @@ struct rxgk_sconn {
     struct rx_identity *client;
     afs_uint32 key_number;
     rxgk_key k0;
+    afsUUID client_uuid;
 };
 
 /*
