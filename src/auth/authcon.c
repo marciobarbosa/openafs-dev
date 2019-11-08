@@ -539,7 +539,8 @@ afsconf_BuildServerSecurityObjects_int(struct afsconf_bsso_info *info,
 					      _afsconf_GetRxkadKrb5Key, NULL);
 #ifdef AFS_RXGK_ENV
     (*classes)[RX_SECIDX_GK] =
-	rxgk_NewServerSecurityObject(dir, afsconf_GetRXGKKey);
+	rxgk_NewServerSecurityObject(info->server_uuid, dir,
+				     afsconf_GetRXGKKey);
 
     if (info->type == AFSCONF_BSSO_VLSERVER) {
 	struct rx_service *service;

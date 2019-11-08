@@ -47,6 +47,9 @@
 #include "../util/afsutil_prototypes.h"
 #include "serialize_state.h"
 #endif /* AFS_DEMAND_ATTACH_FS */
+#ifdef AFS_RXGK_ENV
+# include <rx/rxgk.h>
+#endif
 
 pthread_mutex_t host_glock_mutex;
 
@@ -1833,6 +1836,35 @@ h_threadquota(int waiting)
     return 0;
 }
 
+static struct Identity *
+h_GetIdent_r(struct rx_connection *tcon)
+{
+    struct Identity *identP;
+
+    identP = rx_GetSpecific(tcon, rxcon_ident_key);
+#ifdef AFS_RXGK_ENV
+    if (identP == NULL) {
+	afs_int32 code;
+	afsUUID uuid;
+	memset(&uuid, 0, sizeof(uuid));
+
+	code = rxgk_ServerGetPeerUUID(tcon, &uuid);
+	if (code != 0) {
+	    return NULL;
+	}
+
+	identP = calloc(1, sizeof(*identP));
+	if (identP == NULL) {
+	    return NULL;
+	}
+	identP->uuid = uuid;
+	identP->valid = 1;
+	rx_SetSpecific(tcon, rxcon_ident_key, identP);
+    }
+#endif
+    return identP;
+}
+
 /* If found, host is returned with refCount incremented */
 struct host *
 h_GetHost_r(struct rx_connection *tcon)
@@ -1867,7 +1899,7 @@ h_GetHost_r(struct rx_connection *tcon)
     code = 0;
     if (h_Lookup_r(haddr, hport, &host))
 	return 0;
-    identP = (struct Identity *)rx_GetSpecific(tcon, rxcon_ident_key);
+    identP = h_GetIdent_r(tcon);
     if (host && !identP && !(host->z.Console & 1)) {
 	/* This is a new connection, and we already have a host
 	 * structure for this address. Verify that the identity
