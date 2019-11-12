@@ -1,3 +1,8 @@
+This branch contains a work-in-progress of "phase2" of rxgk, and just exists to
+show all of the phase2 commits all together. See the topic rxgk-phase2 on
+gerrit.openafs.org to see commits that have been submitted to the openafs
+gerrit, and discuss the commits to be included in the tree.
+
 AFS is a distributed file system that enables users to share and
 access all of the files stored in a network of computers as easily as
 they access the files stored on their local machines. The file system is
