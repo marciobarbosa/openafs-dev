@@ -195,7 +195,7 @@ VInitPartition_r(char *path, char *devname, Device dev)
 
     dp = malloc(sizeof(struct DiskPartition64));
     /* Add it to the end, to preserve order when we print statistics */
-    for (op = DiskPartitionList; op; op = op->next) {
+    for (VScanPartList_r(op)) {
 	if (!op->next)
 	    break;
     }
@@ -802,7 +802,7 @@ VAttachPartitions(void)
 	 * of storing the partition names in the NT registry means the same
 	 * partition name will never appear twice in the list.
 	 */
-	for (partP = DiskPartitionList; partP; partP = partP->next) {
+	for (VScanPartList_r(partP)) {
 	    if (*partP->devName == *entry.vp_dev) {
 		Log("Same drive (%s) used for both partition %s and partition %s, ignoring both.\n", entry.vp_dev, partP->name, entry.vp_name);
 		partP->flags = PART_DUPLICATE;
@@ -906,7 +906,7 @@ VGetPartition_r(char *name, int abortp)
 #ifdef AFS_DEMAND_ATTACH_FS
     dp = VLookupPartition_r(name);
 #else /* AFS_DEMAND_ATTACH_FS */
-    for (dp = DiskPartitionList; dp; dp = dp->next) {
+    for (VScanPartList_r(dp)) {
 	if (strcmp(dp->name, name) == 0)
 	    break;
     }
@@ -1029,7 +1029,7 @@ void
 VResetDiskUsage_r(void)
 {
     struct DiskPartition64 *dp;
-    for (dp = DiskPartitionList; dp; dp = dp->next) {
+    for (VScanPartList_r(dp)) {
 	VSetPartitionDiskUsage_r(dp);
 #ifndef AFS_PTHREAD_ENV
 	IOMGR_Poll();
@@ -1118,7 +1118,7 @@ void
 VPrintDiskStats_r(void)
 {
     struct DiskPartition64 *dp;
-    for (dp = DiskPartitionList; dp; dp = dp->next) {
+    for (VScanPartList_r(dp)) {
 	if (dp->free < 0) {
 	    Log("Partition %s: %lld "
 		" available 1K blocks (minfree=%lld), "
