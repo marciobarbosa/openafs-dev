@@ -164,7 +164,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 
     DInit(10);
 
-    err = VAttachPartitions();
+    err = VAttachPartitions(0);
     if (err) {
 	fprintf(stderr, "%d partitions had errors during attach.\n", err);
     }

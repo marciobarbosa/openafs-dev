@@ -113,6 +113,7 @@
 #ifdef AFS_PTHREAD_ENV
 pthread_mutex_t vol_glock_mutex;
 pthread_mutex_t vol_trans_mutex;
+pthread_mutex_t vol_attachpart_mutex;
 pthread_cond_t vol_put_volume_cond;
 pthread_cond_t vol_sleep_cond;
 pthread_cond_t vol_init_attach_cond;
@@ -567,6 +568,7 @@ VInitVolumePackage2(ProgramType pt, VolumePackageOptions * opts)
 
     opr_mutex_init(&vol_glock_mutex);
     opr_mutex_init(&vol_trans_mutex);
+    opr_mutex_init(&vol_attachpart_mutex);
     opr_cv_init(&vol_put_volume_cond);
     opr_cv_init(&vol_sleep_cond);
     opr_cv_init(&vol_init_attach_cond);
@@ -613,7 +615,7 @@ VInitVolumePackage2(ProgramType pt, VolumePackageOptions * opts)
     VInitVnodes(vSmall, opts->nSmallVnodes);
 
 
-    errors = VAttachPartitions();
+    errors = VAttachPartitions(0);
     if (errors)
 	return -1;
 
@@ -659,7 +661,7 @@ VInitAttachVolumes(ProgramType pt)
     if (pt == fileServer) {
 	struct DiskPartition64 *diskP;
 	/* Attach all the volumes in this partition */
-	for (VScanPartList_r(diskP)) {
+	for (VScanPartList(diskP)) {
 	    int nAttached = 0, nUnattached = 0;
 	    opr_Verify(VAttachVolumesByPartition(diskP,
 						 &nAttached, &nUnattached)
@@ -703,7 +705,7 @@ VInitAttachVolumes(ProgramType pt)
 
 	/* create partition work queue */
 	parts = 0;
-	for (VScanPartList_r(diskP)) {
+	for (VScanPartList(diskP)) {
 	    dpq = malloc(sizeof(struct diskpartition_queue_t));
 	    opr_Assert(dpq != NULL);
 	    dpq->diskP = diskP;
@@ -829,7 +831,7 @@ VInitAttachVolumes(ProgramType pt)
 	opr_cv_init(&pq.cv);
 	opr_mutex_init(&pq.mutex);
 	parts = 0;
-	for (VScanPartList_r(diskP)) {
+	for (VScanPartList(diskP)) {
 	    struct diskpartition_queue_t *dp;
 	    dp = malloc(sizeof(struct diskpartition_queue_t));
 	    opr_Assert(dp != NULL);
@@ -1419,7 +1421,7 @@ ShutdownController(vshutdown_thread_t * params)
 	    shadow.schedule_version, shadow.vol_remaining, shadow.pass);
 	Log("ShutdownController:  n_threads_complete=%d, n_parts_done_pass=%d\n",
 	    shadow.n_threads_complete, shadow.n_parts_done_pass);
-	for (VScanPartList_r(diskP)) {
+	for (VScanPartList(diskP)) {
 	    id = diskP->index;
 	    Log("ShutdownController:  part[%d] : (len=%d, thread_target=%d, done_pass=%d, pass_head=%p)\n",
 		id,
