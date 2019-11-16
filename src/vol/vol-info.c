@@ -585,7 +585,7 @@ volinfo_ScanPartitions(struct VolInfoOpt *opt, char *partNameOrId, VolumeId volu
 	}
     }
 
-    err = VAttachPartitions();
+    err = VAttachPartitions(0);
     if (err) {
 	fprintf(stderr, "%s: %d partitions had errors during attach.\n",
 		progname, err);
@@ -811,7 +811,7 @@ HandleAllPart(struct VolInfoOpt *opt)
 {
     struct DiskPartition64 *partP;
 
-    for (VScanPartList_r(partP)) {
+    for (VScanPartList(partP)) {
 	if (opt->dumpInfo || opt->saveInodes || opt->showSizes) {
 	    printf("Processing Partition %s:\n", partP->name);
 	}

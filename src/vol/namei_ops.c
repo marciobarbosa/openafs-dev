@@ -3023,7 +3023,7 @@ namei_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
     int locktype = 0;
 # endif /* AFS_DEMAND_ATTACH_FS */
 
-    for (VScanPartList_r(partP)) {
+    for (VScanPartList(partP)) {
 	if (strcmp(partP->name, pname) == 0) {
 	    break;
 	}

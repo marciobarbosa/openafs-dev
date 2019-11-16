@@ -176,8 +176,9 @@ extern struct DiskPartition64 *VGetPartitionById(afs_int32 index, int abortp);
 extern struct DiskPartition64 *VGetPartitionById_r(afs_int32 index, int abortp);
 extern int VPartHeaderLock(struct DiskPartition64 *dp, int locktype);
 extern void VPartHeaderUnlock(struct DiskPartition64 *dp, int locktype);
+extern void VAttachNewPartitions(int *parts, int parts_len, int *n_parts);
 #endif
-extern int VAttachPartitions(void);
+extern int VAttachPartitions(int dyn_attach);
 extern void VLockPartition(char *name);
 extern void VLockPartition_r(char *name);
 extern void VUnlockPartition(char *name);
@@ -194,10 +195,21 @@ extern void VPrintDiskStats(void);
 extern int VInitPartitionPackage(void);
 
 extern struct DiskPartition64 *VGetNextPartition(struct DiskPartition64 *cursor);
+extern struct DiskPartition64 *VGetFirstPartition(void);
 
-/* Since this list cannot be modified, we can safely read its elements without
- * requesting any lock. */
+/* Iterates over the elements of DiskPartitionList without protection. */
 #define VScanPartList_r(cursor) \
     (cursor) = DiskPartitionList; (cursor); (cursor) = (cursor)->next
+
+/* In order to enforce mutual exclusion between VInitPartition and accesses to
+ * the DiskPartitionList, use this macro to go through the nodes of this list.
+ * Don't use this macro if VOL_LOCK is already held. Use VScanPartList_r
+ * instead.
+ *
+ * Notice that the protection introduced by this macro is effective only if we
+ * assume that updates on this list boil down to appends of new elements
+ * (currently true). */
+#define VScanPartList(cursor) \
+    (cursor) = VGetFirstPartition(); (cursor); (cursor) = VGetNextPartition(cursor)
 
 #endif /* AFS_VOL_PARTITION_H */

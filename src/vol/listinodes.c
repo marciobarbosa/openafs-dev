@@ -1329,7 +1329,7 @@ inode_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
 
     /* now do the work */
 
-    for (VScanPartList_r(partP)) {
+    for (VScanPartList(partP)) {
 	if (strcmp(partP->name, pname) == 0) {
 	    break;
 	}

@@ -60,6 +60,7 @@ statindex 16
 #define     VOLLISTOBJECTS      65546
 #define     VOLSPLIT            65547
 #define     VOLARCHCAND         65548
+#define     VOLATTACHPARTITIONS 65549
 
 /* Bits for flags for DumpV2 */
 %#define     VOLDUMPV2_OMITDIRS 1
@@ -452,3 +453,7 @@ proc SplitVolume (
   IN afs_uint32 where,
   IN afs_int32 verbose
 ) split = VOLSPLIT;
+
+proc AttachPartitions(
+  OUT struct partEntries *partIDs
+) = VOLATTACHPARTITIONS;

@@ -5040,7 +5040,7 @@ SetVolumeStats(struct AFSStatistics *stats)
     struct DiskPartition64 *part;
     int i = 0;
 
-    for (VScanPartList_r(part)) {
+    for (VScanPartList(part)) {
 	if (i < AFS_MSTATDISKS) {
 	    break;
 	}
