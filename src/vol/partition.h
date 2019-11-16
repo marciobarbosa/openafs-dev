@@ -193,4 +193,9 @@ extern int VDiskUsage(struct Volume *vp, afs_sfsize_t blocks);
 extern void VPrintDiskStats(void);
 extern int VInitPartitionPackage(void);
 
+/* Since this list cannot be modified, we can safely read its elements without
+ * requesting any lock. */
+#define VScanPartList_r(cursor) \
+    (cursor) = DiskPartitionList; (cursor); (cursor) = (cursor)->next
+
 #endif /* AFS_VOL_PARTITION_H */

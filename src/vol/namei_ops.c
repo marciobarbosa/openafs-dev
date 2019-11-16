@@ -3023,8 +3023,11 @@ namei_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
     int locktype = 0;
 # endif /* AFS_DEMAND_ATTACH_FS */
 
-    for (partP = DiskPartitionList; partP && strcmp(partP->name, pname);
-         partP = partP->next);
+    for (VScanPartList_r(partP)) {
+	if (strcmp(partP->name, pname) == 0) {
+	    break;
+	}
+    }
     if (!partP) {
         Log("1 namei_ConvertROtoRWvolume: Couldn't find DiskPartition for %s\n", pname);
 	code = EIO;

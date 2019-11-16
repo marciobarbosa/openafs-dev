@@ -398,7 +398,7 @@ handleit(struct cmd_syndesc *as, void *arock)
     }
 #endif
     if (seenpart == 0) {
-	for (partP = DiskPartitionList; partP; partP = partP->next) {
+	for (VScanPartList_r(partP)) {
 	    SalvageFileSysParallel(partP);
 	}
 	SalvageFileSysParallel(0);

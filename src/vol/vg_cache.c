@@ -1015,7 +1015,7 @@ VVGCache_scanStart_r(struct DiskPartition64 * dp)
 	code = _VVGC_scan_start(dp);
     } else {
 	/* start a scanner thread on each partition */
-	for (dp = DiskPartitionList; dp; dp = dp->next) {
+	for (VScanPartList_r(dp)) {
 	    res = _VVGC_scan_start(dp);
 	    if (res) {
 		code = res;
