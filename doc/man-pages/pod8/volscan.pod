@@ -9,6 +9,7 @@ volscan - Produces detailed information about AFS volumes
 
 B<volscan>
     [B<-checkout>]
+    [B<-cache>]
     S<<< [B<-partition> <I<AFS partition name or id>>] >>>
     S<<< [B<-volumeid> <I<Volume id>>] >>>
     S<<< [B<-type> <I<Volume types (rw, ro, bk)>>+] >>>
@@ -97,6 +98,11 @@ houses the volume.
 Limit the volumes to be scanned by read/write, read-only, or backup volumes.
 Specify one or more of C<rw><rw>, C<ro>, C<bk>.  The B<volscan> command will scan
 all types of volumes by default.
+
+=item B<-cache>
+
+Cache vnodes to speedup lookups. This option significantly improves response
+time if the column name "path" is requested.
 
 =item B<-find> <I<Objects to find: file, dir, mount, symlink, acl>>+
 
