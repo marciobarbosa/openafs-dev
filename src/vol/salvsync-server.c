@@ -615,7 +615,7 @@ SALVSYNC_com_CancelAll(SALVSYNC_command * com, SALVSYNC_response * res)
     struct SalvageQueueNode * np, *nnp;
     struct DiskPartition64 * dp;
 
-    for (dp = DiskPartitionList ; dp ; dp = dp->next) {
+    for (VScanPartList_r(dp)) {
 	for (queue_Scan(&salvageQueue.part[dp->index], np, nnp, SalvageQueueNode)) {
 	    DeleteFromSalvageQueue(np);
 	}
