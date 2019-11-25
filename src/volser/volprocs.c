@@ -139,7 +139,7 @@ int
 VPFullUnlock_r(void)
 {
     struct DiskPartition64 *tp;
-    for (tp = DiskPartitionList; tp; tp = tp->next) {
+    for (VScanPartList_r(tp)) {
 	if (tp->lock_fd != INVALID_FD) {
             OS_CLOSE(tp->lock_fd);
 	    tp->lock_fd = INVALID_FD;

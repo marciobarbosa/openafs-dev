@@ -659,7 +659,7 @@ VInitAttachVolumes(ProgramType pt)
     if (pt == fileServer) {
 	struct DiskPartition64 *diskP;
 	/* Attach all the volumes in this partition */
-	for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	for (VScanPartList(diskP)) {
 	    int nAttached = 0, nUnattached = 0;
 	    opr_Verify(VAttachVolumesByPartition(diskP,
 						 &nAttached, &nUnattached)
@@ -702,11 +702,13 @@ VInitAttachVolumes(ProgramType pt)
 	params.n_threads_complete = 0;
 
 	/* create partition work queue */
-	for (parts=0, diskP = DiskPartitionList; diskP; diskP = diskP->next, parts++) {
+	parts = 0;
+	for (VScanPartList(diskP)) {
 	    dpq = malloc(sizeof(struct diskpartition_queue_t));
 	    opr_Assert(dpq != NULL);
 	    dpq->diskP = diskP;
 	    queue_Append(&params,dpq);
+	    parts++;
 	}
 
 	threads = min(parts, vol_attach_threads);
@@ -826,12 +828,14 @@ VInitAttachVolumes(ProgramType pt)
         queue_Init(&pq);
 	opr_cv_init(&pq.cv);
 	opr_mutex_init(&pq.mutex);
-	for (parts = 0, diskP = DiskPartitionList; diskP; diskP = diskP->next, parts++) {
+	parts = 0;
+	for (VScanPartList(diskP)) {
 	    struct diskpartition_queue_t *dp;
 	    dp = malloc(sizeof(struct diskpartition_queue_t));
 	    opr_Assert(dp != NULL);
 	    dp->diskP = diskP;
 	    queue_Append(&pq, dp);
+	    parts++;
 	}
 
         /* number of worker threads; at least one, not to exceed the number of partitions */
@@ -1207,8 +1211,10 @@ VShutdown_r(void)
         VOL_CV_WAIT(&vol_init_attach_cond);
     }
 
-    for (params.n_parts=0, diskP = DiskPartitionList;
-	 diskP; diskP = diskP->next, params.n_parts++);
+    params.n_parts = 0;
+    for (VScanPartList_r(diskP)) {
+	params.n_parts++;
+    }
 
     Log("VShutdown:  shutting down on-line volumes on %d partition%s...\n",
 	params.n_parts, params.n_parts > 1 ? "s" : "");
@@ -1228,7 +1234,7 @@ VShutdown_r(void)
 
 	/* setup the basic partition information structures for
 	 * parallel shutdown */
-	for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	for (VScanPartList_r(diskP)) {
 	    /* XXX debug */
 	    struct rx_queue * qp, * nqp;
 	    Volume * vp;
@@ -1293,7 +1299,7 @@ VShutdown_r(void)
 	opr_mutex_destroy(&params.lock);
 
 	/* drop the VByPList exclusive reservations */
-	for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	for (VScanPartList_r(diskP)) {
 	    VVByPListEndExclusive_r(diskP);
 	    Log("VShutdown:  %s stats : (pass[0]=%d, pass[1]=%d, pass[2]=%d, pass[3]=%d)\n",
 		VPartitionPath(diskP),
@@ -1309,7 +1315,7 @@ VShutdown_r(void)
 	 * another LWP */
 	Log("VShutdown:  beginning single-threaded fileserver shutdown\n");
 
-	for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	for (VScanPartList_r(diskP)) {
 	    VShutdownByPartition_r(diskP);
 	}
     }
@@ -1413,7 +1419,7 @@ ShutdownController(vshutdown_thread_t * params)
 	    shadow.schedule_version, shadow.vol_remaining, shadow.pass);
 	Log("ShutdownController:  n_threads_complete=%d, n_parts_done_pass=%d\n",
 	    shadow.n_threads_complete, shadow.n_parts_done_pass);
-	for (diskP = DiskPartitionList; diskP; diskP=diskP->next) {
+	for (VScanPartList(diskP)) {
 	    id = diskP->index;
 	    Log("ShutdownController:  part[%d] : (len=%d, thread_target=%d, done_pass=%d, pass_head=%p)\n",
 		id,
@@ -1447,7 +1453,7 @@ ShutdownCreateSchedule(vshutdown_thread_t * params)
 
     /* compute the total number of outstanding volumes */
     sum = 0;
-    for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+    for (VScanPartList_r(diskP)) {
 	sum += diskP->vol_list.len;
     }
 
@@ -1467,7 +1473,10 @@ ShutdownCreateSchedule(vshutdown_thread_t * params)
 
     /* for fairness, give every partition with volumes remaining
      * at least one thread */
-    for (diskP = DiskPartitionList; diskP && thr_left; diskP = diskP->next) {
+    for (VScanPartList_r(diskP)) {
+	if (thr_left == 0) {
+	    break;
+	}
 	id = diskP->index;
 	if (diskP->vol_list.len) {
 	    params->part_thread_target[id] = 1;
@@ -1481,7 +1490,10 @@ ShutdownCreateSchedule(vshutdown_thread_t * params)
 	/* compute length-weighted workloads */
 	int delta;
 
-	for (diskP = DiskPartitionList; diskP && thr_left; diskP = diskP->next) {
+	for (VScanPartList_r(diskP)) {
+	    if (thr_left == 0) {
+		break;
+	    }
 	    id = diskP->index;
 	    delta = (diskP->vol_list.len / thr_workload) -
 		params->part_thread_target[id];
@@ -1505,7 +1517,7 @@ ShutdownCreateSchedule(vshutdown_thread_t * params)
 	int max_residue, max_id = 0;
 
 	/* compute the residues */
-	for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	for (VScanPartList_r(diskP)) {
 	    id = diskP->index;
 	    part_residue[id] = diskP->vol_list.len -
 		(params->part_thread_target[id] * thr_workload);
@@ -1515,7 +1527,7 @@ ShutdownCreateSchedule(vshutdown_thread_t * params)
 	 * highest residues */
 	while (thr_left) {
 	    max_residue = 0;
-	    for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	    for (VScanPartList_r(diskP)) {
 		id = diskP->index;
 		if (part_residue[id] > max_residue) {
 		    max_residue = part_residue[id];
@@ -1538,7 +1550,7 @@ ShutdownCreateSchedule(vshutdown_thread_t * params)
 	int alloc;
 	if (thr_left >= params->n_parts) {
 	    alloc = thr_left / params->n_parts;
-	    for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	    for (VScanPartList_r(diskP)) {
 		id = diskP->index;
 		params->part_thread_target[id] += alloc;
 		thr_left -= alloc;
@@ -1546,7 +1558,10 @@ ShutdownCreateSchedule(vshutdown_thread_t * params)
 	}
 
 	/* finish off the last of the threads */
-	for (diskP = DiskPartitionList; thr_left && diskP; diskP = diskP->next) {
+	for (VScanPartList_r(diskP)) {
+	    if (thr_left == 0) {
+		break;
+	    }
 	    id = diskP->index;
 	    params->part_thread_target[id]++;
 	    thr_left--;
@@ -1607,7 +1622,7 @@ VShutdownThread(void * args)
 	schedule_version_save = params->schedule_version;
 	found = 0;
 	/* find a disk partition to work on */
-	for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	for (VScanPartList_r(diskP)) {
 	    id = diskP->index;
 	    if (params->part_thread_target[id] && !params->part_done_pass[id]) {
 		params->part_thread_target[id]--;
@@ -1619,7 +1634,7 @@ VShutdownThread(void * args)
 	if (!found) {
 	    /* hmm. for some reason the controller thread couldn't find anything for
 	     * us to do. let's see if there's anything we can do */
-	    for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	    for (VScanPartList_r(diskP)) {
 		id = diskP->index;
 		if (diskP->vol_list.len && !params->part_done_pass[id]) {
 		    found = 1;
@@ -1670,7 +1685,7 @@ VShutdownThread(void * args)
 		    params->n_threads_complete = 0;
 		    params->n_parts_done_pass = 0;
 		    params->pass++;
-		    for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+		    for (VScanPartList_r(diskP)) {
 			id = diskP->index;
 			params->part_done_pass[id] = 0;
 			params->part_pass_head[id] = queue_First(&diskP->vol_list, rx_queue);
@@ -6597,7 +6612,7 @@ VGetVolumePath(Error * ec, VolumeId volumeId, char **partitionp, char **namep)
     name[0] = OS_DIRSEPC;
     snprintf(&name[1], (sizeof name) - 1, VFORMAT,
 	     afs_printable_VolumeId_lu(volumeId));
-    for (dp = DiskPartitionList; dp; dp = dp->next) {
+    for (VScanPartList_r(dp)) {
 	struct afs_stat_st status;
 	strcpy(path, VPartitionPath(dp));
 	strcat(path, name);
@@ -9243,7 +9258,7 @@ VPrintExtendedCacheStats_r(int flags)
 
 	VOL_LOCK;
 
-	for (diskP = DiskPartitionList; diskP; diskP = diskP->next) {
+	for (VScanPartList_r(diskP)) {
 	    id = diskP->index;
 	    vol_count[id] = diskP->vol_list.len;
 	    part_exists[id] = 1;
