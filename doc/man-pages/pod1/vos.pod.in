@@ -121,6 +121,11 @@ L<B<vos setfields>|vos_setfields(1)>.
 
 =item *
 
+A command to attach new vice partitions dynamically:
+L<B<vos attachpart>|vos_attachpart(1)>.
+
+=item *
+
 Commands to obtain help:
 L<B<vos apropos>|vos_apropos(1)>
 and L<B<vos help>|vos_help(1)>.
