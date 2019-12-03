@@ -760,7 +760,7 @@ FindCurrentPartition(void)
     struct DiskPartition64 *dp;
 
     dr--;
-    for (dp = DiskPartitionList; dp; dp = dp->next) {
+    for (VScanPartList(dp)) {
 	if (*dp->devName - 'A' == dr)
 	    break;
     }
@@ -811,7 +811,7 @@ HandleAllPart(struct VolInfoOpt *opt)
 {
     struct DiskPartition64 *partP;
 
-    for (partP = DiskPartitionList; partP; partP = partP->next) {
+    for (VScanPartList(partP)) {
 	if (opt->dumpInfo || opt->saveInodes || opt->showSizes) {
 	    printf("Processing Partition %s:\n", partP->name);
 	}

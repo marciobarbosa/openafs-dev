@@ -5056,8 +5056,10 @@ SetVolumeStats(struct AFSStatistics *stats)
     struct DiskPartition64 *part;
     int i = 0;
 
-    for (part = DiskPartitionList; part && i < AFS_MSTATDISKS;
-	 part = part->next) {
+    for (VScanPartList(part)) {
+	if (i < AFS_MSTATDISKS) {
+	    break;
+	}
 	stats->Disks[i].TotalBlocks = RoundInt64ToInt31(part->totalUsable);
 	stats->Disks[i].BlocksAvailable = RoundInt64ToInt31(part->free);
 	memset(stats->Disks[i].Name, 0, AFS_DISKNAMESIZE);
