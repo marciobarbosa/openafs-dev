@@ -1856,10 +1856,18 @@ ucs_ProcTail_setup(definition * defp, char *cbheader, int split_flag)
 	    }
 	}
 
-	f_print(fout, "\treturn ubik_CallRock(aclient, aflags, %s%s%s%s, &args);\n",
+	f_print(fout, "\tif ((aflags & SYNCUBIKONLY))\n");
+	f_print(fout, "\t\treturn ubik_CallSync(aclient, aflags, %s%s%s%s, &args);\n",
+		      cbheader, prefix, PackagePrefix[PackageIndex], defp->pc.proc_name);
+	f_print(fout, "\telse\n");
+	f_print(fout, "\t\treturn ubik_CallRock(aclient, aflags, %s%s%s%s, &args);\n",
 		      cbheader, prefix, PackagePrefix[PackageIndex], defp->pc.proc_name);
     } else {
-	f_print(fout, "\treturn ubik_CallRock(aclient, aflags, %s%s%s%s, NULL);\n",
+	f_print(fout, "\tif ((aflags & SYNCUBIKONLY))\n");
+	f_print(fout, "\t\treturn ubik_CallSync(aclient, aflags, %s%s%s%s, NULL);\n",
+		      cbheader, prefix, PackagePrefix[PackageIndex], defp->pc.proc_name);
+	f_print(fout, "\telse\n");
+	f_print(fout, "\t\treturn ubik_CallRock(aclient, aflags, %s%s%s%s, NULL);\n",
 		      cbheader, prefix, PackagePrefix[PackageIndex], defp->pc.proc_name);
     }
 

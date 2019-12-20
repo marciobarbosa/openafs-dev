@@ -223,7 +223,8 @@ convertBulkToNBulk(bulkentries *bulk, nbulkentries *nbulk) {
 int
 VLDB_ListAttributes(VldbListByAttributes *attrp,
                     afs_int32 *entriesp,
-                    nbulkentries *blkentriesp)
+                    nbulkentries *blkentriesp,
+		    int flags)
 {
     bulkentries arrayEntries;
     int code;
@@ -232,7 +233,7 @@ VLDB_ListAttributes(VldbListByAttributes *attrp,
       tryold:
 	memset(&arrayEntries, 0, sizeof(arrayEntries));
 	code =
-	    ubik_VL_ListAttributes(cstruct, 0, attrp, entriesp,
+	    ubik_VL_ListAttributes(cstruct, flags, attrp, entriesp,
 		      &arrayEntries);
 
 	if (code)
@@ -250,7 +251,7 @@ VLDB_ListAttributes(VldbListByAttributes *attrp,
 	return code;
     }
     code =
-        ubik_VL_ListAttributesN(cstruct, 0, attrp, entriesp, blkentriesp);
+        ubik_VL_ListAttributesN(cstruct, flags, attrp, entriesp, blkentriesp);
     if (newvlserver == vltype_unknown) {
 	if (code == RXGEN_OPCODE) {
 	    newvlserver = vltype_old;	/* Doesn't support new interface */
@@ -275,13 +276,14 @@ VLDB_ListAttributesN2(VldbListByAttributes *attrp,
                       afs_int32 thisindex,
                       afs_int32 *nentriesp,
                       nbulkentries *blkentriesp,
-                      afs_int32 *nextindexp)
+                      afs_int32 *nextindexp,
+		      int flags)
 {
     afs_int32 code = RXGEN_OPCODE;
 
     if (newvlserver != vltype_old) {
         code =
-            ubik_VL_ListAttributesN2(cstruct, 0, attrp, (name ? name : ""),
+            ubik_VL_ListAttributesN2(cstruct, flags, attrp, (name ? name : ""),
                                      thisindex, nentriesp, blkentriesp, nextindexp);
 	if (code)
 	    return code;

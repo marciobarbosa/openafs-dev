@@ -833,3 +833,84 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
     UNLOCK_UBIK_CLIENT(aclient);
     return rcode;
 }
+
+/**
+ * Always run proc on the sync-site.
+ *
+ * Run proc on the sync-site so we have the guarantee that this request will be
+ * served by the most recent version of the database. Only useful for read
+ * requests.
+ *
+ * @param[in]  aclient  client struct
+ * @param[in]  aflags   flags
+ * @param[in]  proc     remote procedure call
+ * @param[in]  rock     arguments of proc
+ *
+ * @return operation status
+ *   @retval  0         success
+ *   @retval  non-zero  error
+ */
+afs_int32
+ubik_CallSync(struct ubik_client *aclient, afs_int32 aflags,
+	      ubik_callrock_func proc, void *rock)
+{
+    struct rx_connection *tc;
+    int servindex, syncindex;
+    short origlevel;
+    afs_int32 rcode;
+
+    LOCK_UBIK_CLIENT(aclient);
+  restart:
+    servindex = 0;
+    syncindex = -1;
+    rcode = UNOSERVERS;
+
+    origlevel = aclient->initializationState;
+
+    while (aclient->conns[servindex]) {
+	syncindex = try_GetSyncSite(aclient, servindex);
+
+	if (syncindex == GETSYNCREST) {
+	    goto restart;
+	}
+	if (syncindex != GETSYNCERR) {
+	    break;
+	}
+	servindex++;
+    }
+
+    if (syncindex < 0) {
+	goto done;
+    }
+
+    tc = aclient->conns[syncindex];
+    if (tc && rx_ConnError(tc)) {
+	aclient->conns[syncindex] = tc = ubik_RefreshConn(tc);
+    }
+    if (tc == NULL) {
+	goto done;
+    }
+
+    if ((aclient->states[syncindex] & CFLastFailed)) {
+	goto done;
+    }
+
+    rcode = (*proc)(tc, rock);
+
+    if (aclient->initializationState != origlevel) {
+	if (rcode) {
+	    goto restart;
+	} else {
+	    goto done;
+	}
+    }
+
+    if (rcode < 0) {
+	aclient->states[syncindex] |= CFLastFailed;
+    } else if (rcode != UNOQUORUM) {
+	aclient->states[syncindex] &= ~CFLastFailed;
+    }
+  done:
+    UNLOCK_UBIK_CLIENT(aclient);
+    return rcode;
+}
