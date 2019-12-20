@@ -343,7 +343,49 @@ ubik_client_init_mutex(void)
 static int *calls_needsync[SYNCCOUNT];	/* proc calls that need the sync site */
 static int synccount = 0;
 
+#define GETSYNCERR	-1
+#define GETSYNCREST	-2
+/**
+ * Get IP address of sync-site in net byte order.
+ *
+ * @param[in]   aconn  connection to a ubik server
+ * @param[out]  async  IP address of sync-site in net order
+ *
+ * @return operation status
+ *   @retval  0         success
+ *   @retval  non-zero  error
+ */
+static int
+GetSyncSite(struct rx_connection *aconn, afs_int32 *async)
+{
+    afs_int32 rcode, host, sync;
+    u_short port;
 
+    struct rx_peer *rxp;
+    struct rx_connection *uconn;
+    struct rx_securityClass *sobj;
+
+    sync = *async = 0;
+
+    rxp  = rx_PeerOf(aconn);
+    host = rx_HostOf(rxp);
+    port = rx_PortOf(rxp);
+    sobj = rx_SecurityObjectOf(aconn);
+
+    uconn = rx_NewConnection(host, port, VOTE_SERVICE_ID, sobj, 0);
+    rcode = VOTE_GetSyncSite(uconn, &sync);
+
+    if (!rcode) {
+	if (sync) {
+	    *async = htonl(sync);
+	} else {
+	    rcode = GETSYNCERR;
+	}
+    }
+
+    rx_DestroyConnection(uconn);
+    return rcode;
+}
 
 /*!
  * \brief Call this after getting back a #UNOTSYNC.
@@ -359,47 +401,46 @@ try_GetSyncSite(struct ubik_client *aclient, afs_int32 apos)
 {
     struct rx_peer *rxp;
     afs_int32 code;
-    int i;
+    int i, index;
     afs_int32 thisHost, newHost;
     struct rx_connection *tc;
     short origLevel;
 
+    index = GETSYNCERR;
     origLevel = aclient->initializationState;
 
     /* get this conn */
     tc = aclient->conns[apos];
-    if (tc && rx_ConnError(tc)) {
-	aclient->conns[apos] = (tc = ubik_RefreshConn(tc));
-    }
     if (!tc) {
-	return -1;
+	goto done;
     }
 
     /* now see if we can find the sync site host */
-    code = VOTE_GetSyncSite(tc, &newHost);
+    code = GetSyncSite(tc, &newHost);
     if (aclient->initializationState != origLevel) {
-	return -1;		/* somebody did a ubik_ClientInit */
+	index = GETSYNCREST;		/* somebody did a ubik_ClientInit */
+	goto done;
     }
 
     if (!code && newHost) {
-	newHost = htonl(newHost);	/* convert back to network order */
-
 	/*
 	 * position count at the appropriate slot in the client
 	 * structure and retry. If we can't find in slot, we'll just
 	 * continue through the whole list
 	 */
-	for (i = 0; i < MAXSERVERS; i++) {
+	for (i = 0; i < MAXSERVERS && aclient->conns[i]; i++) {
 	    rxp = rx_PeerOf(aclient->conns[i]);
 	    thisHost = rx_HostOf(rxp);
 	    if (!thisHost) {
-		return -1;
+		goto done;
 	    } else if (thisHost == newHost) {
-		return i;	/* we were told to use this one */
+		index = i;	/* we were told to use this one */
+		goto done;
 	    }
 	}
     }
-    return -1;
+  done:
+    return index;
 }
 
 #define NEED_LOCK 1
@@ -528,10 +569,11 @@ ubik_Call_New(int (*aproc) (), struct ubik_client *aclient,
 	    if (code == UNOTSYNC) {	/* means this requires a sync site */
 		if (aclient->conns[3]) {	/* don't bother unless 4 or more srv */
 		    temp = try_GetSyncSite(aclient, count);
-		    if (aclient->initializationState != origLevel) {
+		    if (temp == GETSYNCREST) {
 			goto restart;	/* somebody did a ubik_ClientInit */
 		    }
-		    if ((temp >= 0) && ((temp > count) || (stepBack++ <= 2))) {
+		    if ((temp != GETSYNCERR) &&
+			((temp > count) || (stepBack++ <= 2))) {
 			count = temp;	/* generally try to make progress */
 		    }
 		}
@@ -604,17 +646,13 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
 		     * RPCs than you would otherwise make.
 		     */
 		    tc = aclient->conns[count];
-		    if (tc && rx_ConnError(tc)) {
-			aclient->conns[count] = tc = ubik_RefreshConn(tc);
-		    }
 		    if (!tc)
 			break;
-		    code = VOTE_GetSyncSite(tc, &newHost);
+		    code = GetSyncSite(tc, &newHost);
 		    if (aclient->initializationState != origLevel)
 			goto restart;	/* somebody did a ubik_ClientInit */
 		    if (code)
 			newHost = 0;
-		    newHost = htonl(newHost);	/* convert to network order */
 		} else {
 		    newHost = 0;
 		}
@@ -728,17 +766,13 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 		     * RPCs than you would otherwise make.
 		     */
 		    tc = aclient->conns[_ucount];
-		    if (tc && rx_ConnError(tc)) {
-			aclient->conns[_ucount] = tc = ubik_RefreshConn(tc);
-		    }
 		    if (!tc)
 			break;
-		    code = VOTE_GetSyncSite(tc, &newHost);
+		    code = GetSyncSite(tc, &newHost);
 		    if (aclient->initializationState != origLevel)
 			goto restart;   /* somebody did a ubik_ClientInit */
 		    if (code)
 			newHost = 0;
-		    newHost = htonl(newHost);   /* convert to network order */
 		} else {
 		    newHost = 0;
 		}
