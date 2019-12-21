@@ -28,6 +28,7 @@
 /*! \name ubik client flags */
 #define UPUBIKONLY 	    1	/*!< only check servers presumed functional */
 #define UBIK_CALL_NEW 	    2	/*!< use the semantics of ubik_Call_New */
+#define SYNCUBIKONLY 	    4	/*!< always send requests to the sync-site */
 /*\}*/
 
 /*! \name RX services types */
@@ -588,6 +589,9 @@ extern struct rx_connection *ubik_RefreshConn(struct rx_connection *tc);
 
 typedef afs_int32 (*ubik_callrock_func)(struct rx_connection *tc, void *rock);
 extern afs_int32 ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
+			       ubik_callrock_func, void *rock)
+			       AFS_NONNULL((1,3));
+extern afs_int32 ubik_CallSync(struct ubik_client *aclient, afs_int32 aflags,
 			       ubik_callrock_func, void *rock)
 			       AFS_NONNULL((1,3));
 

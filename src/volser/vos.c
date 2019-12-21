@@ -4390,7 +4390,7 @@ DeleteEntry(struct cmd_syndesc *as, void *arock)
 
     /* Get all the VLDB entries on a server and/or partition */
     memset(&arrayEntries, 0, sizeof(arrayEntries));
-    vcode = VLDB_ListAttributes(&attributes, &nentries, &arrayEntries);
+    vcode = VLDB_ListAttributes(&attributes, &nentries, &arrayEntries, 0);
     if (vcode) {
 	fprintf(STDERR, "Could not access the VLDB for attributes\n");
 	PrintError("", vcode);
@@ -4509,6 +4509,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
     char pname[10];
     int quiet, sort, lock;
     afs_int32 thisindex, nextindex;
+    int sync, flags = 0;
 
     apart = 0;
 
@@ -4516,6 +4517,12 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
     lock = (as->parms[3].items ? 1 : 0);	/* -lock   flag */
     quiet = (as->parms[4].items ? 1 : 0);	/* -quit   flag */
     sort = (as->parms[5].items ? 0 : 1);	/* -nosort flag */
+    sync = (as->parms[6].items ? 1 : 0);	/* -sync flag */
+
+    if (sync) {
+	/* send this request to the sync-site */
+	flags |= SYNCUBIKONLY;
+    }
 
     /* If the volume name is given, Use VolumeInfoCmd to look it up
      * and not ListAttributes.
@@ -4583,11 +4590,12 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 
 	vcode =
 	    VLDB_ListAttributesN2(&attributes, 0, thisindex, &centries,
-				  &arrayEntries, &nextindex);
+				  &arrayEntries, &nextindex, flags);
 	if (vcode == RXGEN_OPCODE) {
 	    /* Vlserver not running with ListAttributesN2. Fall back */
 	    vcode =
-		VLDB_ListAttributes(&attributes, &centries, &arrayEntries);
+		VLDB_ListAttributes(&attributes, &centries, &arrayEntries,
+				    flags);
 	    nextindex = -1;
 	}
 	if (vcode) {
@@ -4779,7 +4787,7 @@ BackSys(struct cmd_syndesc *as, void *arock)
     }
 
     memset(&arrayEntries, 0, sizeof(arrayEntries));	/* initialize to hint the stub to alloc space */
-    vcode = VLDB_ListAttributes(&attributes, &nentries, &arrayEntries);
+    vcode = VLDB_ListAttributes(&attributes, &nentries, &arrayEntries, 0);
     if (vcode) {
 	fprintf(STDERR, "Could not access the VLDB for attributes\n");
 	PrintError("", vcode);
@@ -5049,7 +5057,7 @@ UnlockVLDB(struct cmd_syndesc *as, void *arock)
     attributes.flag = VLOP_ALLOPERS;
     attributes.Mask |= VLLIST_FLAG;
     memset(&arrayEntries, 0, sizeof(arrayEntries));	/*initialize to hint the stub  to alloc space */
-    vcode = VLDB_ListAttributes(&attributes, &nentries, &arrayEntries);
+    vcode = VLDB_ListAttributes(&attributes, &nentries, &arrayEntries, 0);
     if (vcode) {
 	fprintf(STDERR, "Could not access the VLDB for attributes\n");
 	PrintError("", vcode);
@@ -6265,6 +6273,8 @@ main(int argc, char **argv)
 		"generate minimal information");
     cmd_AddParm(ts, "-nosort", CMD_FLAG, CMD_OPTIONAL,
 		"do not alphabetically sort the volume names");
+    cmd_AddParm(ts, "-sync", CMD_FLAG, CMD_OPTIONAL,
+		"send this request to the sync-site");
     COMMONPARMS;
 
     ts = cmd_CreateSyntax("backupsys", BackSys, NULL, 0, "en masse backups");

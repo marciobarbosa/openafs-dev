@@ -6876,9 +6876,9 @@ UV_SyncServer(afs_uint32 aserver, afs_int32 apart, int flags, int force)
 	/* Collect set of VLDB entries */
 	code =
 	    VLDB_ListAttributesN2(&attributes, 0, si, &nentries,
-				  &arrayEntries, &nsi);
+				  &arrayEntries, &nsi, 0);
 	if (code == RXGEN_OPCODE) {
-	    code = VLDB_ListAttributes(&attributes, &nentries, &arrayEntries);
+	    code = VLDB_ListAttributes(&attributes, &nentries, &arrayEntries, 0);
 	    nsi = -1;
 	}
 	if (code) {
