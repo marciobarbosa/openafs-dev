@@ -14,7 +14,7 @@ B<vos listvldb> S<<< [B<-name> <I<volume name or ID>>] >>>
     S<<< [B<-cell> <I<cell name>>] >>> [B<-noauth>] [B<-localauth>]
     [B<-verbose>] [B<-encrypt>] [B<-noresolve>]
     S<<< [B<-config> <I<config directory>>] >>>
-    [B<-help>]
+    [B<-escalate-search>] [B<-help>]
 
 B<vos listvl> S<<< [B<-na> <I<volume name or ID>>] >>>
     S<<< [B<-s> <I<machine name>>] >>>
@@ -116,6 +116,11 @@ the output includes more than one volume.
 
 Suppresses the default sorting of volume entries alphabetically by volume
 name.
+
+=item B<-escalate-search>
+
+If the volume provided by the B<-name> argument could not be found by a
+vlserver, propagate the same request to the other ones.
 
 =include fragments/vos-common.pod
 

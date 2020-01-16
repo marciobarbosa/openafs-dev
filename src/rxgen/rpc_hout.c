@@ -204,6 +204,9 @@ psproc1(definition * defp, int callTconnF, char *type, char *prefix,
 	    }
 	}
     }
+    if (callTconnF == 2 && ucs_AddAppCode(defp)) {
+	f_print(fout, ", int appcode");
+    }
     f_print(fout, ");\n");
 }
 

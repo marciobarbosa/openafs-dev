@@ -1741,6 +1741,15 @@ ucs_ProcCallback_setup(definition * defp, char *cbheader)
 
 }
 
+int
+ucs_AddAppCode(definition * defp)
+{
+    if (!strcmp(defp->pc.proc_name, "GetEntryByNameN")) {
+	return 1;
+    }
+    return 0;
+}
+
 static void
 ucs_ProcName_setup(definition * defp, char *procheader, int split_flag)
 {
@@ -1782,6 +1791,9 @@ ucs_ProcName_setup(definition * defp, char *procheader, int split_flag)
 		    f_print(fout, " %s", plist->pl.param_name);
 		}
 	    }
+	}
+	if (ucs_AddAppCode(defp)) {
+	    f_print(fout, ", int appcode");
 	}
 	f_print(fout, ")\n");
     }
@@ -1835,6 +1847,11 @@ ucs_ProcTail_setup(definition * defp, char *cbheader, int split_flag)
     proc1_list *plist;
     int any_params = 0;
 
+    char *appcode = "0";
+    if (ucs_AddAppCode(defp)) {
+	appcode = "appcode";
+    }
+
     f_print(fout, "{\n");
 
     for (plist = defp->pc.plists; plist; plist = plist->next) {
@@ -1856,11 +1873,13 @@ ucs_ProcTail_setup(definition * defp, char *cbheader, int split_flag)
 	    }
 	}
 
-	f_print(fout, "\treturn ubik_CallRock(aclient, aflags, %s%s%s%s, &args);\n",
-		      cbheader, prefix, PackagePrefix[PackageIndex], defp->pc.proc_name);
+	f_print(fout, "\treturn ubik_CallRock(aclient, aflags, %s%s%s%s, &args, %s);\n",
+		      cbheader, prefix, PackagePrefix[PackageIndex], defp->pc.proc_name,
+		      appcode);
     } else {
-	f_print(fout, "\treturn ubik_CallRock(aclient, aflags, %s%s%s%s, NULL);\n",
-		      cbheader, prefix, PackagePrefix[PackageIndex], defp->pc.proc_name);
+	f_print(fout, "\treturn ubik_CallRock(aclient, aflags, %s%s%s%s, NULL, %s);\n",
+		      cbheader, prefix, PackagePrefix[PackageIndex], defp->pc.proc_name,
+		      appcode);
     }
 
     f_print(fout, "}\n\n");

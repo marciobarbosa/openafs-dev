@@ -104,7 +104,7 @@ afscp_VolumeByName(struct afscp_cell *cell, const char *vname,
     if (code == RXGEN_OPCODE) {
 	type = 1;
 	code =
-	    ubik_VL_GetEntryByNameN(cell->vlservers, 0, (char *)vname, &u.n);
+	    ubik_VL_GetEntryByNameN(cell->vlservers, 0, (char *)vname, &u.n, 0);
 	if (code == RXGEN_OPCODE) {
 	    type = 2;
 	    code = ubik_VL_GetEntryByNameO(cell->vlservers, 0, (char *)vname,

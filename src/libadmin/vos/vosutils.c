@@ -175,7 +175,7 @@ aVLDB_GetEntryByName(afs_cell_handle_p cellHandle, char *namep,
 	if (cellHandle->vos_new) {
 	    tst =
 		ubik_VL_GetEntryByNameN(cellHandle->vos, 0, namep,
-			  entryp);
+			  entryp, 0);
 	    if (tst) {
 		if (tst == RXGEN_OPCODE) {
 		    cellHandle->vos_new = 0;

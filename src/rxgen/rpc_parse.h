@@ -198,3 +198,5 @@ struct definition {
     int statindex;
 };
 typedef struct definition definition;
+
+extern int ucs_AddAppCode(definition * defp);

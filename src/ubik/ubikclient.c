@@ -691,7 +691,7 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
 
 afs_int32
 ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
-	      ubik_callrock_func proc, void *rock)
+	      ubik_callrock_func proc, void *rock, afs_int32 appcode)
 {
     afs_int32 rcode, code, newHost, thisHost, i, _ucount;
     int chaseCount, pass, needsync;
@@ -790,6 +790,10 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 	    } else if (rcode != UNOQUORUM) {
 		/* either misc ubik code, or misc appl code, or success. */
 		aclient->states[_ucount] &= ~CFLastFailed;	/* mark server up*/
+		/* try another server if appcode was returned by this one */
+		if ((aflags & UBIK_RETRY_APPFLAG) && rcode == appcode) {
+		    continue;
+		}
 		goto done;      /* all done */
 	    }
 	}

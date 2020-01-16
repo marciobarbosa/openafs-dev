@@ -149,7 +149,7 @@ VLDB_GetEntryByID(afs_uint32 volid, afs_int32 voltype, struct nvldbentry *entryp
 }
 
 int
-VLDB_GetEntryByName(char *namep, struct nvldbentry *entryp)
+VLDB_GetEntryByName(char *namep, struct nvldbentry *entryp, int flags, int appcode)
 {
     struct vldbentry oentry;
     int code;
@@ -161,7 +161,7 @@ VLDB_GetEntryByName(char *namep, struct nvldbentry *entryp)
 	    ovlentry_to_nvlentry(&oentry, entryp);
 	return code;
     }
-    code = ubik_VL_GetEntryByNameN(cstruct, 0, namep, entryp);
+    code = ubik_VL_GetEntryByNameN(cstruct, flags, namep, entryp, appcode);
     if (newvlserver == vltype_unknown) {
 	if (code == RXGEN_OPCODE) {
 	    newvlserver = vltype_old;	/* Doesn't support new interface */
@@ -455,7 +455,7 @@ vsu_GetVolumeID(char *astring, struct ubik_client *acstruct, afs_int32 *errp)
     /* It was not a volume number but something else */
     total = strlen(astring);
     vsu_ExtractName(volname, astring);
-    vcode = VLDB_GetEntryByName(volname, &entry);
+    vcode = VLDB_GetEntryByName(volname, &entry, 0, 0);
     if (!vcode) {
       if ((total >= 9) && (!strcmp(&astring[total - 9], ".readonly")))
 	return entry.volumeId[ROVOL];
