@@ -689,12 +689,47 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
     return rcode;
 }
 
+/**
+ * Check if site is the sync-site.
+ *
+ * @param[in]  aconn  connection to the site
+ *
+ * @return boolean
+ *   @retval  0  failure or site isn't the sync-site
+ *   @retval  1  site is the sync-site
+ */
+static int
+IsSyncSite(struct rx_connection *aconn)
+{
+    afs_int32 rcode, host;
+    u_short port;
+
+    struct rx_peer *rxp;
+    struct rx_connection *uconn;
+    struct rx_securityClass *sobj;
+
+    struct ubik_debug udebug;
+
+    rxp  = rx_PeerOf(aconn);
+    host = rx_HostOf(rxp);
+    port = rx_PortOf(rxp);
+    sobj = rx_SecurityObjectOf(aconn);
+
+    uconn = rx_NewConnection(host, port, VOTE_SERVICE_ID, sobj, 0);
+    rcode = VOTE_Debug(uconn, &udebug);
+
+    if (rcode != 0 || !udebug.amSyncSite) {
+	return 0;
+    }
+    return 1;
+}
+
 afs_int32
 ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 	      ubik_callrock_func proc, void *rock)
 {
     afs_int32 rcode, code, newHost, thisHost, i, _ucount;
-    int chaseCount, pass, needsync;
+    int chaseCount, pass, needsync, forcesync, syncfound;
     struct rx_connection *tc;
     struct rx_peer *rxp;
     short origLevel;
@@ -706,7 +741,11 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
  restart:
     origLevel = aclient->initializationState;
     rcode = UNOSERVERS;
-    chaseCount = needsync = 0;
+    chaseCount = needsync = forcesync = syncfound = 0;
+
+    if ((aflags & UBIK_FORCE_SYNCSITE)) {
+	needsync = forcesync = 1;
+    }
 
     /*
      * First  pass, we try all servers that are up.
@@ -718,9 +757,23 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 	    struct ubik_callrock_info info;
 	    if (needsync) {
 		/* Need a sync site. Lets try to quickly find it */
+		syncfound = 0;
 		if (aclient->syncSite) {
 		    newHost = aclient->syncSite;	/* already in network order */
 		    aclient->syncSite = 0;      /* Will reset if it works */
+		} else if (forcesync) {
+		    tc = aclient->conns[_ucount];
+		    if (tc == NULL) {
+			break;
+		    }
+		    code = IsSyncSite(tc);
+		    if (aclient->initializationState != origLevel) {
+			goto restart;
+		    }
+		    if (!code) {
+			continue;
+		    }
+		    newHost = rx_HostOf(rx_PeerOf(tc));
 		} else if (aclient->conns[3]) {
 		    /*
 		     * If there are fewer than four db servers in a cell,
@@ -758,10 +811,14 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 			    if (chaseCount++ > 2)
 				break;  /* avoid loop asking */
 			    _ucount = i;  /* this index is the sync site */
+			    syncfound = 1;
 			    break;
 			}
 		    }
 		}
+	    }
+	    if (forcesync && !syncfound) {
+		break;
 	    }
 	    /*needsync */
 	    tc = aclient->conns[_ucount];

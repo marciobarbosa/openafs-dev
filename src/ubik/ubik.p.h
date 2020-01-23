@@ -28,6 +28,7 @@
 /*! \name ubik client flags */
 #define UPUBIKONLY 	    1	/*!< only check servers presumed functional */
 #define UBIK_CALL_NEW 	    2	/*!< use the semantics of ubik_Call_New */
+#define UBIK_FORCE_SYNCSITE 4	/*!< always send requests to the sync-site */
 /*\}*/
 
 /*! \name RX services types */
