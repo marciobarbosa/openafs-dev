@@ -2009,7 +2009,7 @@ CreateVolume(struct cmd_syndesc *as, void *arock)
 		as->parms[2].items->data);
 	return EINVAL;
     }
-    vcode = VLDB_GetEntryByName(as->parms[2].items->data, &entry);
+    vcode = VLDB_GetEntryByName(as->parms[2].items->data, &entry, 0);
     if (!vcode) {
 	fprintf(STDERR, "Volume %s already exists\n",
 		as->parms[2].items->data);
@@ -2374,7 +2374,7 @@ CopyVolume(struct cmd_syndesc *as, void *arock)
 		tovolume);
 	return EINVAL;
     }
-    code = VLDB_GetEntryByName(tovolume, &entry);
+    code = VLDB_GetEntryByName(tovolume, &entry, 0);
     if (!code) {
 	fprintf(STDERR, "Volume %s already exists\n", tovolume);
 	PrintDiagnostics("copy", code);
@@ -3138,7 +3138,7 @@ RestoreVolumeCmd(struct cmd_syndesc *as, void *arock)
     /* Check if volume exists or not */
 
     vsu_ExtractName(volname, avolname);
-    vcode = VLDB_GetEntryByName(volname, &entry);
+    vcode = VLDB_GetEntryByName(volname, &entry, 0);
     if (vcode) {		/* no volume - do a full restore */
 	restoreflags = RV_FULLRST;
 	if ((aoverwrite == INC) || (aoverwrite == ABORT))
@@ -3941,7 +3941,7 @@ SyncServer(struct cmd_syndesc *as, void *arock)
 }
 
 static int
-VolumeInfoCmd(char *name)
+VolumeInfoCmd(char *name, int flags)
 {
     struct nvldbentry entry;
     afs_int32 vcode;
@@ -3949,7 +3949,7 @@ VolumeInfoCmd(char *name)
     /* The vlserver will handle names with the .readonly
      * and .backup extension as well as volume ids.
      */
-    vcode = VLDB_GetEntryByName(name, &entry);
+    vcode = VLDB_GetEntryByName(name, &entry, flags);
     if (vcode) {
 	PrintError("", vcode);
 	exit(1);
@@ -4156,13 +4156,13 @@ RenameVolume(struct cmd_syndesc *as, void *arock)
     afs_int32 code1, code2, code;
     struct nvldbentry entry;
 
-    code1 = VLDB_GetEntryByName(as->parms[0].items->data, &entry);
+    code1 = VLDB_GetEntryByName(as->parms[0].items->data, &entry, 0);
     if (code1) {
 	fprintf(STDERR, "vos: Could not find entry for volume %s\n",
 		as->parms[0].items->data);
 	exit(1);
     }
-    code2 = VLDB_GetEntryByName(as->parms[1].items->data, &entry);
+    code2 = VLDB_GetEntryByName(as->parms[1].items->data, &entry, 0);
     if ((!code1) && (!code2)) {	/*the newname already exists */
 	fprintf(STDERR, "vos: volume %s already exists\n",
 		as->parms[1].items->data);
@@ -4509,6 +4509,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
     char pname[10];
     int quiet, sort, lock;
     afs_int32 thisindex, nextindex;
+    int sync, flags = 0;
 
     apart = 0;
 
@@ -4516,6 +4517,12 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
     lock = (as->parms[3].items ? 1 : 0);	/* -lock   flag */
     quiet = (as->parms[4].items ? 1 : 0);	/* -quit   flag */
     sort = (as->parms[5].items ? 0 : 1);	/* -nosort flag */
+    sync = (as->parms[6].items ? 1 : 0);	/* -sync flag */
+
+    if (sync) {
+	/* send this request to the sync-site */
+	flags |= UBIK_FORCE_SYNCSITE;
+    }
 
     /* If the volume name is given, Use VolumeInfoCmd to look it up
      * and not ListAttributes.
@@ -4526,7 +4533,7 @@ ListVLDB(struct cmd_syndesc *as, void *arock)
 		    "vos: illegal use of '-locked' switch, need to specify server and/or partition\n");
 	    exit(1);
 	}
-	code = VolumeInfoCmd(as->parms[0].items->data);
+	code = VolumeInfoCmd(as->parms[0].items->data, flags);
 	if (code) {
 	    PrintError("", code);
 	    exit(1);
@@ -6265,6 +6272,8 @@ main(int argc, char **argv)
 		"generate minimal information");
     cmd_AddParm(ts, "-nosort", CMD_FLAG, CMD_OPTIONAL,
 		"do not alphabetically sort the volume names");
+    cmd_AddParm(ts, "-sync", CMD_FLAG, CMD_OPTIONAL,
+		"send this request to the sync-site");
     COMMONPARMS;
 
     ts = cmd_CreateSyntax("backupsys", BackSys, NULL, 0, "en masse backups");

@@ -14,7 +14,7 @@ B<vos listvldb> S<<< [B<-name> <I<volume name or ID>>] >>>
     S<<< [B<-cell> <I<cell name>>] >>> [B<-noauth>] [B<-localauth>]
     [B<-verbose>] [B<-encrypt>] [B<-noresolve>]
     S<<< [B<-config> <I<config directory>>] >>>
-    [B<-help>]
+    [B<-sync>] [B<-help>]
 
 B<vos listvl> S<<< [B<-na> <I<volume name or ID>>] >>>
     S<<< [B<-s> <I<machine name>>] >>>
@@ -116,6 +116,14 @@ the output includes more than one volume.
 
 Suppresses the default sorting of volume entries alphabetically by volume
 name.
+
+=item B<-sync>
+
+Send this request to the sync-site. Doing so, we have the guarantee that this
+request will be served by the most recent version of the database.
+
+In order to preserve the benefits of load balancing, this option must be
+reserved for very specific situations.
 
 =include fragments/vos-common.pod
 

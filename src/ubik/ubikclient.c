@@ -624,12 +624,49 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
     return rcode;
 }
 
+/**
+ * Check if site is the sync-site.
+ *
+ * @param[in]  aconn  connection to the site
+ *
+ * @return status
+ *   @retval  0         site is the sync-site
+ *   @retval  UNOTSYNC  site isn't the sync-site
+ *   @retval  negative  failure
+ */
+static int
+CheckIfSyncSite(struct rx_connection *aconn)
+{
+    afs_int32 rcode, host;
+    u_short port;
+
+    struct rx_peer *rxp;
+    struct rx_connection *uconn;
+    struct rx_securityClass *sobj;
+
+    struct ubik_debug udebug;
+
+    rxp  = rx_PeerOf(aconn);
+    host = rx_HostOf(rxp);
+    port = rx_PortOf(rxp);
+    sobj = rx_SecurityObjectOf(aconn);
+
+    uconn = rx_NewConnection(host, port, VOTE_SERVICE_ID, sobj, 0);
+    rcode = VOTE_Debug(uconn, &udebug);
+    rx_DestroyConnection(uconn);
+
+    if (rcode == 0 && !udebug.amSyncSite) {
+	rcode = UNOTSYNC;
+    }
+    return rcode;
+}
+
 afs_int32
 ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 	      ubik_callrock_func proc, void *rock)
 {
     afs_int32 rcode, code, newHost, _ucount;
-    int chaseCount, pass, needsync;
+    int chaseCount, pass, needsync, forcesync;
     struct rx_connection *tc;
     struct rx_peer *rxp;
     short origLevel;
@@ -641,7 +678,11 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
  restart:
     origLevel = aclient->initializationState;
     rcode = UNOSERVERS;
-    chaseCount = needsync = 0;
+    chaseCount = needsync = forcesync = 0;
+
+    if ((aflags & UBIK_FORCE_SYNCSITE)) {
+	needsync = forcesync = 1;
+    }
 
     /*
      * First  pass, we try all servers that are up.
@@ -664,6 +705,18 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 		    code = IndexOf(aclient, newHost, &chaseCount);
 		    if (code != -1) {
 			_ucount = code;
+		    }
+		} else if (forcesync) {
+		    tc = aclient->conns[_ucount];
+		    if (tc == NULL) {
+			break;
+		    }
+		    rcode = CheckIfSyncSite(tc);
+		    if (aclient->initializationState != origLevel) {
+			goto restart;
+		    }
+		    if (rcode != 0) {
+			continue;
 		    }
 		}
 	    }
