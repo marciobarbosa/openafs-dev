@@ -4526,7 +4526,7 @@ UV_RestoreVolume2(afs_uint32 toserver, afs_int32 topart, afs_uint32 tovolid,
     pparentid = toparentid;
     toconn = UV_Bind(toserver, AFSCONF_VOLUMEPORT);
     if (pvolid == 0) {		/*alot a new id if needed */
-	vcode = VLDB_GetEntryByName(tovolname, &entry);
+	vcode = VLDB_GetEntryByName(tovolname, &entry, 0);
 	if (vcode == VL_NOENT) {
 	    vcode = ubik_VL_GetNewVolumeId(cstruct, 0, 1, &pvolid);
 	    if (vcode) {
@@ -6152,7 +6152,7 @@ UV_SyncVolume(afs_uint32 aserver, afs_int32 apart, char *avolname, int flags)
     }
 
     /* Read the VLDB entry */
-    vcode = VLDB_GetEntryByName(avolname, &vldbentry);
+    vcode = VLDB_GetEntryByName(avolname, &vldbentry, 0);
     if (vcode && (vcode != VL_NOENT)) {
 	fprintf(STDERR, "Could not access the VLDB for volume %s\n",
 		avolname);
