@@ -81,6 +81,7 @@ enum {
     COMMONPARM_OFFSET_NORESOLVE = 30,
     COMMONPARM_OFFSET_CONFIG    = 31,
     COMMONPARM_OFFSET_RXGK      = 32,
+    COMMONPARM_OFFSET_SYNC      = 33,
 };
 
 #define COMMONPARMS \
@@ -101,6 +102,8 @@ cmd_AddParmAtOffset(ts, COMMONPARM_OFFSET_CONFIG, \
     "-config", CMD_SINGLE, CMD_OPTIONAL, "config location"); \
 cmd_AddParmAtOffset(ts, COMMONPARM_OFFSET_RXGK, \
     "-rxgk", CMD_SINGLE, CMD_OPTIONAL, "rxgk security level to use"); \
+cmd_AddParmAtOffset(ts, COMMONPARM_OFFSET_SYNC, \
+    "-sync", CMD_FLAG, CMD_OPTIONAL, "send request to the sync-site"); \
 
 #define ERROR_EXIT(code) do { \
     error = (code); \
@@ -5972,6 +5975,9 @@ MyBeforeProc(struct cmd_syndesc *as, void *arock)
 	noresolve = 1;
     else
 	noresolve = 0;
+    if (as->parms[COMMONPARM_OFFSET_SYNC].items) {	/* -sync flag set */
+	ubik_ClientSetFlags(cstruct, UBIK_FORCE_SYNCSITE);
+    }
 
     return 0;
 }
