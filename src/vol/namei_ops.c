@@ -3150,6 +3150,8 @@ namei_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
 	code = -1;
 	goto done;
     }
+    code = 0;
+
     fd = OS_OPEN(oldpath, O_RDWR, 0);
     if (fd == INVALID_FD) {
 	Log("1 namei_ConvertROtoRWvolume: could not open RO info file: %s\n",
@@ -3186,6 +3188,8 @@ namei_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
 	code = -1;
 	goto done;
     }
+    code = 0;
+
     fd = OS_OPEN(newpath, O_RDWR, 0);
     if (fd == INVALID_FD) {
 	Log("1 namei_ConvertROtoRWvolume: could not open SmallIndex file: %s\n", newpath);
@@ -3214,6 +3218,8 @@ namei_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
 	code = -1;
 	goto done;
     }
+    code = 0;
+
     fd = OS_OPEN(newpath, O_RDWR, 0);
     if (fd == INVALID_FD) {
 	Log("1 namei_ConvertROtoRWvolume: could not open LargeIndex file: %s\n", newpath);
