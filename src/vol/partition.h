@@ -168,6 +168,7 @@ struct DiskPartitionStats64 {
 
 struct Volume;			/* Potentially forward definition */
 
+/* DiskPartitionList is protected by VOL_LOCK */
 extern struct DiskPartition64 *DiskPartitionList;
 extern struct DiskPartition64 *VGetPartition(char * name, int abortp);
 extern struct DiskPartition64 *VGetPartition_r(char * name, int abortp);
@@ -176,8 +177,9 @@ extern struct DiskPartition64 *VGetPartitionById(afs_int32 index, int abortp);
 extern struct DiskPartition64 *VGetPartitionById_r(afs_int32 index, int abortp);
 extern int VPartHeaderLock(struct DiskPartition64 *dp, int locktype);
 extern void VPartHeaderUnlock(struct DiskPartition64 *dp, int locktype);
+extern void VAttachNewPartitions(int *parts, int parts_len, int *n_parts);
 #endif
-extern int VAttachPartitions(void);
+extern int VAttachPartitions(int dyn_attach);
 extern void VLockPartition(char *name);
 extern void VLockPartition_r(char *name);
 extern void VUnlockPartition(char *name);
@@ -193,17 +195,25 @@ extern int VDiskUsage(struct Volume *vp, afs_sfsize_t blocks);
 extern void VPrintDiskStats(void);
 extern int VInitPartitionPackage(void);
 
-/* Since DiskPartitionList cannot be modified, we can safely read its elements
- * without requesting any lock. */
+extern struct DiskPartition64 *VGetNextPartition(struct DiskPartition64 *cursor);
+extern struct DiskPartition64 *VGetFirstPartition(void);
 
 /* Iterates over the elements of DiskPartitionList without protection. Used when
  * caller has VOL_LOCK. */
 #define VScanPartList_r(cursor) \
     (cursor) = DiskPartitionList; (cursor); (cursor) = (cursor)->next
 
-/* Iterates over the elements of DiskPartitionList without protection. Used when
- * caller does not have VOL_LOCK. */
+/*
+ * In order to enforce mutual exclusion between VInitPartition and accesses to
+ * the DiskPartitionList, use this macro to go through the nodes of this list.
+ * Don't use this macro if VOL_LOCK is already held. Use VScanPartList_r
+ * instead.
+ *
+ * Notice that the protection introduced by this macro is effective only if we
+ * assume that updates on this list boil down to appends of new elements
+ * (currently true).
+ */
 #define VScanPartList(cursor) \
-    (cursor) = DiskPartitionList; (cursor); (cursor) = (cursor)->next
+    (cursor) = VGetFirstPartition(); (cursor); (cursor) = VGetNextPartition(cursor)
 
 #endif /* AFS_VOL_PARTITION_H */
