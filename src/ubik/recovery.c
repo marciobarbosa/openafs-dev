@@ -501,8 +501,25 @@ urecovery_Interact(void *dummy)
 		} else {
 		    UBIK_BEACON_UNLOCK;
 		    DBHOLD(ubik_dbase);
-		    if (!ts->currentDB)
-			urecovery_state &= ~UBIK_RECFOUNDDB;
+		    /*
+		     * If this site has an out-of-date database (!currentDB),
+		     * trigger the recovery process so we'll send an up-to-date
+		     * database to that site.
+		     */
+		    if (!ts->currentDB) {
+			/*
+			 * Only do this if the site is also voting for us.
+			 * Otherwise, we may send an up-to-date copy of the
+			 * database to this site, and then that site's db
+			 * immediately becomes stale because we skip sending
+			 * write transactions to it (see CCheckSyncAdvertised).
+			 * And because that site now has a stale db, the whole
+			 * process repeats.
+			 */
+			if (ts->beaconSinceDown && ts->lastVote) {
+			    urecovery_state &= ~UBIK_RECFOUNDDB;
+			}
+		    }
 		    DBRELE(ubik_dbase);
 		}
 	    }
