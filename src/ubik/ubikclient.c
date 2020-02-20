@@ -488,7 +488,7 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
 	  long p11, long p12, long p13, long p14, long p15, long p16)
 {
     afs_int32 rcode, newHost, thisHost, i, count;
-    int chaseCount, pass, needsync, inlist, j;
+    int pass, needsync, inlist, j;
     struct rx_connection *tc;
     struct rx_peer *rxp;
     short origLevel;
@@ -505,7 +505,7 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
   restart:
     origLevel = aclient->initializationState;
     rcode = UNOSERVERS;
-    chaseCount = inlist = needsync = 0;
+    inlist = needsync = 0;
 
     LOCK_UCLNT_CACHE;
     for (j = 0; ((j < SYNCCOUNT) && calls_needsync[j]); j++) {
@@ -542,8 +542,6 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
 			if (!thisHost)
 			    break;
 			if (thisHost == newHost) {
-			    if (chaseCount++ > 2)
-				break;	/* avoid loop asking */
 			    count = i;	/* this index is the sync site */
 			    break;
 			}
@@ -607,7 +605,7 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 	      ubik_callrock_func proc, void *rock)
 {
     afs_int32 rcode, newHost, thisHost, i, _ucount;
-    int chaseCount, pass, needsync;
+    int pass, needsync;
     struct rx_connection *tc;
     struct rx_peer *rxp;
     short origLevel;
@@ -619,7 +617,7 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
  restart:
     origLevel = aclient->initializationState;
     rcode = UNOSERVERS;
-    chaseCount = needsync = 0;
+    needsync = 0;
 
     /*
      * First  pass, we try all servers that are up.
@@ -649,8 +647,6 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 			if (!thisHost)
 			    break;
 			if (thisHost == newHost) {
-			    if (chaseCount++ > 2)
-				break;  /* avoid loop asking */
 			    _ucount = i;  /* this index is the sync site */
 			    break;
 			}
