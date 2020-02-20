@@ -273,6 +273,21 @@ causes B<vos> to use rxgk without any per-packet cryptography.
 By default, B<vos> uses rxkad credentials.  B<vos> falls back to unauthenticated
 connections if credentials are not available.
 
+=item B<-sync>
+
+Try to communicate with the sync-site vlserver, to avoid getting information
+from a stale version of the VLDB. Without this option, B<vos> will contact a
+random vlserver, which may have a stale version of the VLDB if it is recovering
+from network issues or other problems.
+
+For cells with multiple vlservers, using this option incurs extra load on the
+vlservers, and so it is recommended to use this option sparingly. The operation
+may also fail if there is no sync site available, when otherwise we might have
+succeeded without the B<-sync> option.
+
+For cells with a single vlserver, this option does not incur much extra load,
+but using this option is pointless since there is only one server to contact.
+
 =back
 
 =head1 PRIVILEGE REQUIRED

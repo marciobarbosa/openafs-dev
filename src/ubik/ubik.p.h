@@ -28,6 +28,7 @@
 /*! \name ubik client flags */
 #define UPUBIKONLY 	    1	/*!< only check servers presumed functional */
 #define UBIK_CALL_NEW 	    2	/*!< use the semantics of ubik_Call_New */
+#define UBIK_FORCE_SYNCSITE 4	/*!< always send requests to the sync-site */
 /*\}*/
 
 /*! \name RX services types */
@@ -68,6 +69,7 @@ struct ubik_client {
     short states[MAXSERVERS];	/*!< state bits */
     struct rx_connection *conns[MAXSERVERS];
     afs_int32 syncSite;
+    afs_int32 flags;
 #ifdef AFS_PTHREAD_ENV
     pthread_mutex_t cm;
 #endif
@@ -584,6 +586,7 @@ extern unsigned int afs_random(void);
 extern int ubik_ClientInit(struct rx_connection **serverconns,
 			   struct ubik_client **aclient);
 extern afs_int32 ubik_ClientDestroy(struct ubik_client *aclient);
+extern void ubik_ClientSetFlags(struct ubik_client *aclient, afs_int32 aflags);
 extern struct rx_connection *ubik_RefreshConn(struct rx_connection *tc);
 
 struct ubik_callrock_info {

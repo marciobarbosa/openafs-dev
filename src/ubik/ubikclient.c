@@ -286,6 +286,26 @@ ubik_ClientDestroy(struct ubik_client * aclient)
     return 0;
 }
 
+/**
+ * Set ubik client flags.
+ *
+ * The flags initialized here are automatically incorporated by the flags used
+ * by the ubik_Call* functions.
+ *
+ * @param[in]  aclient  client structure
+ * @param[in]  aflags   flags to be applied
+ *
+ * @return none
+ */
+void
+ubik_ClientSetFlags(struct ubik_client *aclient, afs_int32 aflags)
+{
+    if (aclient == NULL) {
+	return;
+    }
+    aclient->flags |= aflags;
+}
+
 /*!
  * \brief So that intermittent failures that cause connections to die
  *     don't kill whole ubik connection, refresh them when the connection is in
@@ -504,6 +524,43 @@ IndexOf(struct ubik_client *aclient, int ahost)
     return index;
 }
 
+/**
+ * Check if site is the sync-site.
+ *
+ * @param[in]  aconn  connection to the site
+ *
+ * @return status
+ *   @retval  0         site is the sync-site
+ *   @retval  UNOTSYNC  site isn't the sync-site
+ *   @retval  other     failure
+ */
+static int
+CheckIfSyncSite(struct rx_connection *aconn)
+{
+    afs_int32 rcode, host;
+    u_short port;
+
+    struct rx_peer *rxp;
+    struct rx_connection *uconn;
+    struct rx_securityClass *sobj;
+
+    struct ubik_debug udebug;
+
+    rxp  = rx_PeerOf(aconn);
+    host = rx_HostOf(rxp);
+    port = rx_PortOf(rxp);
+    sobj = rx_SecurityObjectOf(aconn);
+
+    uconn = rx_NewConnection(host, port, VOTE_SERVICE_ID, sobj, 0);
+    rcode = VOTE_Debug(uconn, &udebug);
+    rx_DestroyConnection(uconn);
+
+    if (rcode == 0 && !udebug.amSyncSite) {
+	rcode = UNOTSYNC;
+    }
+    return rcode;
+}
+
 /*!
  * call this instead of stub and we'll guarantee to find a host that's up.
  *
@@ -516,7 +573,7 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
 	  long p11, long p12, long p13, long p14, long p15, long p16)
 {
     afs_int32 rcode, code, count;
-    int pass, needsync, inlist, j;
+    int pass, needsync, forcesync, inlist, j;
     struct rx_connection *tc;
     struct rx_peer *rxp;
     short origLevel;
@@ -530,10 +587,16 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
 	return UNOENT;
     LOCK_UBIK_CLIENT(aclient);
 
+    /* always apply flags from aclient */
+    aflags |= aclient->flags;
+
   restart:
     origLevel = aclient->initializationState;
     rcode = UNOSERVERS;
-    inlist = needsync = 0;
+    inlist = needsync = forcesync = 0;
+
+    if ((aflags & UBIK_FORCE_SYNCSITE))
+	needsync = forcesync = 1;
 
     LOCK_UCLNT_CACHE;
     for (j = 0; ((j < SYNCCOUNT) && calls_needsync[j]); j++) {
@@ -563,6 +626,16 @@ ubik_Call(int (*aproc) (), struct ubik_client *aclient,
 		    aclient->syncSite = 0;
 		    if (code != -1)
 			count = code;
+		} else if (forcesync) {
+		    tc = aclient->conns[count];
+		    if (tc == NULL)
+			break;
+
+		    rcode = CheckIfSyncSite(tc);
+		    if (aclient->initializationState != origLevel)
+			goto restart;
+		    if (rcode != 0)
+			continue;
 		}
 	    }
 	    /*needsync */
@@ -622,7 +695,7 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 	      ubik_callrock_func proc, void *rock)
 {
     afs_int32 rcode, code, _ucount;
-    int pass, needsync;
+    int pass, needsync, forcesync;
     struct rx_connection *tc;
     struct rx_peer *rxp;
     short origLevel;
@@ -631,10 +704,16 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 	return UNOENT;
     LOCK_UBIK_CLIENT(aclient);
 
+    /* always apply flags from aclient */
+    aflags |= aclient->flags;
+
  restart:
     origLevel = aclient->initializationState;
     rcode = UNOSERVERS;
-    needsync = 0;
+    needsync = forcesync = 0;
+
+    if ((aflags & UBIK_FORCE_SYNCSITE))
+	needsync = forcesync = 1;
 
     /*
      * First  pass, we try all servers that are up.
@@ -656,6 +735,16 @@ ubik_CallRock(struct ubik_client *aclient, afs_int32 aflags,
 		    aclient->syncSite = 0;
 		    if (code != -1)
 			_ucount = code;
+		} else if (forcesync) {
+		    tc = aclient->conns[_ucount];
+		    if (tc == NULL)
+			break;
+
+		    rcode = CheckIfSyncSite(tc);
+		    if (aclient->initializationState != origLevel)
+			goto restart;
+		    if (rcode != 0)
+			continue;
 		}
 	    }
 	    /*needsync */
