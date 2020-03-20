@@ -1741,7 +1741,7 @@ RunVnodeScanProcs(struct VolInfoOpt *opt, VnodeClass class,
     struct VnodeScanProc *entry;
 
     for (opr_queue_Scan(scanList, cursor)) {
-	entry = (struct VnodeScanProc *)cursor;
+	entry = opr_queue_Entry(cursor, struct VnodeScanProc, link);
 	if (entry->proc) {
 	    (*entry->proc) (opt, vnodeDetails);
 	}
@@ -1826,7 +1826,8 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
     }
 
     for (opr_queue_Scan(scanList, cursor)) {
-	struct VnodeScanProc *entry = (struct VnodeScanProc *)cursor;
+	struct VnodeScanProc *entry;
+	entry = opr_queue_Entry(cursor, struct VnodeScanProc, link);
 	if (entry->heading) {
 	    printf("%s", entry->heading);
 	}
