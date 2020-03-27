@@ -1696,6 +1696,76 @@ ModeMaskMatch(struct VolInfoOpt *opt, unsigned int modeBits)
     return 1;
 }
 
+static_inline void
+RunVnodeScanProcs(struct VolInfoOpt *opt, VnodeClass class,
+		  struct VnodeDetails *vnodeDetails)
+{
+    struct opr_queue *scanList = &VnodeScanLists[class];
+    struct opr_queue *cursor;
+    struct VnodeScanProc *entry;
+
+    for (opr_queue_Scan(scanList, cursor)) {
+	entry = (struct VnodeScanProc *)cursor;
+	if (entry->proc) {
+	    (*entry->proc) (opt, vnodeDetails);
+	}
+    }
+}
+
+/**
+ * Run vnode scanning procedure for each vnode.
+ *
+ * @param[in] nVnodes  number of vnodes
+ * @param[in] diskSize size of each disk vnode
+ * @param[in] class    vnode class (large or small)
+ * @param[in] vp       volume object
+ * @param[in] fdP      vnode index handle
+ *
+ * @return none
+ */
+static void
+ProcessVnodes(struct VolInfoOpt *opt, afs_sfsize_t nVnodes, afs_int32 diskSize,
+	      VnodeClass class, Volume *vp, FdHandle_t *fdP)
+{
+    int vnodeIndex;
+    afs_foff_t offset = 0;
+    StreamHandle_t *file = NULL;
+
+    char buf[SIZEOF_LARGEDISKVNODE];
+    struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
+
+    file = FDH_FDOPEN(fdP, "r");
+    if (!file) {
+	fprintf(stderr, "%s: fdopen failed\n", progname);
+	return;
+    }
+    if (nVnodes > 0) {
+	STREAM_ASEEK(file, diskSize);
+    }
+
+    for (vnodeIndex = 0;
+	 nVnodes && STREAM_READ(vnode, diskSize, 1, file) == 1;
+	 nVnodes--, vnodeIndex++, offset += diskSize) {
+
+	struct VnodeDetails vnodeDetails;
+
+	if (!ModeMaskMatch(opt, vnode->modeBits)) {
+	    continue;
+	}
+
+	memset(&vnodeDetails, 0, sizeof(vnodeDetails));
+	vnodeDetails.vp = vp;
+	vnodeDetails.class = class;
+	vnodeDetails.vnode = vnode;
+	vnodeDetails.vnodeNumber = bitNumberToVnodeNumber(vnodeIndex, class);
+	vnodeDetails.offset = offset;
+	vnodeDetails.index = vnodeIndex;
+
+	RunVnodeScanProcs(opt, class, &vnodeDetails);
+    }
+    STREAM_CLOSE(file);
+}
+
 /**
  * Scan a volume index and handle each vnode
  *
@@ -1709,12 +1779,7 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
 {
     afs_int32 diskSize =
 	(class == vSmall ? SIZEOF_SMALLDISKVNODE : SIZEOF_LARGEDISKVNODE);
-    char buf[SIZEOF_LARGEDISKVNODE];
-    struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
-    StreamHandle_t *file = NULL;
-    int vnodeIndex;
     afs_sfsize_t nVnodes;
-    afs_foff_t offset = 0;
     IHandle_t *ih = vp->vnodeIndex[class].handle;
     FdHandle_t *fdP = NULL;
     afs_sfsize_t size;
@@ -1739,12 +1804,6 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
 	goto error;
     }
 
-    file = FDH_FDOPEN(fdP, "r");
-    if (!file) {
-	fprintf(stderr, "%s: fdopen failed\n", progname);
-	goto error;
-    }
-
     if (GetFileInfo(fdP->fd_fd, &size, &ctime, &atime, &mtime) != 0) {
 	goto error;
     }
@@ -1754,41 +1813,12 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
     }
 
     nVnodes = (size / diskSize) - 1;
-    if (nVnodes > 0) {
-	STREAM_ASEEK(file, diskSize);
-    } else
+    if (nVnodes < 0) {
 	nVnodes = 0;
-
-    for (vnodeIndex = 0;
-	 nVnodes && STREAM_READ(vnode, diskSize, 1, file) == 1;
-	 nVnodes--, vnodeIndex++, offset += diskSize) {
-
-	struct VnodeDetails vnodeDetails;
-
-	if (!ModeMaskMatch(opt, vnode->modeBits)) {
-	    continue;
-	}
-
-	memset(&vnodeDetails, 0, sizeof(struct VnodeDetails));
-	vnodeDetails.vp = vp;
-	vnodeDetails.class = class;
-	vnodeDetails.vnode = vnode;
-	vnodeDetails.vnodeNumber = bitNumberToVnodeNumber(vnodeIndex, class);
-	vnodeDetails.offset = offset;
-	vnodeDetails.index = vnodeIndex;
-
-	for (opr_queue_Scan(scanList, cursor)) {
-	    struct VnodeScanProc *entry = (struct VnodeScanProc *)cursor;
-	    if (entry->proc) {
-		(*entry->proc) (opt, &vnodeDetails);
-	    }
-	}
     }
+    ProcessVnodes(opt, nVnodes, diskSize, class, vp, fdP);
 
   error:
-    if (file) {
-	STREAM_CLOSE(file);
-    }
     if (fdP) {
 	FDH_CLOSE(fdP);
     }
