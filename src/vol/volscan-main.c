@@ -64,6 +64,7 @@ typedef enum {
     P_DELIM,
     P_NOHEADING,
     P_NOMAGIC,
+    P_CACHEALL,
 } volscan_parm_t;
 
 /**
@@ -116,6 +117,9 @@ VolScan(struct cmd_syndesc *as, void *arock)
     if ((ti = as->parms[P_DELIM].items)) {
 	strncpy(opt->columnDelim, ti->data, 15);
 	opt->columnDelim[15] = '\0';
+    }
+    if (as->parms[P_CACHEALL].items) {
+	opt->cacheAll = 1;
     }
 
     /* Limit types of volumes to scan. */
@@ -244,6 +248,8 @@ main(int argc, char **argv)
 			"Do not print the heading line");
     cmd_AddParmAtOffset(ts, P_NOMAGIC, "-ignore-magic", CMD_FLAG, CMD_OPTIONAL,
 			"Skip directory vnode magic checks when looking up paths.");
+    cmd_AddParmAtOffset(ts, P_CACHEALL, "-cache-all", CMD_FLAG, CMD_OPTIONAL,
+			"Allocate cache to speedup lookups of vnodes paths");
 
     code = cmd_Dispatch(argc, argv);
     return code;

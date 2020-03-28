@@ -35,6 +35,7 @@
 #include <afs/errors.h>
 #include <afs/acl.h>
 #include <afs/prs_fs.h>
+#include <afs/opr.h>
 #include <rx/rx_queue.h>
 
 #include "nfs.h"
@@ -111,6 +112,17 @@ struct VnodeIndexFile {
     size_t      VnodeIndexSize;	/**< Size of vnode index file. */
 };
 static struct VnodeIndexFile VnodeInfo[nVNODECLASSES];
+
+/* Cache - used if opt->cacheAll is set */
+#define VNODE_CACHE_BUCKETS	64
+#define MIN_N_VNODES		4
+
+static struct opr_cache *vnode_cache;
+
+static int InitVnodeCache(Volume *vp, afs_uint32 buckets);
+static void InsertVnodeCache(struct VnodeDetails *vdp);
+static void DestroyVnodeCache(void);
+static int PopulateVnodeCache(struct VolInfoOpt *opt, Volume *vp, void *vAddr);
 
 static int NumOutputColumns = 0;
 static columnType OutputColumn[max_column_type];
@@ -1163,8 +1175,17 @@ HandleVolume(struct VolInfoOpt *opt, struct DiskPartition64 *dp, char *name)
     if (IsScannable(opt, vp)) {
 	InitVnodeIndex(vp);
 
+	if (opt->cacheAll) {
+	    opr_Assert(InitVnodeCache(vp, VNODE_CACHE_BUCKETS) == 0);
+	    opr_Assert(PopulateVnodeCache(opt, vp, VnodeInfo[vLarge].VnodeIndexAddr) == 0);
+	}
+
 	HandleVnodes(opt, vp, vLarge);
 	HandleVnodes(opt, vp, vSmall);
+
+	if (opt->cacheAll) {
+	    DestroyVnodeCache();
+	}
 
 	DestroyVnodeIndex();
     }
@@ -1519,17 +1540,23 @@ LookupPath(struct VolInfoOpt *opt, struct VnodeDetails *vdp)
     *cursor = '\0';
 
     while (parent) {
-	int len;
+	size_t len;
 
 	code = GetDirVnode(opt, vp, parent, pvn);
 	if (code) {
 	    cursor = NULL;
 	    break;
 	}
-	code = GetDirEntry(vp, pvn, cvnid, cuniq, dirent, MAX_PATH_LEN);
-	if (code) {
-	    cursor = NULL;
-	    break;
+
+	len = sizeof(dirent);
+	code = opr_cache_get(vnode_cache, &cvnid, sizeof(cvnid), dirent, &len);
+
+	if (code != 0) {
+	    code = GetDirEntry(vp, pvn, cvnid, cuniq, dirent, MAX_PATH_LEN);
+	    if (code) {
+		cursor = NULL;
+		break;
+	    }
 	}
 
 	len = strlen(dirent);
@@ -2307,3 +2334,194 @@ PrintColumns(struct VolInfoOpt *opt, struct VnodeDetails *vdp, const char *desc)
     }
     printf("\n");
 }
+
+/*
+ * Cache dirent names - begin.
+ *
+ * If -cache-all is given, use the following functions to cache dirent names.
+ */
+
+/**
+ * Count how many vnodes of a given class we have.
+ *
+ * @param[in] ih     ihandle of the file holding vnodes
+ * @param[in] class  class of vnodes stored by ih
+ *
+ * @return number of vnodes; -1 on failure
+ */
+static int
+CountVnodes(IHandle_t *ih, VnodeClass class)
+{
+    struct afs_stat stat;
+    FdHandle_t *fdP;
+
+    int diskSize, code;
+    int nVnodes = -1;
+
+    fdP = IH_OPEN(ih);
+    if (fdP == NULL) {
+	goto error;
+    }
+    code = afs_fstat(fdP->fd_fd, &stat);
+    if (code == -1) {
+	goto error;
+    }
+    diskSize =
+	(class == vSmall ? SIZEOF_SMALLDISKVNODE : SIZEOF_LARGEDISKVNODE);
+
+    nVnodes = (stat.st_size / diskSize) - 1;
+    if (nVnodes < 0) {
+	nVnodes = 0;
+    }
+ error:
+    if (fdP) {
+	FDH_CLOSE(fdP);
+    }
+    return nVnodes;
+}
+
+/**
+ * Initialize cache.
+ *
+ * Cache addressed by the vnode number.
+ *
+ * @param[in] vp      volume object
+ * @param[in] buckets number of buckets
+ *
+ * @return 0 on success
+ */
+static int
+InitVnodeCache(Volume *vp, afs_uint32 buckets)
+{
+    struct opr_cache_opts opts;
+    int nLargeVnodes, nSmallVnodes, nVnodes;
+    int code;
+
+    nLargeVnodes = CountVnodes(vp->vnodeIndex[vLarge].handle, vLarge);
+    nSmallVnodes = CountVnodes(vp->vnodeIndex[vSmall].handle, vSmall);
+
+    if (nLargeVnodes < 0 || nSmallVnodes < 0) {
+	code = -1;
+	goto done;
+    }
+    nVnodes = nLargeVnodes + nSmallVnodes;
+
+    /* opr_cache_init fails if opts.max_entries is less than 4 */
+    if (nVnodes < MIN_N_VNODES) {
+	nVnodes = MIN_N_VNODES;
+    }
+
+    memset(&opts, 0, sizeof(opts));
+    opts.max_entries = nVnodes;
+    opts.n_buckets = buckets;
+
+    code = opr_cache_init(&opts, &vnode_cache);
+  done:
+    return code;
+}
+
+/**
+ * Hook that adds vnode names into the cache.
+ *
+ * @param[in] name   vnode name
+ * @param[in] vnode  vnode number
+ *
+ * @return 0 on success
+ */
+static int
+AddName(void *rock, char *name, afs_int32 vnode, afs_int32 unique)
+{
+    if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+	return 0;
+    }
+    opr_cache_put(vnode_cache, &vnode, sizeof(vnode), name, strlen(name) + 1);
+
+    return 0;
+}
+
+/**
+ * Insert vnode names into the cache.
+ *
+ * This function inserts every single vnode name stored by vdp->vnode (large
+ * vnode) into the cache.
+ *
+ * @param[in] vdp  vnode details object
+ *
+ * @return none
+ */
+static void
+InsertVnodeCache(struct VnodeDetails *vdp)
+{
+    Inode ino;
+    DirHandle dir;
+    VolumeId parent;
+    Device device;
+    afs_int32 volchanged;
+
+    parent = V_parentId(vdp->vp);
+    device = V_device(vdp->vp);
+
+    ino = VNDISK_GET_INO(vdp->vnode);
+
+    if (!VALID_INO(ino)) {
+	return;
+    }
+    SetSalvageDirHandle(&dir, parent, device, ino, &volchanged);
+    afs_dir_EnumerateDir(&dir, AddName, 0);
+    FidZap(&dir);
+}
+
+/**
+ * Release caches.
+ *
+ * @return none
+ */
+static void
+DestroyVnodeCache(void)
+{
+    opr_cache_free(&vnode_cache);
+}
+
+static int
+PopulateVnodeCache(struct VolInfoOpt *opt, Volume *vp, void *vAddr)
+{
+    afs_foff_t offset = 0;
+
+    int nVnodes, diskSize = SIZEOF_LARGEDISKVNODE;
+    char *VnodeIndexAddr;
+
+    if (vAddr == NULL) {
+	return -1;
+    }
+    VnodeIndexAddr = (char *)vAddr;
+
+    nVnodes = CountVnodes(vp->vnodeIndex[vLarge].handle, vLarge);
+    if (nVnodes < 0) {
+	return -1;
+    }
+    if (nVnodes > 0) {
+	VnodeIndexAddr += diskSize;
+    }
+
+    while (nVnodes) {
+	struct VnodeDetails vnodeDetails;
+	struct VnodeDiskObject *vnode;
+
+	vnode = (struct VnodeDiskObject *)(VnodeIndexAddr + offset);
+
+	if (!ModeMaskMatch(opt, vnode->modeBits)) {
+	    continue;
+	}
+
+	memset(&vnodeDetails, 0, sizeof(vnodeDetails));
+	vnodeDetails.vp = vp;
+	vnodeDetails.vnode = vnode;
+	InsertVnodeCache(&vnodeDetails);
+
+	nVnodes--;
+	offset += diskSize;
+    }
+    return 0;
+}
+
+/* Cache dirent names - end. */
