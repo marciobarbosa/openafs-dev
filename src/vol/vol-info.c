@@ -101,8 +101,10 @@ struct VnodeDetails {
 };
 
 
-static int NeedDirIndex;        /**< Large vnode index handle is needed for path lookups. */
-static FdHandle_t *DirIndexFd = NULL; /**< Current large vnode index handle for path lookups. */
+struct VnodeIndexFile {
+    FdHandle_t *VnodeIndexFd;	/**< Vnode index handle. */
+};
+static struct VnodeIndexFile VnodeInfo[nVNODECLASSES];
 
 static int NumOutputColumns = 0;
 static columnType OutputColumn[max_column_type];
@@ -736,9 +738,6 @@ volinfo_AddOutputColumn(char *name)
 	    columnType t = ColumnName[i].type;
 	    OutputColumn[NumOutputColumns++] = t;
 
-	    if (t == col_path) {
-		NeedDirIndex = 1;
-	    }
 	    return 0;
 	}
     }
@@ -1006,6 +1005,37 @@ IsScannable(struct VolInfoOpt *opt, Volume * vp)
     return 0;
 }
 
+static void
+InitVnodeIndex(Volume *vp)
+{
+    IHandle_t *ih;
+
+    ih = vp->vnodeIndex[vLarge].handle;
+    VnodeInfo[vLarge].VnodeIndexFd = IH_OPEN(ih);
+    if (VnodeInfo[vLarge].VnodeIndexFd == NULL) {
+	fprintf(stderr, "%s: Failed to open index for directories.", progname);
+    }
+
+    ih = vp->vnodeIndex[vSmall].handle;
+    VnodeInfo[vSmall].VnodeIndexFd = IH_OPEN(ih);
+    if (VnodeInfo[vLarge].VnodeIndexFd == NULL) {
+	fprintf(stderr, "%s: Failed to open index for files.", progname);
+    }
+}
+
+static void
+DestroyVnodeIndex(void)
+{
+    if (VnodeInfo[vLarge].VnodeIndexFd != NULL) {
+	FDH_CLOSE(VnodeInfo[vLarge].VnodeIndexFd);
+	VnodeInfo[vLarge].VnodeIndexFd = NULL;
+    }
+    if (VnodeInfo[vSmall].VnodeIndexFd) {
+	FDH_CLOSE(VnodeInfo[vSmall].VnodeIndexFd);
+	VnodeInfo[vSmall].VnodeIndexFd = NULL;
+    }
+}
+
 /**
  * Attach and scan the volume and handle the header and vnodes
  *
@@ -1067,22 +1097,12 @@ HandleVolume(struct VolInfoOpt *opt, struct DiskPartition64 *dp, char *name)
 	PrintHeader(vp);
     }
     if (IsScannable(opt, vp)) {
-	if (NeedDirIndex) {
-	    IHandle_t *ih = vp->vnodeIndex[vLarge].handle;
-	    DirIndexFd = IH_OPEN(ih);
-	    if (DirIndexFd == NULL) {
-		fprintf(stderr, "%s: Failed to open index for directories.",
-			progname);
-	    }
-	}
+	InitVnodeIndex(vp);
 
 	HandleVnodes(opt, vp, vLarge);
 	HandleVnodes(opt, vp, vSmall);
 
-	if (DirIndexFd) {
-	    FDH_CLOSE(DirIndexFd);
-	    DirIndexFd = NULL;
-	}
+	DestroyVnodeIndex();
     }
     if (opt->showSizes) {
 	volumeTotals.diskused_k = V_diskused(vp);
@@ -1320,6 +1340,7 @@ GetDirVnode(struct VolInfoOpt *opt, Volume * vp, VnodeId parent, VnodeDiskObject
 {
     afs_int32 code;
     afs_foff_t offset;
+    FdHandle_t *DirIndexFd = VnodeInfo[vLarge].VnodeIndexFd;
 
     if (!DirIndexFd) {
 	return -1;		/* previously failed to open the large vnode index. */
@@ -1780,7 +1801,6 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
     afs_int32 diskSize =
 	(class == vSmall ? SIZEOF_SMALLDISKVNODE : SIZEOF_LARGEDISKVNODE);
     afs_sfsize_t nVnodes;
-    IHandle_t *ih = vp->vnodeIndex[class].handle;
     FdHandle_t *fdP = NULL;
     afs_sfsize_t size;
     char *ctime, *atime, *mtime;
@@ -1799,14 +1819,14 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
 	}
     }
 
-    fdP = IH_OPEN(ih);
+    fdP = VnodeInfo[class].VnodeIndexFd;
     if (fdP == NULL) {
 	fprintf(stderr, "%s: open failed: ", progname);
-	goto error;
+	return;
     }
 
     if (GetFileInfo(fdP->fd_fd, &size, &ctime, &atime, &mtime) != 0) {
-	goto error;
+	return;
     }
     if (opt->dumpInodeTimes) {
 	printf("ichanged : %s\nimodified: %s\niaccessed: %s\n\n", ctime,
@@ -1818,11 +1838,6 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
 	nVnodes = 0;
     }
     ProcessVnodes(opt, nVnodes, diskSize, class, vp, fdP);
-
-  error:
-    if (fdP) {
-	FDH_CLOSE(fdP);
-    }
 }
 
 /**
