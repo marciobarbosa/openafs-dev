@@ -25,12 +25,17 @@
 #include <sys/file.h>
 #endif
 
+#ifndef AFS_NT40_ENV
+# include <sys/mman.h>
+#endif
+
 #include <afs/cmd.h>
 #include <afs/dir.h>
 #include <afs/afsint.h>
 #include <afs/errors.h>
 #include <afs/acl.h>
 #include <afs/prs_fs.h>
+#include <afs/opr.h>
 #include <rx/rx_queue.h>
 
 #include "nfs.h"
@@ -104,6 +109,8 @@ struct VnodeDetails {
 struct VnodeIndexFile {
     FdHandle_t     *VnodeIndexFd;	/**< Vnode index handle */
     StreamHandle_t *VnodeIndexStream;	/**< Vnode stream handle */
+    void           *VnodeIndexAddr;	/**< Address of memory-mapped vnode index file */
+    size_t          VnodeIndexSize;	/**< Size of vnode index file */
 };
 static struct VnodeIndexFile VnodeInfo[nVNODECLASSES];
 
@@ -1006,9 +1013,50 @@ IsScannable(struct VolInfoOpt *opt, Volume * vp)
     return 0;
 }
 
+static int
+MMapVnodeFile(struct VnodeIndexFile *VnFile)
+{
+    int code = -1;
+#ifndef AFS_NT40_ENV
+    struct stat st;
+    FD_t fd;
+
+    if (VnFile->VnodeIndexFd == NULL) {
+	return -1;
+    }
+
+    fd = VnFile->VnodeIndexFd->fd_fd;
+    code = fstat(fd, &st);
+    if (code != 0) {
+	return -1;
+    }
+
+    VnFile->VnodeIndexSize = st.st_size;
+    VnFile->VnodeIndexAddr = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    if (VnFile->VnodeIndexAddr == MAP_FAILED) {
+	code = -1;
+    }
+#endif
+    return code;
+}
+
+static void
+MUnmapVnodeFile(struct VnodeIndexFile *VnFile)
+{
+#ifndef AFS_NT40_ENV
+    if (VnFile->VnodeIndexAddr != NULL) {
+	munmap(VnFile->VnodeIndexAddr, VnFile->VnodeIndexSize);
+	VnFile->VnodeIndexAddr = NULL;
+	VnFile->VnodeIndexSize = 0;
+    }
+#endif
+    return;
+}
+
 static void
 OpenVnodeIndex(Volume *vp)
 {
+    int code;
     char *vntype;
     VnodeClass class;
     struct VnodeIndexFile *VnFile;
@@ -1022,6 +1070,16 @@ OpenVnodeIndex(Volume *vp)
 	    fprintf(stderr, "%s: Failed to open %s.", progname, vntype);
 	    continue;
 	}
+
+	code = MMapVnodeFile(VnFile);
+	if (code == 0) {
+	    /* VnodeIndexStream is not used if VnodeIndexAddr is set */
+	    VnFile->VnodeIndexStream = NULL;
+	    continue;
+	}
+	VnFile->VnodeIndexAddr = NULL;
+	VnFile->VnodeIndexSize = 0;
+	fprintf(stderr, "%s: Using non-mmap mode for %s.\n", progname, vntype);
 
 	VnFile->VnodeIndexStream = FDH_FDOPEN(VnFile->VnodeIndexFd, "r");
 	if (VnFile->VnodeIndexStream == NULL)
@@ -1047,6 +1105,7 @@ CloseVnodeIndex(void)
 	    STREAM_CLOSE(VnFile->VnodeIndexStream);
 	    VnFile->VnodeIndexStream = NULL;
 	}
+	MUnmapVnodeFile(VnFile);
     }
 }
 
@@ -1355,7 +1414,9 @@ GetDirVnode(struct VolInfoOpt *opt, Volume * vp, VnodeId parent, VnodeDiskObject
     afs_int32 code;
     afs_foff_t offset;
     FdHandle_t *DirIndexFd;
+    char *DirIndexAddr;
 
+    DirIndexAddr = VnodeInfo[vLarge].VnodeIndexAddr;
     DirIndexFd = VnodeInfo[vLarge].VnodeIndexFd;
     if (!DirIndexFd) {
 	return -1;		/* previously failed to open the large vnode index. */
@@ -1367,13 +1428,18 @@ GetDirVnode(struct VolInfoOpt *opt, Volume * vp, VnodeId parent, VnodeDiskObject
 		afs_printable_uint32_lu(V_id(vp)));
     }
     offset = vnodeIndexOffset(&VnodeClassInfo[vLarge], parent);
-    code = FDH_PREAD(DirIndexFd, pvn, SIZEOF_LARGEDISKVNODE, offset);
-    if (code != SIZEOF_LARGEDISKVNODE) {
-	fprintf(stderr,
-		"%s: GetDirVnode: read failed for %lu.%lu at offset %llu\n",
-		progname, afs_printable_uint32_lu(V_id(vp)),
-		afs_printable_uint32_lu(parent), (long long unsigned)offset);
-	return -1;
+    if (DirIndexAddr != NULL) {
+	memcpy(pvn, DirIndexAddr + offset, sizeof(*pvn));
+	opr_Assert((offset + sizeof(*pvn)) <= VnodeInfo[vLarge].VnodeIndexSize);
+    } else {
+	code = FDH_PREAD(DirIndexFd, pvn, SIZEOF_LARGEDISKVNODE, offset);
+	if (code != SIZEOF_LARGEDISKVNODE) {
+	    fprintf(stderr,
+		    "%s: GetDirVnode: read failed for %lu.%lu at offset %llu\n",
+		    progname, afs_printable_uint32_lu(V_id(vp)),
+		    afs_printable_uint32_lu(parent), (long long unsigned)offset);
+	    return -1;
+	}
     }
     if (opt->checkMagic && (pvn->vnodeMagic != LARGEVNODEMAGIC)) {
 	fprintf(stderr, "%s: GetDirVnode: bad vnode magic for %lu.%lu at offset %llu\n",
@@ -1764,24 +1830,35 @@ ProcessVnodes(struct VolInfoOpt *opt, afs_sfsize_t nVnodes, afs_int32 diskSize,
 {
     int vnodeIndex;
     afs_foff_t offset = 0;
-    StreamHandle_t *file = NULL;
+    StreamHandle_t *VnStream;
+    char *VnAddr;
 
     char buf[SIZEOF_LARGEDISKVNODE];
     struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
 
-    file = VnodeInfo[class].VnodeIndexStream;
-    if (file == NULL) {
+    VnStream = VnodeInfo[class].VnodeIndexStream;
+    VnAddr = VnodeInfo[class].VnodeIndexAddr;
+    if (VnStream == NULL && VnAddr == NULL) {
 	return;
     }
+
     if (nVnodes > 0) {
-	STREAM_ASEEK(file, diskSize);
+	if (VnAddr != NULL) {
+	    VnAddr += diskSize;
+	} else {
+	    STREAM_ASEEK(VnStream, diskSize);
+	}
     }
 
-    for (vnodeIndex = 0;
-	 nVnodes && STREAM_READ(vnode, diskSize, 1, file) == 1;
-	 nVnodes--, vnodeIndex++, offset += diskSize) {
-
+    for (vnodeIndex = 0; nVnodes; nVnodes--, vnodeIndex++, offset += diskSize) {
 	struct VnodeDetails vnodeDetails;
+
+	if (VnAddr != NULL) {
+	    memcpy(vnode, VnAddr + offset, sizeof(buf));
+	} else {
+	    if (STREAM_READ(vnode, diskSize, 1, VnStream) != 1)
+		break;
+	}
 
 	if (!ModeMaskMatch(opt, vnode->modeBits)) {
 	    continue;
