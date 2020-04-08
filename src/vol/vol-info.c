@@ -101,8 +101,17 @@ struct VnodeDetails {
 };
 
 
-static int NeedDirIndex;        /**< Large vnode index handle is needed for path lookups. */
-static FdHandle_t *DirIndexFd = NULL; /**< Current large vnode index handle for path lookups. */
+struct VnodeIndexFile {
+    FdHandle_t *fd;		/**< Vnode index handle */
+    StreamHandle_t *stream;	/**< Vnode stream handle */
+    afs_sfsize_t size;		/**< Size of vnode index file */
+    afs_sfsize_t nVnodes;	/**< Number of vnodes */
+    afs_int32 diskSize;		/**< Size of each disk vnode */
+    char *ctime;		/**< ctime as a formatted string */
+    char *atime;		/**< atime as a formatted string */
+    char *mtime;		/**< mtime as a formatted string */
+};
+static struct VnodeIndexFile VnodeFileInfo[nVNODECLASSES];
 
 static int NumOutputColumns = 0;
 static columnType OutputColumn[max_column_type];
@@ -145,6 +154,7 @@ static Volume *AttachVolume(struct VolInfoOpt *opt, struct DiskPartition64 *dp, 
 static void HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class);
 static void PrintColumnHeading(struct VolInfoOpt *opt);
 static void PrintColumns(struct VolInfoOpt *opt, struct VnodeDetails *vdp, const char *desc);
+static int GetFileInfo(FD_t fd, afs_sfsize_t * size, char **ctime, char **mtime, char **atime);
 
 /* externs */
 extern void SetSalvageDirHandle(DirHandle * dir, afs_int32 volume,
@@ -736,9 +746,6 @@ volinfo_AddOutputColumn(char *name)
 	    columnType t = ColumnName[i].type;
 	    OutputColumn[NumOutputColumns++] = t;
 
-	    if (t == col_path) {
-		NeedDirIndex = 1;
-	    }
 	    return 0;
 	}
     }
@@ -1006,6 +1013,67 @@ IsScannable(struct VolInfoOpt *opt, Volume * vp)
     return 0;
 }
 
+static void
+OpenVnodeIndex(Volume *vp)
+{
+    afs_int32 code;
+    VnodeClass class;
+    char *vntype;
+    struct VnodeIndexFile *VnFile;
+
+    for (class = 0; class < nVNODECLASSES; class++) {
+	VnFile = &VnodeFileInfo[class];
+	vntype = (class == vLarge) ? "large vnode index" : "small vnode index";
+
+	VnFile->diskSize =
+	    (class == vSmall ? SIZEOF_SMALLDISKVNODE : SIZEOF_LARGEDISKVNODE);
+
+	VnFile->fd = IH_OPEN(vp->vnodeIndex[class].handle);
+	if (VnFile->fd == NULL) {
+	    fprintf(stderr, "%s: Failed to open %s.", progname, vntype);
+	    continue;
+	}
+
+	VnFile->stream = FDH_FDOPEN(VnFile->fd, "r");
+	if (VnFile->stream == NULL)
+	    fprintf(stderr, "%s: Failed to fdopen %s.\n", progname, vntype);
+
+	code = GetFileInfo(VnFile->fd->fd_fd,
+			   &VnFile->size,
+			   &VnFile->ctime,
+			   &VnFile->atime,
+			   &VnFile->mtime);
+	if (code != 0) {
+	    fprintf(stderr, "%s: Failed to fstat %s.\n", progname, vntype);
+	    VnFile->size = 0;
+	    VnFile->ctime = VnFile->atime = VnFile->mtime = NULL;
+	    continue;
+	}
+	VnFile->nVnodes = (VnFile->size / VnFile->diskSize) - 1;
+	if (VnFile->nVnodes < 0)
+	    VnFile->nVnodes = 0;
+    }
+}
+
+static void
+CloseVnodeIndex(void)
+{
+    VnodeClass class;
+    struct VnodeIndexFile *VnFile;
+
+    for (class = 0; class < nVNODECLASSES; class++) {
+	VnFile = &VnodeFileInfo[class];
+
+	if (VnFile->fd != NULL) {
+	    FDH_CLOSE(VnFile->fd);
+	}
+	if (VnFile->stream != NULL) {
+	    STREAM_CLOSE(VnFile->stream);
+	}
+	memset(VnFile, 0, sizeof(*VnFile));
+    }
+}
+
 /**
  * Attach and scan the volume and handle the header and vnodes
  *
@@ -1067,22 +1135,12 @@ HandleVolume(struct VolInfoOpt *opt, struct DiskPartition64 *dp, char *name)
 	PrintHeader(vp);
     }
     if (IsScannable(opt, vp)) {
-	if (NeedDirIndex) {
-	    IHandle_t *ih = vp->vnodeIndex[vLarge].handle;
-	    DirIndexFd = IH_OPEN(ih);
-	    if (DirIndexFd == NULL) {
-		fprintf(stderr, "%s: Failed to open index for directories.",
-			progname);
-	    }
-	}
+	OpenVnodeIndex(vp);
 
 	HandleVnodes(opt, vp, vLarge);
 	HandleVnodes(opt, vp, vSmall);
 
-	if (DirIndexFd) {
-	    FDH_CLOSE(DirIndexFd);
-	    DirIndexFd = NULL;
-	}
+	CloseVnodeIndex();
     }
     if (opt->showSizes) {
 	volumeTotals.diskused_k = V_diskused(vp);
@@ -1320,7 +1378,9 @@ GetDirVnode(struct VolInfoOpt *opt, Volume * vp, VnodeId parent, VnodeDiskObject
 {
     afs_int32 code;
     afs_foff_t offset;
+    FdHandle_t *DirIndexFd;
 
+    DirIndexFd = VnodeFileInfo[vLarge].fd;
     if (!DirIndexFd) {
 	return -1;		/* previously failed to open the large vnode index. */
     }
@@ -1696,68 +1756,51 @@ ModeMaskMatch(struct VolInfoOpt *opt, unsigned int modeBits)
     return 1;
 }
 
+static_inline void
+RunVnodeScanProcs(struct VolInfoOpt *opt, VnodeClass class,
+		  struct VnodeDetails *vnodeDetails)
+{
+    struct opr_queue *scanList = &VnodeScanLists[class];
+    struct opr_queue *cursor;
+    struct VnodeScanProc *entry;
+
+    for (opr_queue_Scan(scanList, cursor)) {
+	entry = (struct VnodeScanProc *)cursor;
+	if (entry->proc) {
+	    (*entry->proc) (opt, vnodeDetails);
+	}
+    }
+}
+
 /**
- * Scan a volume index and handle each vnode
+ * Run vnode scanning procedure for each vnode.
  *
- * @param[in] vp      volume object
- * @param[in] class   which index to scan
+ * @param[in] class    vnode class (large or small)
+ * @param[in] vp       volume object
  *
  * @return none
  */
 static void
-HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
+ProcessVnodes(struct VolInfoOpt *opt, VnodeClass class, Volume *vp)
 {
-    afs_int32 diskSize =
-	(class == vSmall ? SIZEOF_SMALLDISKVNODE : SIZEOF_LARGEDISKVNODE);
-    char buf[SIZEOF_LARGEDISKVNODE];
-    struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
-    StreamHandle_t *file = NULL;
     int vnodeIndex;
     afs_sfsize_t nVnodes;
     afs_foff_t offset = 0;
-    IHandle_t *ih = vp->vnodeIndex[class].handle;
-    FdHandle_t *fdP = NULL;
-    afs_sfsize_t size;
-    char *ctime, *atime, *mtime;
-    struct opr_queue *scanList = &VnodeScanLists[class];
-    struct opr_queue *cursor;
+    StreamHandle_t *file = NULL;
 
-    if (opr_queue_IsEmpty(scanList)) {
+    char buf[SIZEOF_LARGEDISKVNODE];
+    struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
+    afs_int32 diskSize = VnodeFileInfo[class].diskSize;
+
+    file = VnodeFileInfo[class].stream;
+    if (file == NULL) {
 	return;
     }
 
-    for (opr_queue_Scan(scanList, cursor)) {
-	struct VnodeScanProc *entry = (struct VnodeScanProc *)cursor;
-	if (entry->heading) {
-	    printf("%s", entry->heading);
-	}
-    }
-
-    fdP = IH_OPEN(ih);
-    if (fdP == NULL) {
-	fprintf(stderr, "%s: open failed: ", progname);
-	goto error;
-    }
-
-    file = FDH_FDOPEN(fdP, "r");
-    if (!file) {
-	fprintf(stderr, "%s: fdopen failed\n", progname);
-	goto error;
-    }
-
-    if (GetFileInfo(fdP->fd_fd, &size, &ctime, &atime, &mtime) != 0) {
-	goto error;
-    }
-    if (opt->dumpInodeTimes) {
-	printf("ichanged : %s\nimodified: %s\niaccessed: %s\n\n", ctime,
-	       mtime, atime);
-    }
-
-    nVnodes = (size / diskSize) - 1;
+    nVnodes = VnodeFileInfo[class].nVnodes;
     if (nVnodes > 0) {
 	STREAM_ASEEK(file, diskSize);
-    } else
-	nVnodes = 0;
+    }
 
     for (vnodeIndex = 0;
 	 nVnodes && STREAM_READ(vnode, diskSize, 1, file) == 1;
@@ -1769,7 +1812,7 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
 	    continue;
 	}
 
-	memset(&vnodeDetails, 0, sizeof(struct VnodeDetails));
+	memset(&vnodeDetails, 0, sizeof(vnodeDetails));
 	vnodeDetails.vp = vp;
 	vnodeDetails.class = class;
 	vnodeDetails.vnode = vnode;
@@ -1777,21 +1820,46 @@ HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
 	vnodeDetails.offset = offset;
 	vnodeDetails.index = vnodeIndex;
 
-	for (opr_queue_Scan(scanList, cursor)) {
-	    struct VnodeScanProc *entry = (struct VnodeScanProc *)cursor;
-	    if (entry->proc) {
-		(*entry->proc) (opt, &vnodeDetails);
-	    }
+	RunVnodeScanProcs(opt, class, &vnodeDetails);
+    }
+}
+
+/**
+ * Scan a volume index and handle each vnode
+ *
+ * @param[in] vp      volume object
+ * @param[in] class   which index to scan
+ *
+ * @return none
+ */
+static void
+HandleVnodes(struct VolInfoOpt *opt, Volume * vp, VnodeClass class)
+{
+    struct opr_queue *cursor;
+    struct opr_queue *scanList = &VnodeScanLists[class];
+    struct VnodeIndexFile *VnFile = &VnodeFileInfo[class];
+
+    /*
+     * Check prerequisites. If VnFile->size is not set, we could not fstat
+     * (GetFileInfo) the vnode index file in question. As a result, the
+     * following variables are not initialized: VnFile->ctime, VnFile->mtime,
+     * VnFile->atime, and VnodeNumber.
+     */
+    if (opr_queue_IsEmpty(scanList) || VnFile->fd == NULL || VnFile->size == 0)
+	return;
+
+    for (opr_queue_Scan(scanList, cursor)) {
+	struct VnodeScanProc *entry = (struct VnodeScanProc *)cursor;
+	if (entry->heading) {
+	    printf("%s", entry->heading);
 	}
     }
 
-  error:
-    if (file) {
-	STREAM_CLOSE(file);
+    if (opt->dumpInodeTimes) {
+	printf("ichanged : %s\nimodified: %s\niaccessed: %s\n\n",
+	       VnFile->ctime, VnFile->mtime, VnFile->atime);
     }
-    if (fdP) {
-	FDH_CLOSE(fdP);
-    }
+    ProcessVnodes(opt, class, vp);
 }
 
 /**
