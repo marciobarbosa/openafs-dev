@@ -45,6 +45,7 @@ struct VolInfoOpt {
     unsigned int modeMask[64]; /**< unix mode bit pattern for searching for specific modes */
     int scanVolType;	     /**< volume types to scan; zero means do not check */
     int findVnType;	     /**< types of objects to find */
+    int cacheAll;	     /**< Cache the name of each vnode to speedup lookups */
 };
 
 

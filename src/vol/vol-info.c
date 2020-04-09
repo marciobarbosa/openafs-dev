@@ -119,6 +119,18 @@ struct VnodeIndexFile {
 };
 static struct VnodeIndexFile VnodeFileInfo[nVNODECLASSES];
 
+/* Cache - used if opt->cacheAll is set */
+#define MAX_N_BUCKETS	1024*1024
+#define MIN_N_BUCKETS	4
+#define MIN_N_VNODES	4
+
+static struct opr_cache *vnode_cache;
+
+static int InitVnodeCache(struct VolInfoOpt *opt, Volume *vp);
+static void InsertVnodeCache(struct VnodeDetails *vdp);
+static void DestroyVnodeCache(struct VolInfoOpt *opt);
+static int PopulateVnodeCache(struct VolInfoOpt *opt, Volume *vp, void *vAddr);
+
 static int NumOutputColumns = 0;
 static columnType OutputColumn[max_column_type];
 
@@ -138,6 +150,7 @@ static struct sizeTotals volumeTotals = { 0, 0, 0, 0, 0, 0 };
 static struct sizeTotals partitionTotals = { 0, 0, 0, 0, 0, 0 };
 static struct sizeTotals serverTotals = { 0, 0, 0, 0, 0, 0 };
 static int PrintingVolumeSizes = 0;	/*print volume size lines */
+static int PrintingPaths;	/* print directory path and filename */
 
 /**
  * List of procedures to call when scanning vnodes.
@@ -752,6 +765,9 @@ volinfo_AddOutputColumn(char *name)
 	    columnType t = ColumnName[i].type;
 	    OutputColumn[NumOutputColumns++] = t;
 
+	    if (t == col_path) {
+		PrintingPaths = 1;
+	    }
 	    return 0;
 	}
     }
@@ -1189,10 +1205,13 @@ HandleVolume(struct VolInfoOpt *opt, struct DiskPartition64 *dp, char *name)
     }
     if (IsScannable(opt, vp)) {
 	OpenVnodeIndex(vp);
+	opr_Assert(InitVnodeCache(opt, vp) == 0);
+	opr_Assert(PopulateVnodeCache(opt, vp, VnodeFileInfo[vLarge].addr) == 0);
 
 	HandleVnodes(opt, vp, vLarge);
 	HandleVnodes(opt, vp, vSmall);
 
+	DestroyVnodeCache(opt);
 	CloseVnodeIndex();
     }
     if (opt->showSizes) {
@@ -1550,20 +1569,27 @@ LookupPath(struct VolInfoOpt *opt, struct VnodeDetails *vdp)
     *cursor = '\0';
 
     while (parent) {
-	int len;
+	size_t len;
 
 	code = GetDirVnode(opt, vp, parent, pvn);
 	if (code) {
 	    cursor = NULL;
 	    break;
 	}
-	code = GetDirEntry(vp, pvn, cvnid, cuniq, dirent, MAX_PATH_LEN);
-	if (code) {
-	    cursor = NULL;
-	    break;
+
+	len = sizeof(dirent);
+	code = opr_cache_get(vnode_cache, &cvnid, sizeof(cvnid), dirent, &len);
+
+	if (code != 0) {
+	    /* if not found in vnode_cache */
+	    code = GetDirEntry(vp, pvn, cvnid, cuniq, dirent, MAX_PATH_LEN);
+	    if (code) {
+		cursor = NULL;
+		break;
+	    }
+	    len = strlen(dirent);
 	}
 
-	len = strlen(dirent);
 	if (len == 0) {
 	    fprintf(stderr,
 		    "%s: Failed to lookup path for fid %lu.%lu.%lu: empty dir entry\n",
@@ -2293,3 +2319,170 @@ PrintColumns(struct VolInfoOpt *opt, struct VnodeDetails *vdp, const char *desc)
     }
     printf("\n");
 }
+
+/*
+ * Cache dirent names - begin.
+ *
+ * If -cache-all is given, use the following functions to cache dirent names.
+ */
+
+/**
+ * Initialize cache.
+ *
+ * Cache addressed by the vnode number.
+ *
+ * @param[in] vp      volume object
+ *
+ * @return 0 on success
+ */
+static int
+InitVnodeCache(struct VolInfoOpt *opt, Volume *vp)
+{
+    struct opr_cache_opts opts;
+    int nVnodes, code;
+
+    if (!(opt->cacheAll && PrintingPaths)) {
+	return 0;
+    }
+    nVnodes = VnodeFileInfo[vLarge].nVnodes + VnodeFileInfo[vSmall].nVnodes;
+
+    /* opr_cache_init fails if opts.max_entries is less than 4 */
+    if (nVnodes < MIN_N_VNODES) {
+	nVnodes = MIN_N_VNODES;
+    }
+
+    memset(&opts, 0, sizeof(opts));
+    opts.max_entries = nVnodes;
+    opts.n_buckets = nVnodes / 128;
+
+    if (opts.n_buckets > MAX_N_BUCKETS) {
+	opts.n_buckets = MAX_N_BUCKETS;
+    } else if (opts.n_buckets < MIN_N_BUCKETS) {
+	opts.n_buckets = MIN_N_BUCKETS;
+    }
+    code = opr_cache_init(&opts, &vnode_cache);
+
+    return code;
+}
+
+/**
+ * Hook that adds vnode names into the cache.
+ *
+ * @param[in] name   vnode name
+ * @param[in] vnode  vnode number
+ *
+ * @note This function is passed to afs_dir_EnumerateDir and needs to return a
+ *       value.
+ *
+ * @return 0 on success
+ */
+static int
+AddName(void *rock, char *name, afs_int32 vnode, afs_int32 unique)
+{
+    if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+	return 0;
+    }
+    opr_cache_put(vnode_cache, &vnode, sizeof(vnode), name, strlen(name) + 1);
+
+    return 0;
+}
+
+/**
+ * Insert vnode names into the cache.
+ *
+ * This function inserts every single vnode name stored by vdp->vnode (large
+ * vnode) into the cache.
+ *
+ * @param[in] vdp  vnode details object
+ *
+ * @return none
+ */
+static void
+InsertVnodeCache(struct VnodeDetails *vdp)
+{
+    Inode ino;
+    DirHandle dir;
+    VolumeId parent;
+    Device device;
+    afs_int32 volchanged;
+
+    parent = V_parentId(vdp->vp);
+    device = V_device(vdp->vp);
+
+    ino = VNDISK_GET_INO(vdp->vnode);
+
+    if (!VALID_INO(ino)) {
+	return;
+    }
+    SetSalvageDirHandle(&dir, parent, device, ino, &volchanged);
+    afs_dir_EnumerateDir(&dir, AddName, 0);
+    FidZap(&dir);
+}
+
+/**
+ * Release caches.
+ *
+ * @return none
+ */
+static void
+DestroyVnodeCache(struct VolInfoOpt *opt)
+{
+    if (opt->cacheAll && PrintingPaths) {
+	opr_cache_free(&vnode_cache);
+    }
+}
+
+/**
+ * Populate cache with the name of each vnode.
+ *
+ * We populate the cache with vnode names before we process any vnode, since
+ * looking up the name of a vnode in its parent dir involves enumerating all of
+ * the parent's directory entries. So, it is much faster to fill the cache with
+ * names beforehand, instead of waiting until we calculate the path for a vnode.
+ *
+ * @param[in] vp      volume object
+ * @param[in] vAddr   address of memory-mapped vnode index file
+ *
+ * @return 0 on success
+ */
+static int
+PopulateVnodeCache(struct VolInfoOpt *opt, Volume *vp, void *vAddr)
+{
+    afs_foff_t offset = 0;
+
+    int nVnodes, diskSize = SIZEOF_LARGEDISKVNODE;
+    char *VnodeIndexAddr;
+
+    char buf[SIZEOF_LARGEDISKVNODE];
+    struct VnodeDiskObject *vnode = (struct VnodeDiskObject *)buf;
+
+    if (!(opt->cacheAll && PrintingPaths)) {
+	return 0;
+    }
+    if (vAddr == NULL) {
+	return -1;
+    }
+    VnodeIndexAddr = vAddr;
+
+    nVnodes = VnodeFileInfo[vLarge].nVnodes;
+    if (nVnodes > 0) {
+	VnodeIndexAddr += diskSize;
+    }
+
+    while (nVnodes) {
+	struct VnodeDetails vnodeDetails;
+
+	memcpy(vnode, VnodeIndexAddr + offset, sizeof(buf));
+	memset(&vnodeDetails, 0, sizeof(vnodeDetails));
+
+	vnodeDetails.vp = vp;
+	vnodeDetails.vnode = vnode;
+	InsertVnodeCache(&vnodeDetails);
+
+	nVnodes--;
+	offset += diskSize;
+    }
+    return 0;
+}
+
+/* Cache dirent names - end. */
