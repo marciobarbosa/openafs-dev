@@ -135,7 +135,8 @@ static int afs_encode_fh(struct dentry *de, __u32 *fh, int *max_len,
 	fh[1] = htonl(tvc->f.fid.Fid.Volume);
 	fh[2] = htonl(tvc->f.fid.Fid.Vnode);
 	fh[3] = htonl(tvc->f.fid.Fid.Unique);
-	*max_len = 4;
+	fh[4] = htonl(tvc->f.fid.linkedFid.Volume);
+	*max_len = 5;
 	return AFSFH_NET_VENUSFID;
     }
 
@@ -152,8 +153,9 @@ static int afs_encode_fh(struct dentry *de, __u32 *fh, int *max_len,
     fh[4] = htonl(tvc->f.fid.Fid.Volume);
     fh[5] = htonl(tvc->f.fid.Fid.Vnode);
     fh[6] = htonl(tvc->f.fid.Fid.Unique);
+    fh[7] = htonl(tvc->f.fid.linkedFid.Volume);
 
-    *max_len = 7;
+    *max_len = 8;
     return AFSFH_NET_CELLFID;
 }
 
@@ -179,10 +181,11 @@ static struct dentry *afs_decode_fh(struct super_block *sb, __u32 *fh,
 	case AFSFH_VENUSFID:
 	    if (fh_len != 4)
 		return NULL;
-	    fid.Cell       = fh[0];
-	    fid.Fid.Volume = fh[1];
-	    fid.Fid.Vnode  = fh[2];
-	    fid.Fid.Unique = fh[3];
+	    fid.Cell             = fh[0];
+	    fid.Fid.Volume       = fh[1];
+	    fid.Fid.Vnode        = fh[2];
+	    fid.Fid.Unique       = fh[3];
+	    fid.linkedFid.Volume = fh[4];
 	    break;
 
 	case AFSFH_CELLFID:
@@ -194,19 +197,21 @@ static struct dentry *afs_decode_fh(struct super_block *sb, __u32 *fh,
 		AFS_GUNLOCK();
 		return NULL;
 	    }
-	    fid.Cell       = tc->cellNum;
-	    fid.Fid.Volume = fh[4];
-	    fid.Fid.Vnode  = fh[5];
-	    fid.Fid.Unique = fh[6];
+	    fid.Cell             = tc->cellNum;
+	    fid.Fid.Volume       = fh[4];
+	    fid.Fid.Vnode        = fh[5];
+	    fid.Fid.Unique       = fh[6];
+	    fid.linkedFid.Volume = fh[7];
 	    afs_PutCell(tc, READ_LOCK);
 	    AFS_GUNLOCK();
 	    break;
 
 	case AFSFH_NET_VENUSFID:
-	    fid.Cell       = ntohl(fh[0]);
-	    fid.Fid.Volume = ntohl(fh[1]);
-	    fid.Fid.Vnode  = ntohl(fh[2]);
-	    fid.Fid.Unique = ntohl(fh[3]);
+	    fid.Cell             = ntohl(fh[0]);
+	    fid.Fid.Volume       = ntohl(fh[1]);
+	    fid.Fid.Vnode        = ntohl(fh[2]);
+	    fid.Fid.Unique       = ntohl(fh[3]);
+	    fid.linkedFid.Volume = ntohl(fh[4]);
 	    break;
 
 	case AFSFH_NET_CELLFID:
@@ -218,10 +223,11 @@ static struct dentry *afs_decode_fh(struct super_block *sb, __u32 *fh,
 		AFS_GUNLOCK();
 		return NULL;
 	    }
-	    fid.Cell       = tc->cellNum;
-	    fid.Fid.Volume = ntohl(fh[4]);
-	    fid.Fid.Vnode  = ntohl(fh[5]);
-	    fid.Fid.Unique = ntohl(fh[6]);
+	    fid.Cell             = tc->cellNum;
+	    fid.Fid.Volume       = ntohl(fh[4]);
+	    fid.Fid.Vnode        = ntohl(fh[5]);
+	    fid.Fid.Unique       = ntohl(fh[6]);
+	    fid.linkedFid.Unique = ntohl(fh[7]);
 	    afs_PutCell(tc, READ_LOCK);
 	    AFS_GUNLOCK();
 	    break;
