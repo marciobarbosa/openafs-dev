@@ -283,6 +283,11 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
 
     *rxconn = NULL;
 
+    if (afid) {
+	afs_warn("\t<marcio> afs_Conn: volume: %d\n", afid->Fid.Volume);
+	afs_warn("\t<marcio> afs_Conn: linked volume: %d\n", afid->linkedFid.Volume);
+    }
+
     AFS_STATCNT(afs_Conn);
     /* Get fid's volume. */
     tv = afs_GetVolume(afid, areq, READ_LOCK);
