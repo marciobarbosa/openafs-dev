@@ -2645,6 +2645,11 @@ afs_FindVCache(struct VenusFid *afid, afs_int32 * retry, afs_int32 flag)
 	else
 	    afs_stats_cmperf.vremoteAccesses++;
     }
+    /* <marcio> debug */
+    if (tvc) {
+	afs_warn("<marcio> volume id: %d\n", tvc->f.fid.Fid.Volume);
+	afs_warn("<marcio> linked volume id: %d\n", tvc->f.fid.linkedFid.Volume);
+    }
     return tvc;
 }				/*afs_FindVCache */
 
