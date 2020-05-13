@@ -151,6 +151,7 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	    /* If not mount point, generate a new fid. */
 	    newFid.Cell = adp->f.fid.Cell;
     	    newFid.Fid.Volume = adp->f.fid.Fid.Volume;
+    	    newFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	    afs_GenFakeFid(&newFid, VDIR, 1);
 	}
     	/* XXX: If mount point???*/
@@ -185,6 +186,7 @@ afs_mkdir(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	adp->f.m.LinkCount = OutDirStatus->LinkCount;
     newFid.Cell = adp->f.fid.Cell;
     newFid.Fid.Volume = adp->f.fid.Fid.Volume;
+    newFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
     ReleaseWriteLock(&adp->lock);
     if (AFS_IS_DISCON_RW) {
     	/* When disconnected, we have to create the full dir here. */
@@ -324,7 +326,7 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 	code = afs_dir_Lookup(tdc, aname, &unlinkFid.Fid);
 	if (code == 0) {
 	    unlinkFid.Cell = adp->f.fid.Cell;
-	    unlinkFid.Fid.Volume = adp->f.fid.Fid.Volume;
+	    unlinkFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	    if (unlinkFid.Fid.Unique == 0) {
 		tvc =
 		    afs_LookupVCache(&unlinkFid, treq, adp, aname);
@@ -388,7 +390,7 @@ afs_rmdir(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 	    struct VenusFid tfid;
 
 	    tfid.Cell = adp->f.fid.Cell;
-	    tfid.Fid.Volume = adp->f.fid.Fid.Volume;
+	    tfid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	    code = afs_dir_Lookup(tdc, aname, &tfid.Fid);
 
 	    ObtainSharedLock(&afs_xvcache, 764);

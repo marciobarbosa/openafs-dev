@@ -444,6 +444,7 @@ afs_linux_readdir(struct file *fp, void *dirbuf, filldir_t filldir)
 	    afid.Fid.Volume = avc->f.fid.Fid.Volume;
 	    afid.Fid.Vnode = ntohl(de->fid.vnode);
 	    afid.Fid.Unique = ntohl(de->fid.vunique);
+	    afid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
 	    if ((avc->f.states & CForeign) == 0 && (ntohl(de->fid.vnode) & 1)) {
 		type = DT_DIR;
 	    } else if ((tvc = afs_FindVCache(&afid, 0, 0))) {

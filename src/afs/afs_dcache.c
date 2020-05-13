@@ -3824,6 +3824,7 @@ afs_MakeShadowDir(struct vcache *avc, struct dcache *adc)
     /* Generate a fid for the shadow dir. */
     shadow_fid.Cell = avc->f.fid.Cell;
     shadow_fid.Fid.Volume = avc->f.fid.Fid.Volume;
+    shadow_fid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
     afs_GenShadowFid(&shadow_fid);
 
     ObtainWriteLock(&afs_xdcache, 716);
@@ -3938,6 +3939,7 @@ afs_DeleteShadowDir(struct vcache *avc)
     shadow_fid.Fid.Volume = avc->f.fid.Fid.Volume;
     shadow_fid.Fid.Vnode = avc->f.shadow.vnode;
     shadow_fid.Fid.Unique = avc->f.shadow.unique;
+    shadow_fid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
 
     tdc = afs_FindDCacheByFid(&shadow_fid);
     if (tdc) {

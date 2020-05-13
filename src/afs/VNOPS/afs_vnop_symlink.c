@@ -195,6 +195,7 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     } else {
 	newFid.Cell = adp->f.fid.Cell;
 	newFid.Fid.Volume = adp->f.fid.Fid.Volume;
+	newFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	afs_GenFakeFid(&newFid, VREG, 0);
     }
 
@@ -230,6 +231,7 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     }
     newFid.Cell = adp->f.fid.Cell;
     newFid.Fid.Volume = adp->f.fid.Fid.Volume;
+    newFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
     ReleaseWriteLock(&adp->lock);
 
     /* now we're done with parent dir, create the link's entry.  Note that

@@ -176,6 +176,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	    /* found the file, so use it */
 	    newFid.Cell = adp->f.fid.Cell;
 	    newFid.Fid.Volume = adp->f.fid.Fid.Volume;
+	    newFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	    tvc = NULL;
 	    if (newFid.Fid.Unique == 0) {
 		tvc = afs_LookupVCache(&newFid, treq, adp, aname);
@@ -379,6 +380,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 	/* Generate a fake FID for disconnected mode. */
 	newFid.Cell = adp->f.fid.Cell;
 	newFid.Fid.Volume = adp->f.fid.Fid.Volume;
+	newFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	afs_GenFakeFid(&newFid, VREG, 1);
     }				/* if (!AFS_IS_DISCON_RW) */
 
@@ -404,6 +406,7 @@ afs_create(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
 
     newFid.Cell = adp->f.fid.Cell;
     newFid.Fid.Volume = adp->f.fid.Fid.Volume;
+    newFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
     ReleaseWriteLock(&adp->lock);
     volp = afs_FindVolume(&newFid, READ_LOCK);
 
