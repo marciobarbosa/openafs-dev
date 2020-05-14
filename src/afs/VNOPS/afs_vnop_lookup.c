@@ -698,6 +698,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
     int flagIndex = 0;		/* First file with bulk fetch flag set */
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+    struct VenusFid tempfid;
     dotdot.Cell = 0;
     dotdot.Fid.Unique = 0;
     dotdot.Fid.Vnode = 0;
@@ -939,6 +940,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
     if (fidIndex == 0)
 	goto done;
 
+    tempfid = adp->f.fid;
     do {
 	/* setup the RPC parm structures */
 	fidParm.AFSCBFids_len = fidIndex;
@@ -951,7 +953,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 	/* start the timer; callback expirations are relative to this */
 	startTime = osi_Time();
 
-	tcp = afs_Conn(&adp->f.fid, areqp, SHARED_LOCK, &rxconn);
+	tcp = afs_Conn(&tempfid, areqp, SHARED_LOCK, &rxconn);
 	if (tcp) {
 	    hostp = tcp->parent->srvr->server;
 
@@ -983,6 +985,10 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 
 		afs_PutVCache(tvcp);
 		tvcp = NULL;
+
+		if (tempfid.Fid.Volume != adp->f.fid.Fid.Volume) {
+		    fidParm.AFSCBFids_val[i].Volume = tempfid.Fid.Volume;
+		}
 	    }
 
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_BULKSTATUS);
@@ -1021,7 +1027,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 	 */
     } while (afs_Analyze
 	     (tcp, rxconn, code ? code : (&statsp[0])->errorCode,
-	      &adp->f.fid, areqp, AFS_STATS_FS_RPCIDX_BULKSTATUS,
+	      &tempfid, areqp, AFS_STATS_FS_RPCIDX_BULKSTATUS,
 	      SHARED_LOCK, NULL));
 
     /* now, if we didnt get the info, bail out. */

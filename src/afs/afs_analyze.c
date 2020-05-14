@@ -423,6 +423,8 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
     afs_int32 serversleft = 1;
     struct afs_stats_RPCErrors *aerrP;
     afs_uint32 address;
+    struct cell *pcell = NULL;
+    afs_int32 volid;
 
     if (AFS_IS_DISCONNECTED && !AFS_IN_SYNC) {
 	/* On reconnection, act as connected. XXX: for now.... */
@@ -435,6 +437,7 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 	     *       get a connection because we're disconnected !!!*/
 	    afs_PutConn(aconn, rxconn, locktype);
 	}
+	afs_warn("<marcio> return 1\n");
 	return 0;
     }
 
@@ -484,6 +487,7 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 	if (shouldRetry != 0)
 	    areq->busyCount++;
 
+	afs_warn("<marcio> return 2\n");
 	return shouldRetry;	/* should retry */
     }
 
@@ -580,6 +584,26 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 	}
 	if (aconn) /* simply lacking aconn->server doesn't absolve this */
 	    afs_PutConn(aconn, rxconn, locktype);
+
+	pcell = afs_GetPrimaryCell(READ_LOCK);
+	/* if afid->linkedFid.Vnode is set, we already tried the linked cell */
+	if (pcell && afid && pcell->lcellp && afid->linkedFid.Vnode == 0) {
+	    volid = afid->Fid.Volume;
+	    afid->Fid.Volume = afid->linkedFid.Volume;
+	    afid->linkedFid.Volume = volid;
+	    afid->Cell = pcell->lcellp->cellNum;
+	    afid->linkedFid.Vnode = 1;
+	    areq->accessError = 0;
+	    areq->volumeError = 0;
+	    areq->networkError = 0;
+	    areq->permWriteError = 0;
+	    areq->idleError = 0;
+	    shouldRetry = 1;
+	}
+	if (pcell) {
+	    afs_PutCell(pcell, READ_LOCK);
+	}
+	afs_warn("<marcio> return 3\n");
 	return shouldRetry;
     }
 
@@ -608,6 +632,7 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 	}
 
 	afs_PutConn(aconn, rxconn, locktype);
+	afs_warn("<marcio> return 4\n");
 	return 0;
     }
 
@@ -848,5 +873,6 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 out:
     /* now unlock the connection and return */
     afs_PutConn(aconn, rxconn, locktype);
+    afs_warn("<marcio> return 5\n");
     return (shouldRetry);
 }				/*afs_Analyze */

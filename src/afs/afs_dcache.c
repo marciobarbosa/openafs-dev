@@ -1971,6 +1971,7 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
     int doReallyAdjustSize = 0;
     int overWriteWholeChunk = 0;
     struct rx_connection *rxconn;
+    struct VenusFid tfid = avc->f.fid;
 
 #ifndef AFS_NOSTATS
     struct afs_stats_AccessInfo *accP;	/*Ptr to access record in stats */
@@ -2610,7 +2611,7 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
 		 * tdc->lock(W)
 		 */
 
-		tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK, &rxconn);
+		tc = afs_Conn(&tfid, areq, SHARED_LOCK, &rxconn);
 		if (tc) {
 #ifndef AFS_NOSTATS
 		    numFetchLoops++;
@@ -2626,7 +2627,8 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
 		    }
 		    i = osi_Time();
 		    code = afs_CacheFetchProc(tc, rxconn, file, Position, tdc,
-					       avc, size, tsmall);
+					       avc, size, tsmall, &tfid);
+
 		} else
 		   code = -1;
 
@@ -2677,7 +2679,7 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
 			 * dcache regardless, so we just ignore the retry hint
 			 * returned by afs_Analyze on this call.
 			 */
-			(void)afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+			(void)afs_Analyze(tc, rxconn, code, &tfid, areq,
 					  AFS_STATS_FS_RPCIDX_FETCHDATA, SHARED_LOCK, NULL);
 
 			ReleaseReadLock(&avc->lock);
@@ -2688,7 +2690,7 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
 		}
 
 	    } while (afs_Analyze
-		     (tc, rxconn, code, &avc->f.fid, areq,
+		     (tc, rxconn, code, &tfid, areq,
 		      AFS_STATS_FS_RPCIDX_FETCHDATA, SHARED_LOCK, NULL));
 
 	/*

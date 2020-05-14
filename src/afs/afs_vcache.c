@@ -1596,17 +1596,19 @@ afs_RemoteLookup(struct VenusFid *afid, struct vrequest *areq,
     struct rx_connection *rxconn;
     struct AFSFetchStatus OutDirStatus;
     XSTATS_DECLS;
+    struct VenusFid tfid;
     if (!name)
 	name = "";		/* XXX */
+    tfid = *afid;
     do {
-	tc = afs_Conn(afid, areq, SHARED_LOCK, &rxconn);
+	tc = afs_Conn(&tfid, areq, SHARED_LOCK, &rxconn);
 	if (tc) {
 	    if (serverp)
 		*serverp = tc->parent->srvr->server;
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_XLOOKUP);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_Lookup(rxconn, (struct AFSFid *)&afid->Fid, name,
+		RXAFS_Lookup(rxconn, (struct AFSFid *)&tfid.Fid, name,
 			     (struct AFSFid *)&nfid->Fid, OutStatusp,
 			     &OutDirStatus, CallBackp, tsyncp);
 	    RX_AFS_GLOCK();
@@ -1614,7 +1616,7 @@ afs_RemoteLookup(struct VenusFid *afid, struct vrequest *areq,
 	} else
 	    code = -1;
     } while (afs_Analyze
-	     (tc, rxconn, code, afid, areq, AFS_STATS_FS_RPCIDX_XLOOKUP, SHARED_LOCK,
+	     (tc, rxconn, code, &tfid, areq, AFS_STATS_FS_RPCIDX_XLOOKUP, SHARED_LOCK,
 	      NULL));
 
     return code;
@@ -2357,29 +2359,39 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
     struct AFSVolSync tsync;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+    struct VenusFid tfid = *afid;
+    int addr; /* <marcio> */
     do {
-	tc = afs_Conn(afid, areq, SHARED_LOCK, &rxconn);
+	tc = afs_Conn(&tfid, areq, SHARED_LOCK, &rxconn);
 	avc->dchint = NULL;	/* invalidate hints */
 	if (tc) {
+	    addr = ntohl(tc->parent->srvr->sa_ip);
 	    avc->callback = tc->parent->srvr->server;
 	    start = osi_Time();
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHSTATUS);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_FetchStatus(rxconn, (struct AFSFid *)&afid->Fid, Outsp,
+		RXAFS_FetchStatus(rxconn, (struct AFSFid *)&tfid.Fid, Outsp,
 				  &CallBack, &tsync);
 	    RX_AFS_GLOCK();
+
+	    afs_warn("-----\n");
+	    afs_warn("<marcio> ip: %u.%u.%u.%u\n",
+		    (addr >> 24) & 0xff, (addr >> 16) & 0xff, (addr >> 8) & 0xff, (addr) & 0xff);
+	    afs_warn("<marcio> code returned by RXAFS_FetchStatus: %d\n", code);
 
 	    XSTATS_END_TIME;
 
 	    if (code == 0) {
 		code = afs_CheckFetchStatus(tc, Outsp);
+		afs_warn("<marcio> code returned by afs_CheckFetchStatus: %d\n", code);
 	    }
+	    afs_warn("-----\n");
 
 	} else
 	    code = -1;
     } while (afs_Analyze
-	     (tc, rxconn, code, afid, areq, AFS_STATS_FS_RPCIDX_FETCHSTATUS,
+	     (tc, rxconn, code, &tfid, areq, AFS_STATS_FS_RPCIDX_FETCHSTATUS,
 	      SHARED_LOCK, NULL));
 
     if (!code) {
@@ -2645,11 +2657,7 @@ afs_FindVCache(struct VenusFid *afid, afs_int32 * retry, afs_int32 flag)
 	else
 	    afs_stats_cmperf.vremoteAccesses++;
     }
-    /* <marcio> debug */
-    if (tvc) {
-	afs_warn("<marcio> volume id: %d\n", tvc->f.fid.Fid.Volume);
-	afs_warn("<marcio> linked volume id: %d\n", tvc->f.fid.linkedFid.Volume);
-    }
+
     return tvc;
 }				/*afs_FindVCache */
 
