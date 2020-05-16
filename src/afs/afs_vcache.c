@@ -71,6 +71,7 @@ afs_int32 vcachegen = 0;
 unsigned int afs_paniconwarn = 0;
 struct vcache *afs_vhashT[VCSIZE];
 struct afs_q afs_vhashTV[VCSIZE];
+struct afs_q afs_vhashTLV[VCSIZE];
 static struct afs_cbr *afs_cbrHashT[CBRSIZE];
 afs_int32 afs_bulkStatsLost;
 int afs_norefpanic = 0;
@@ -101,6 +102,13 @@ int VCHash(struct VenusFid *fid)
 int VCHashV(struct VenusFid *fid)
 {
     return opr_jhash_int(fid->Fid.Volume, 0) & opr_jhash_mask(VCSIZEBITS);
+}
+
+/* Hash only on linked-volume id. */
+int VCHashLV(struct VenusFid *fid)
+{
+    afs_warn("<marcio> Hashing linked volume: %d\n", fid->linkedFid.Volume);
+    return opr_jhash_int(fid->linkedFid.Volume, 0) & opr_jhash_mask(VCSIZEBITS);
 }
 
 /*!
@@ -201,6 +209,7 @@ afs_FlushVCache(struct vcache *avc, int *slept)
 
     /* remove entry from the volume hash table */
     QRemove(&avc->vhashq);
+    QRemove(&avc->lvhashq);
 
 #if defined(AFS_LINUX26_ENV)
     {
@@ -987,6 +996,9 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
     tvc->hnext = afs_vhashT[i];
     afs_vhashT[i] = tvc;
     QAdd(&afs_vhashTV[j], &tvc->vhashq);
+
+    j = VCHashLV(afid);
+    QAdd(&afs_vhashTLV[j], &tvc->lvhashq);
 
     if ((VLRU.next->prev != &VLRU) || (VLRU.prev->next != &VLRU)) {
         refpanic("NewVCache VLRU inconsistent");
@@ -2868,8 +2880,10 @@ afs_vcacheInit(int astatSize)
     }
 #endif
     QInit(&VLRU);
-    for(i = 0; i < VCSIZE; ++i)
+    for(i = 0; i < VCSIZE; ++i) {
 	QInit(&afs_vhashTV[i]);
+	QInit(&afs_vhashTLV[i]);
+    }
 }
 
 /*!
@@ -2972,8 +2986,10 @@ shutdown_vcache(void)
     AFS_RWLOCK_INIT(&afs_xvcache, "afs_xvcache");
     LOCK_INIT(&afs_xvcb, "afs_xvcb");
     QInit(&VLRU);
-    for(i = 0; i < VCSIZE; ++i)
+    for(i = 0; i < VCSIZE; ++i) {
 	QInit(&afs_vhashTV[i]);
+	QInit(&afs_vhashTLV[i]);
+    }
 }
 
 void

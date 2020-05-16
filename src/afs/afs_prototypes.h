@@ -1048,6 +1048,7 @@ extern void afs_WarnENOSPC(void);
 /* afs_vcache.c */
 extern int VCHash(struct VenusFid *fid);
 extern int VCHashV(struct VenusFid *fid);
+extern int VCHashLV(struct VenusFid *fid);
 extern int afs_ShakeLooseVCaches(afs_int32 anumber);
 extern afs_int32 afs_maxvcount;
 extern afs_int32 afs_vcount;
@@ -1060,6 +1061,7 @@ extern struct afs_q VLRU;
 extern afs_int32 vcachegen;
 extern unsigned int afs_paniconwarn;
 extern struct afs_q afs_vhashTV[VCSIZE];
+extern struct afs_q afs_vhashTLV[VCSIZE];
 extern afs_int32 afs_bulkStatsLost;
 extern int afs_norefpanic;
 extern struct vcache *ReclaimedVCList;

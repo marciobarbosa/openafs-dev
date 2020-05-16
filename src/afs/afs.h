@@ -239,6 +239,7 @@ struct afs_q {
 #define QTOV(e)	    QEntry(e, struct vcache, vlruq)
 #define QTOC(e)	    QEntry(e, struct cell, lruq)
 #define QTOVH(e)    QEntry(e, struct vcache, vhashq)
+#define QTOLVH(e)   QEntry(e, struct vcache, lvhashq)
 
 /*!
  * List of free slot numbers
@@ -852,6 +853,7 @@ struct vcache {
 #endif
     struct vcache *hnext;	/* Hash next */
     struct afs_q vhashq;	/* Hashed per-volume list */
+    struct afs_q lvhashq;	/* Hashed per-linked-volume list */
     /*! Queue of dirty vcaches. Lock with afs_disconDirtyLock */
     struct afs_q dirtyq;
     /*! Queue of vcaches with shadow entries. Lock with afs_disconDirtyLock */

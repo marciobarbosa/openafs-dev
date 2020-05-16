@@ -292,6 +292,7 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     /* Get fid's volume. */
     tv = afs_GetVolume(afid, areq, READ_LOCK);
     if (!tv) {
+	afs_warn("<marcio> afs_conn: could not get the volume\n");
 	if (areq) {
 	    afs_FinalizeReq(areq);
 	    areq->volumeError = 1;

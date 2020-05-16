@@ -588,6 +588,7 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 	pcell = afs_GetPrimaryCell(READ_LOCK);
 	/* if afid->linkedFid.Vnode is set, we already tried the linked cell */
 	if (pcell && afid && pcell->lcellp && afid->linkedFid.Vnode == 0) {
+	    afs_warn("<marcio> switching volumes\n");
 	    volid = afid->Fid.Volume;
 	    afid->Fid.Volume = afid->linkedFid.Volume;
 	    afid->linkedFid.Volume = volid;
@@ -604,6 +605,12 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 	    afs_PutCell(pcell, READ_LOCK);
 	}
 	afs_warn("<marcio> return 3\n");
+	if (shouldRetry == 0) {
+	    afs_warn("<marcio> shouldRetry == 0\n");
+	    if (afid) {
+		afs_warn("<marcio> Vnode flag: %d\n", afid->linkedFid.Vnode);
+	    }
+	}
 	return shouldRetry;
     }
 

@@ -403,15 +403,85 @@ ClearCallBack(struct rx_connection *a_conn,
 {
     struct vcache *tvc;
     int i;
-    struct VenusFid localFid;
+    struct VenusFid localFid, tfid;
     struct volume *tv;
 #ifdef AFS_DARWIN80_ENV
     vnode_t vp;
 #endif
+    struct server *ts;
+    struct rx_peer *peer;
+    struct cell *pcell;
+    int linkedcell = 0, linknumber = 0;
+    struct afs_q *tq, *uq;
+    struct VenusFid volfid;
+    afs_int32 volid;
 
     AFS_STATCNT(ClearCallBack);
 
     AFS_ASSERT_GLOCK();
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell && pcell->lcellp) {
+	peer = rx_PeerOf(a_conn);
+	ts = afs_FindServer(rx_HostOf(peer), rx_PortOf(peer), 0, 0);
+	if (ts && (pcell->lcellp->cellNum == ts->cell->cellNum)) {
+	    linkedcell = 1;
+	    linknumber = pcell->lcellp->cellNum;
+	}
+    }
+    if (pcell) {
+	afs_PutCell(pcell, READ_LOCK);
+    }
+
+    /* <marcio> check volume */
+    if (linkedcell) {
+	afs_warn("<marcio> callback came from linked cell\n");
+	tfid.Cell = 0;
+	tfid.Fid.Volume = a_fid->Volume;
+	tfid.Fid.Vnode = a_fid->Vnode;
+	tfid.Fid.Unique = a_fid->Unique;
+	tfid.linkedFid.Volume = a_fid->Volume;
+	ObtainReadLock(&afs_xvcache);
+	i = VCHashLV(&tfid);
+	for (uq = afs_vhashTLV[i].next; uq != &afs_vhashTLV[i]; uq = tq) {
+	    tq = QNext(uq);
+	    tvc = QTOLVH(uq);
+	    afs_warn("<marcio> cb> volume: %d\n", tvc->f.fid.Fid.Volume);
+	    afs_warn("<marcio> cb> linked volume: %d\n", tvc->f.fid.linkedFid.Volume);
+	    afs_warn("<marcio> cb> looking for: %d\n", a_fid->Volume);
+	    if (tvc->f.fid.linkedFid.Volume == a_fid->Volume) {
+		volid = a_fid->Volume;
+		a_fid->Volume = tvc->f.fid.Fid.Volume;
+		afs_warn("<marcio> original volume found: %d\n", a_fid->Volume);
+		break;
+	    }
+	}
+	/*
+	for (i = 0; i < VCSIZE; i ++) {
+	    while (!QEmpty(&afs_vhashTLV[i])) {
+		tvc = QEntry(QPrev(&afs_vhashTLV[i]), struct vcache, lvhashq);
+		QRemove(&tvc->lvhashq);
+		afs_warn("<marcio> cb> volume: %d\n", tvc->f.fid.Fid.Volume);
+		afs_warn("<marcio> cb> linked volume: %d\n", tvc->f.fid.linkedFid.Volume);
+		afs_warn("<marcio> cb> vnode: %d\n", tvc->f.fid.Fid.Vnode);
+	    }
+	}
+	*/
+	/*
+	i = VCHashLV(&tfid);
+	for (tq = afs_vhashTLV[i].prev; tq != &afs_vhashTLV[i]; tq = uq) {
+	    uq = QPrev(tq);
+	    tvc = QTOVH(tq);
+	    afs_warn("<marcio> loop: %d %d\n", tvc->f.fid.linkedFid.Volume, tvc->f.fid.Fid.Volume);
+	    if (tvc->f.fid.linkedFid.Volume == a_fid->Volume) {
+		volid = tvc->f.fid.Fid.Volume;
+		afs_warn("<marcio> original volume found: %d\n", volid);
+		break;
+	    }
+	}
+	*/
+	ReleaseReadLock(&afs_xvcache);
+    }
 
     /*
      * XXXX Don't hold any server locks here because of callback protocol XXX
@@ -426,7 +496,7 @@ ClearCallBack(struct rx_connection *a_conn,
      */
     if (a_fid->Volume != 0) {
 	if (a_fid->Vnode == 0) {
-		struct afs_q *tq, *uq;
+	    afs_warn("<marcio> break cbs for the whole volume\n");
 	    /*
 	     * Clear callback for the whole volume.  Zip through the
 	     * hash chain, nullifying entries whose volume ID matches.
@@ -498,7 +568,12 @@ loop1:
 	    /*
 	     * XXXX Don't hold any locks here XXXX
 	     */
-	    tv = afs_FindVolume(&localFid, 0);
+	    volfid = localFid;
+	    if (linkedcell) {
+		volfid.Cell = linknumber;
+		volfid.Fid.Volume = volid;
+	    }
+	    tv = afs_FindVolume(&volfid, 0);
 	    if (tv) {
 		afs_ResetVolumeInfo(tv);
 		afs_PutVolume(tv, 0);
@@ -511,6 +586,7 @@ loop1:
 	     */
 	    struct vcache *uvc;
 	    afs_allCBs++;
+	    afs_warn("<marcio> break cbs for one file\n");
 	    if (a_fid->Vnode & 1)
 		afs_oddCBs++;	/*Could do this on volume basis, too */
 	    else
@@ -520,6 +596,10 @@ loop2:
 	    i = VCHash(&localFid);
 	    for (tvc = afs_vhashT[i]; tvc; tvc = uvc) {
 		uvc = tvc->hnext;
+		afs_warn("\tvol %d ; vnode %d ; unique: %d\n",
+			tvc->f.fid.Fid.Volume, tvc->f.fid.Fid.Vnode, tvc->f.fid.Fid.Unique);
+		afs_warn("\tcb vol %d ; cb vnode %d ; cb unique: %d\n",
+			a_fid->Volume, a_fid->Vnode, a_fid->Unique);
 		if (tvc->f.fid.Fid.Vnode == a_fid->Vnode
 		    && tvc->f.fid.Fid.Volume == a_fid->Volume
 		    && tvc->f.fid.Fid.Unique == a_fid->Unique) {
