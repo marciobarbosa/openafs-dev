@@ -1726,6 +1726,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 	tfid.Cell = adp->f.fid.Cell;
 	tfid.Fid.Volume = adp->f.fid.Fid.Volume;
 	tfid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
+	tfid.linkedFid.Vnode = 0;
 	afs_Trace4(afs_iclSetp, CM_TRACE_LOOKUP, ICL_TYPE_POINTER, adp,
 		   ICL_TYPE_STRING, tname, ICL_TYPE_FID, &tfid,
 		   ICL_TYPE_INT32, code);
