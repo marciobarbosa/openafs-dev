@@ -585,6 +585,12 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 	}
 	if (aconn) /* simply lacking aconn->server doesn't absolve this */
 	    afs_PutConn(aconn, rxconn, locktype);
+	if (!shouldRetry && !afid && cellp && cellp->lcellp) {
+	    *acell = afs_GetCell(cellp->lcellp->cellNum, READ_LOCK);
+	    afs_PutCell(cellp, READ_LOCK);
+	    afs_FinalizeReq(areq);
+	    shouldRetry = 1;
+	}
 	return shouldRetry;
     }
 
