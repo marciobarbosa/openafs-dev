@@ -820,6 +820,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 	    tfid.Fid.Volume = adp->f.fid.Fid.Volume;
 	    tfid.Fid.Vnode = ntohl(dirEntryp->fid.vnode);
 	    tfid.Fid.Unique = ntohl(dirEntryp->fid.vunique);
+	    tfid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	    do {
 		retry = 0;
 		ObtainWriteLock(&afs_xvcache, 130);
@@ -958,6 +959,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 		afid.Fid.Volume = adp->f.fid.Fid.Volume;
 		afid.Fid.Vnode = fidsp[i].Vnode;
 		afid.Fid.Unique = fidsp[i].Unique;
+		afid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 
 		do {
 		    retry = 0;
@@ -1118,6 +1120,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 	afid.Fid.Volume = adp->f.fid.Fid.Volume;
 	afid.Fid.Vnode = fidsp[i].Vnode;
 	afid.Fid.Unique = fidsp[i].Unique;
+	afid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	do {
 	    retry = 0;
 	    ObtainReadLock(&afs_xvcache);
@@ -1297,6 +1300,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 	afid.Fid.Volume = adp->f.fid.Fid.Volume;
 	afid.Fid.Vnode = fidsp[i].Vnode;
 	afid.Fid.Unique = fidsp[i].Unique;
+	afid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	do {
 	    retry = 0;
 	    ObtainReadLock(&afs_xvcache);
@@ -1707,6 +1711,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 	/* new fid has same cell and volume */
 	tfid.Cell = adp->f.fid.Cell;
 	tfid.Fid.Volume = adp->f.fid.Fid.Volume;
+	tfid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 	afs_Trace4(afs_iclSetp, CM_TRACE_LOOKUP, ICL_TYPE_POINTER, adp,
 		   ICL_TYPE_STRING, tname, ICL_TYPE_FID, &tfid,
 		   ICL_TYPE_INT32, code);

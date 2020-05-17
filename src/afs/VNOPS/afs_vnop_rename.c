@@ -200,6 +200,7 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
 	/* Seek moved file vcache. */
 	fileFid.Cell = aodp->f.fid.Cell;
 	fileFid.Fid.Volume = aodp->f.fid.Fid.Volume;
+	fileFid.linkedFid.Volume = aodp->f.fid.linkedFid.Volume;
 	ObtainSharedLock(&afs_xvcache, 754);
 	tvc = afs_FindVCache(&fileFid, 0 , 1);
 	ReleaseSharedLock(&afs_xvcache);
@@ -358,6 +359,7 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
     if (unlinkFid.Fid.Vnode) {
 
 	unlinkFid.Fid.Volume = aodp->f.fid.Fid.Volume;
+	unlinkFid.linkedFid.Volume = aodp->f.fid.linkedFid.Volume;
 	unlinkFid.Cell = aodp->f.fid.Cell;
 	tvc = NULL;
 	if (!unlinkFid.Fid.Unique) {
@@ -390,6 +392,7 @@ afsrename(struct vcache *aodp, char *aname1, struct vcache *andp,
     /* now handle ".." invalidation */
     if (!oneDir) {
 	fileFid.Fid.Volume = aodp->f.fid.Fid.Volume;
+	fileFid.linkedFid.Volume = aodp->f.fid.linkedFid.Volume;
 	fileFid.Cell = aodp->f.fid.Cell;
 	if (!fileFid.Fid.Unique)
 	    tvc = afs_LookupVCache(&fileFid, areq, andp, aname2);
