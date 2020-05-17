@@ -907,7 +907,7 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
 	} else
 	    code = -1;
     } while (afs_Analyze(tconn, rxconn, code, NULL, treq, -1,	/* no op code for this */
-			 SHARED_LOCK, tcell));
+			 SHARED_LOCK, &tcell));
 
     if (code) {
 	afs_CopyError(treq, areq);
@@ -1215,7 +1215,7 @@ LockAndInstallUVolumeEntry(struct volume *av, struct uvldbentry *ve, int acell,
 			code = VL_NOENT;
 
 		} while (afs_Analyze
-			 (tconn, rxconn, code, NULL, areq, -1, SHARED_LOCK, tcell));
+			 (tconn, rxconn, code, NULL, areq, -1, SHARED_LOCK, &tcell));
 		if (code) {
 		    /* Better handing of such failures; for now we'll simply retry this call */
 		    areq->volumeError = 1;
