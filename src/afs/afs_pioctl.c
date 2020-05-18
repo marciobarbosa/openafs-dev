@@ -1584,6 +1584,7 @@ DECL_PIOCTL(PGetAcl)
     struct AFSFid Fid;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+    struct VenusFid vfid;	/* Local copy of the fid stored by avc */
 
     AFS_STATCNT(PGetAcl);
     if (!avc)
@@ -1604,19 +1605,21 @@ DECL_PIOCTL(PGetAcl)
 	Fid.Vnode |= (ain->remaining << 30);
     }
     acl.AFSOpaque_val = aout->ptr;
+    vfid = avc->f.fid;
     do {
-	tconn = afs_Conn(&avc->f.fid, areq, SHARED_LOCK, &rxconn);
+	tconn = afs_Conn(&vfid, areq, SHARED_LOCK, &rxconn);
 	if (tconn) {
 	    acl.AFSOpaque_val[0] = '\0';
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHACL);
 	    RX_AFS_GUNLOCK();
+	    Fid.Volume = vfid.Fid.Volume;
 	    code = RXAFS_FetchACL(rxconn, &Fid, &acl, &OutStatus, &tsync);
 	    RX_AFS_GLOCK();
 	    XSTATS_END_TIME;
 	} else
 	    code = -1;
     } while (afs_Analyze
-	     (tconn, rxconn, code, &avc->f.fid, areq, AFS_STATS_FS_RPCIDX_FETCHACL,
+	     (tconn, rxconn, code, &vfid, areq, AFS_STATS_FS_RPCIDX_FETCHACL,
 	      SHARED_LOCK, NULL));
 
     if (code == 0) {
@@ -2006,6 +2009,7 @@ DECL_PIOCTL(PGetVolumeStatus)
     char *Name;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+    struct VenusFid vfid;	/* Local copy of the fid stored by avc */
 
     osi_Assert(offLineMsg != NULL);
     osi_Assert(motd != NULL);
@@ -2015,20 +2019,21 @@ DECL_PIOCTL(PGetVolumeStatus)
 	goto out;
     }
     Name = volName;
+    vfid = avc->f.fid;
     do {
-	tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK, &rxconn);
+	tc = afs_Conn(&vfid, areq, SHARED_LOCK, &rxconn);
 	if (tc) {
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_GETVOLUMESTATUS);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_GetVolumeStatus(rxconn, avc->f.fid.Fid.Volume, &volstat,
+		RXAFS_GetVolumeStatus(rxconn, vfid.Fid.Volume, &volstat,
 				      &Name, &offLineMsg, &motd);
 	    RX_AFS_GLOCK();
 	    XSTATS_END_TIME;
 	} else
 	    code = -1;
     } while (afs_Analyze
-	     (tc, rxconn, code, &avc->f.fid, areq, AFS_STATS_FS_RPCIDX_GETVOLUMESTATUS,
+	     (tc, rxconn, code, &vfid, areq, AFS_STATS_FS_RPCIDX_GETVOLUMESTATUS,
 	      SHARED_LOCK, NULL));
 
     if (code)
@@ -4983,6 +4988,7 @@ DECL_PIOCTL(PPrefetchFromTape)
     struct AFSFid *Fid;
     struct vcache *tvc;
     struct rx_connection *rxconn;
+    struct VenusFid vfid;	/* Local copy of the fid stored by tvc */
 
     AFS_STATCNT(PPrefetchFromTape);
     if (!avc)
@@ -5006,14 +5012,15 @@ DECL_PIOCTL(PPrefetchFromTape)
     afs_Trace3(afs_iclSetp, CM_TRACE_PREFETCHCMD, ICL_TYPE_POINTER, tvc,
 	       ICL_TYPE_FID, &tfid, ICL_TYPE_FID, &tvc->f.fid);
 
+    vfid = tvc->f.fid;
     do {
-	tc = afs_Conn(&tvc->f.fid, areq, SHARED_LOCK, &rxconn);
+	tc = afs_Conn(&vfid, areq, SHARED_LOCK, &rxconn);
 	if (tc) {
 
 	    RX_AFS_GUNLOCK();
 	    tcall = rx_NewCall(rxconn);
 	    code =
-		StartRXAFS_FetchData(tcall, (struct AFSFid *)&tvc->f.fid.Fid, 0,
+		StartRXAFS_FetchData(tcall, (struct AFSFid *)&vfid.Fid, 0,
 				     0);
 	    if (!code) {
 		rx_Read(tcall, (char *)&outval, sizeof(afs_int32));
@@ -5025,7 +5032,7 @@ DECL_PIOCTL(PPrefetchFromTape)
 	} else
 	    code = -1;
     } while (afs_Analyze
-	     (tc, rxconn, code, &tvc->f.fid, areq, AFS_STATS_FS_RPCIDX_RESIDENCYRPCS,
+	     (tc, rxconn, code, &vfid, areq, AFS_STATS_FS_RPCIDX_RESIDENCYRPCS,
 	      SHARED_LOCK, NULL));
     /* This call is done only to have the callback things handled correctly */
     afs_FetchStatus(tvc, &tfid, areq, &OutStatus);
