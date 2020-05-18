@@ -517,7 +517,7 @@ afs_FlushVCBs(afs_int32 lockit)
 			if (!afs_Analyze
 			    (tc, rxconn, code, 0, treq,
 			     AFS_STATS_FS_RPCIDX_GIVEUPCALLBACKS, SHARED_LOCK,
-			     tsp->cell)) {
+			     &tsp->cell)) {
 			    break;
 			}
 		    }
