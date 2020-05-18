@@ -159,7 +159,7 @@ VLDB_Same(struct VenusFid *afid, struct vrequest *areq)
 	} else
 	    i = -1;
     } while (afs_Analyze(tconn, rxconn, i, NULL, treq, -1,	/* no op code for this */
-			 SHARED_LOCK, tcell));
+			 SHARED_LOCK, &tcell));
 
     afs_PutCell(tcell, READ_LOCK);
     afs_Trace2(afs_iclSetp, CM_TRACE_CHECKVLDB, ICL_TYPE_FID, &afid,
@@ -395,7 +395,7 @@ afs_PrintServerErrors(struct vrequest *areq, struct VenusFid *afid)
  *                       may be null if none was involved.
  * \param[in,out] areq   The request record associated with this operation.
  * \param[in]     op     which RPC we are analyzing.
- * \param[in]     cellp  pointer to a cell struct.  Must provide either fid or cell.
+ * \param[in]     acell  pointer to a cell struct.  Must provide either fid or cell.
  *
  * \returns
  *	Non-zero value if the related RPC operation should be retried,
@@ -413,7 +413,7 @@ afs_PrintServerErrors(struct vrequest *areq, struct VenusFid *afid)
 int
 afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
             afs_int32 acode, struct VenusFid *afid, struct vrequest *areq,
-            int op, afs_int32 locktype, struct cell *cellp)
+	    int op, afs_int32 locktype, struct cell **acell)
 {
     afs_int32 i;
     struct srvAddr *sa;
@@ -423,6 +423,11 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
     afs_int32 serversleft = 1;
     struct afs_stats_RPCErrors *aerrP;
     afs_uint32 address;
+
+    struct cell *cellp = NULL;
+    if (acell) {
+	cellp = *acell;
+    }
 
     if (AFS_IS_DISCONNECTED && !AFS_IN_SYNC) {
 	/* On reconnection, act as connected. XXX: for now.... */

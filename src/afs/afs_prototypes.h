@@ -14,7 +14,7 @@
 extern int afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
                        afs_int32 acode, struct VenusFid *afid,
                        struct vrequest *areq,
-		       int op, afs_int32 locktype, struct cell *cellp);
+		       int op, afs_int32 locktype, struct cell **acell);
 
 /* afs_axscache.c */
 extern afs_rwlock_t afs_xaxs;
