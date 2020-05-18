@@ -2249,6 +2249,7 @@ DECL_PIOCTL(PNewStatMount)
     }
     tfid.Cell = avc->f.fid.Cell;
     tfid.Fid.Volume = avc->f.fid.Fid.Volume;
+    tfid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
     if (!tfid.Fid.Unique && (avc->f.states & CForeign)) {
 	tvc = afs_LookupVCache(&tfid, areq, avc, bufp);
     } else {
@@ -3310,6 +3311,7 @@ DECL_PIOCTL(PRemoveMount)
     }
     tfid.Cell = avc->f.fid.Cell;
     tfid.Fid.Volume = avc->f.fid.Fid.Volume;
+    tfid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
     if (!tfid.Fid.Unique && (avc->f.states & CForeign)) {
 	tvc = afs_LookupVCache(&tfid, areq, avc, bufp);
     } else {
@@ -4863,6 +4865,7 @@ DECL_PIOCTL(PFlushMount)
     }
     tfid.Cell = avc->f.fid.Cell;
     tfid.Fid.Volume = avc->f.fid.Fid.Volume;
+    tfid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
     if (!tfid.Fid.Unique && (avc->f.states & CForeign)) {
 	tvc = afs_LookupVCache(&tfid, areq, avc, bufp);
     } else {

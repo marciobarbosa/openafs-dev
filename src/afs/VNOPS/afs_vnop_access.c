@@ -144,6 +144,7 @@ afs_AccessOK(struct vcache *avc, afs_int32 arights, struct vrequest *areq,
 	    dirFid.Fid.Volume = avc->f.fid.Fid.Volume;
 	    dirFid.Fid.Vnode = avc->f.parent.vnode;
 	    dirFid.Fid.Unique = avc->f.parent.unique;
+	    dirFid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
 	    /* Avoid this GetVCache call */
 	    tvc = afs_GetVCache(&dirFid, areq);
 	    if (tvc) {

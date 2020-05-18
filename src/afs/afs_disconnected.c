@@ -164,6 +164,7 @@ afs_GetParentDirFid(struct vcache *avc, struct VenusFid *afid)
 
     afid->Cell = avc->f.fid.Cell;
     afid->Fid.Volume = avc->f.fid.Fid.Volume;
+    afid->linkedFid.Volume = avc->f.fid.linkedFid.Volume;
 
     switch (vType(avc)) {
     case VREG:
@@ -252,6 +253,7 @@ afs_GetVnodeName(struct vcache *avc, struct VenusFid *afid, char *aname,
 	/* Get the parent dir's vcache that contains the shadow fid. */
 	parent_fid.Cell = avc->f.fid.Cell;
 	parent_fid.Fid.Volume = avc->f.fid.Fid.Volume;
+	parent_fid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
 	if (avc->f.ddirty_flags & VDisconRename) {
 	    /* For renames the old dir fid is needed. */
 	    parent_fid.Fid.Vnode = avc->f.oldParent.vnode;
@@ -273,6 +275,7 @@ afs_GetVnodeName(struct vcache *avc, struct VenusFid *afid, char *aname,
     	shadow_fid.Fid.Volume = parent_vc->f.fid.Fid.Volume;
     	shadow_fid.Fid.Vnode = parent_vc->f.shadow.vnode;
     	shadow_fid.Fid.Unique = parent_vc->f.shadow.unique;
+	shadow_fid.linkedFid.Volume = parent_vc->f.fid.linkedFid.Volume;
 
 	afs_PutVCache(parent_vc);
 
@@ -332,6 +335,7 @@ chk_del_children_hook(void *hdata, char *aname, afs_int32 vnode,
     tfid.Fid.Volume = v->vc->f.fid.Fid.Volume;
     tfid.Fid.Vnode = vnode;
     tfid.Fid.Unique = unique;
+    tfid.linkedFid.Volume = v->vc->f.fid.linkedFid.Volume;
 
     ObtainSharedLock(&afs_xvcache, 757);
     tvc = afs_FindVCache(&tfid, 0, 1);
@@ -373,6 +377,7 @@ afs_CheckDeletedChildren(struct vcache *avc)
     shadow_fid.Fid.Volume = avc->f.fid.Fid.Volume;
     shadow_fid.Fid.Vnode = avc->f.shadow.vnode;
     shadow_fid.Fid.Unique = avc->f.shadow.unique;
+    shadow_fid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
 
     dcc.count = 0;
 
@@ -409,6 +414,7 @@ fix_children_fids_hook(void *hdata, char *aname, afs_int32 vnode,
     tfid.Fid.Volume = afid->Fid.Volume;
     tfid.Fid.Vnode = vnode;
     tfid.Fid.Unique = unique;
+    tfid.linkedFid.Volume = afid->linkedFid.Volume;
 
     if (!(vnode % 2)) {
 	/* vnode's parity indicates that it's a file. */
@@ -565,6 +571,7 @@ afs_ProcessOpRename(struct vcache *avc, struct vrequest *areq)
     old_pdir_fid.Fid.Volume = avc->f.fid.Fid.Volume;
     old_pdir_fid.Fid.Vnode = avc->f.oldParent.vnode;
     old_pdir_fid.Fid.Unique = avc->f.oldParent.unique;
+    old_pdir_fid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
 
     /* Get old name. */
     old_name = afs_osi_Alloc(AFSNAMEMAX);

@@ -588,8 +588,27 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 	if (!shouldRetry && !afid && cellp && cellp->lcellp) {
 	    *acell = afs_GetCell(cellp->lcellp->cellNum, READ_LOCK);
 	    afs_PutCell(cellp, READ_LOCK);
+	    areq->initd = 0;
 	    afs_FinalizeReq(areq);
 	    shouldRetry = 1;
+	}
+	if (!shouldRetry && afid && afid->linkedFid.Vnode == 0) {
+	    struct cell *tcell = afs_GetPrimaryCell(READ_LOCK);
+	    afs_uint32 volid;
+
+	    if (tcell && tcell->lcellp) {
+		volid = afid->Fid.Volume;
+		afid->Fid.Volume = afid->linkedFid.Volume;
+		afid->linkedFid.Volume = volid;
+		afid->Cell = tcell->lcellp->cellNum;
+		afid->linkedFid.Vnode = 1;
+		areq->initd = 0;
+		afs_FinalizeReq(areq);
+		shouldRetry = 1;
+	    }
+	    if (tcell) {
+		afs_PutCell(pcell, READ_LOCK);
+	    }
 	}
 	return shouldRetry;
     }

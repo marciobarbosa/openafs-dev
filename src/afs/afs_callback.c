@@ -405,13 +405,49 @@ ClearCallBack(struct rx_connection *a_conn,
     int i;
     struct VenusFid localFid;
     struct volume *tv;
+    struct afs_q *tq, *uq;
 #ifdef AFS_DARWIN80_ENV
     vnode_t vp;
 #endif
+    struct VenusFid tfid;
+    struct server *ts;
+    struct rx_peer *peer;
+    struct cell *pcell;
+    int linkedcell = 0, linkednumber = 0;
+    afs_uint32 volid;
 
     AFS_STATCNT(ClearCallBack);
 
     AFS_ASSERT_GLOCK();
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell && pcell->lcellp) {
+	peer = rx_PeerOf(a_conn);
+	ts = afs_FindServer(rx_HostOf(peer), rx_PortOf(peer), 0, 0);
+	if (ts && (pcell->lcellp->cellNum == ts->cell->cellNum)) {
+	    linkedcell = 1;
+	    linkednumber = pcell->lcellp->cellNum;
+	}
+    }
+    if (pcell) {
+	afs_PutCell(pcell, READ_LOCK);
+    }
+
+    if (linkedcell) {
+	tfid.linkedFid.Volume = a_fid->Volume;
+	ObtainReadLock(&afs_xvcache);
+	i = VCHashLV(&tfid);
+	for (uq = afs_vhashTLV[i].next; uq != &afs_vhashTLV[i]; uq = tq) {
+	    tq = QNext(uq);
+	    tvc = QTOLVH(uq);
+	    if (tvc->f.fid.linkedFid.Volume == a_fid->Volume) {
+		volid = a_fid->Volume;
+		a_fid->Volume = tvc->f.fid.Fid.Volume;
+		break;
+	    }
+	}
+	ReleaseReadLock(&afs_xvcache);
+    }
 
     /*
      * XXXX Don't hold any server locks here because of callback protocol XXX
@@ -426,7 +462,6 @@ ClearCallBack(struct rx_connection *a_conn,
      */
     if (a_fid->Volume != 0) {
 	if (a_fid->Vnode == 0) {
-		struct afs_q *tq, *uq;
 	    /*
 	     * Clear callback for the whole volume.  Zip through the
 	     * hash chain, nullifying entries whose volume ID matches.
@@ -498,7 +533,12 @@ loop1:
 	    /*
 	     * XXXX Don't hold any locks here XXXX
 	     */
-	    tv = afs_FindVolume(&localFid, 0);
+	    tfid = localFid;
+	    if (linkedcell) {
+		tfid.Cell = linkednumber;
+		tfid.Fid.Volume = volid;
+	    }
+	    tv = afs_FindVolume(&tfid, 0);
 	    if (tv) {
 		afs_ResetVolumeInfo(tv);
 		afs_PutVolume(tv, 0);

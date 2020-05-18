@@ -257,6 +257,7 @@ afs_remove(OSI_VC_DECL(adp), char *aname, afs_ucred_t *acred)
 	    if (code == 0) {
 		unlinkFid.Cell = adp->f.fid.Cell;
 		unlinkFid.Fid.Volume = adp->f.fid.Fid.Volume;
+		unlinkFid.linkedFid.Volume = adp->f.fid.linkedFid.Volume;
 		if (unlinkFid.Fid.Unique == 0) {
 		    tvc =
 			afs_LookupVCache(&unlinkFid, treq, adp,
@@ -435,6 +436,7 @@ afs_remunlink(struct vcache *avc, int doit)
 	    dirFid.Fid.Volume = avc->f.fid.Fid.Volume;
 	    dirFid.Fid.Vnode = avc->f.parent.vnode;
 	    dirFid.Fid.Unique = avc->f.parent.unique;
+	    dirFid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
 	    adp = afs_GetVCache(&dirFid, treq);
 
 	    if (adp) {

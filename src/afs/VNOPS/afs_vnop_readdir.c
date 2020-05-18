@@ -254,6 +254,7 @@ afs_readdir_type(struct vcache *avc, struct DirEntry *ade)
     tfid.Fid.Volume = avc->f.fid.Fid.Volume;
     tfid.Fid.Vnode = ntohl(ade->fid.vnode);
     tfid.Fid.Unique = ntohl(ade->fid.vunique);
+    tfid.linkedFid.Volume = avc->f.fid.linkedFid.Volume;
     if ((avc->f.states & CForeign) == 0 && (ntohl(ade->fid.vnode) & 1)) {
 	return DT_DIR;
     }
