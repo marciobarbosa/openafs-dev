@@ -75,7 +75,7 @@ VPurgeVolume(Error * ec, Volume * vp)
     PurgeIndex_r(vp, vSmall);
     PurgeHeader_r(vp);
 
-    code = VDestroyVolumeDiskHeader(tpartp, volid, parent);
+    code = VDestroyVolumeDiskHeader(tpartp, volid, parent, 1);
     if (code) {
 	Log("VPurgeVolume: Error %ld when destroying volume %lu header\n",
 	    afs_printable_int32_ld(code),

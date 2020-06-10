@@ -258,7 +258,7 @@ VCreateVolume_r(Error * ec, char *partname, VolumeId volumeId, VolumeId parentId
 	    if (!*ec) {
 		*ec = VNOVOL;
 	    }
-	    VDestroyVolumeDiskHeader(partition, volumeId, parentId);
+	    VDestroyVolumeDiskHeader(partition, volumeId, parentId, 1);
 	  bad_noheader:
 # ifdef AFS_DEMAND_ATTACH_FS
 	    if (locktype) {
@@ -303,7 +303,7 @@ VCreateVolume_r(Error * ec, char *partname, VolumeId volumeId, VolumeId parentId
     IH_RELEASE(handle);
 
     VolumeHeaderToDisk(&diskHeader, &tempHeader);
-    rc = VCreateVolumeDiskHeader(&diskHeader, partition);
+    rc = VCreateVolumeDiskHeader(&diskHeader, partition, 1);
     if (rc) {
 	Log("VCreateVolume: Error %d trying to write volume header for "
 	    "volume %" AFS_VOLID_FMT " on partition %s; volume not created\n", rc,
@@ -538,6 +538,7 @@ _VWriteVolumeDiskHeader(VolumeDiskHeader_t * hdr,
  *
  * @param[in] hdr   volume disk header
  * @param[in] dp    disk partition object
+ * @param[in] useFSYNC	1 if fileserver is up, 0 otherwise
  *
  * @return operation status
  *    @retval 0 success
@@ -546,7 +547,8 @@ _VWriteVolumeDiskHeader(VolumeDiskHeader_t * hdr,
  */
 afs_int32
 VWriteVolumeDiskHeader(VolumeDiskHeader_t * hdr,
-		       struct DiskPartition64 * dp)
+		       struct DiskPartition64 * dp,
+		       int useFSYNC)
 {
     afs_int32 code;
 
@@ -579,7 +581,7 @@ VWriteVolumeDiskHeader(VolumeDiskHeader_t * hdr,
     }
 
 #ifdef AFS_DEMAND_ATTACH_FS
-    if (delvgc) {
+    if (useFSYNC && delvgc) {
 	memset(&res, 0, sizeof(res));
 	code = FSYNC_VGCDel(dp->name, oldhdr.parent, oldhdr.id, FSYNC_WHATEVER, &res);
 
@@ -595,7 +597,7 @@ VWriteVolumeDiskHeader(VolumeDiskHeader_t * hdr,
 	}
 
     }
-    if (addvgc) {
+    if (useFSYNC && addvgc) {
 	memset(&res, 0, sizeof(res));
 	code = FSYNC_VGCAdd(dp->name, hdr->parent, hdr->id, FSYNC_WHATEVER, &res);
 	if (code) {
@@ -619,6 +621,7 @@ VWriteVolumeDiskHeader(VolumeDiskHeader_t * hdr,
  *
  * @param[in] hdr   volume disk header
  * @param[in] dp    disk partition object
+ * @param[in] useFSYNC	1 if fileserver is up, 0 otherwise
  *
  * @return operation status
  *    @retval 0 success
@@ -629,7 +632,8 @@ VWriteVolumeDiskHeader(VolumeDiskHeader_t * hdr,
  */
 afs_int32
 VCreateVolumeDiskHeader(VolumeDiskHeader_t * hdr,
-			struct DiskPartition64 * dp)
+			struct DiskPartition64 * dp,
+			int useFSYNC)
 {
     afs_int32 code = 0;
 #ifdef AFS_DEMAND_ATTACH_FS
@@ -642,15 +646,17 @@ VCreateVolumeDiskHeader(VolumeDiskHeader_t * hdr,
     }
 
 #ifdef AFS_DEMAND_ATTACH_FS
-    memset(&res, 0, sizeof(res));
-    code = FSYNC_VGCAdd(dp->name, hdr->parent, hdr->id, FSYNC_WHATEVER, &res);
-    if (code) {
-	Log("VCreateVolumeDiskHeader: FSYNC_VGCAdd(%s, %lu, %lu) failed "
-	    "with code %ld reason %ld\n", dp->name,
-	    afs_printable_uint32_lu(hdr->parent),
-	    afs_printable_uint32_lu(hdr->id),
-	    afs_printable_int32_ld(code),
-	    afs_printable_int32_ld(res.hdr.reason));
+    if (useFSYNC) {
+	memset(&res, 0, sizeof(res));
+	code = FSYNC_VGCAdd(dp->name, hdr->parent, hdr->id, FSYNC_WHATEVER, &res);
+	if (code) {
+	    Log("VCreateVolumeDiskHeader: FSYNC_VGCAdd(%s, %lu, %lu) failed "
+		"with code %ld reason %ld\n", dp->name,
+		afs_printable_uint32_lu(hdr->parent),
+	        afs_printable_uint32_lu(hdr->id),
+		afs_printable_int32_ld(code),
+		afs_printable_int32_ld(res.hdr.reason));
+	}
     }
 #endif /* AFS_DEMAND_ATTACH_FS */
 
@@ -674,7 +680,8 @@ VCreateVolumeDiskHeader(VolumeDiskHeader_t * hdr,
 afs_int32
 VDestroyVolumeDiskHeader(struct DiskPartition64 * dp,
 			 VolumeId volid,
-			 VolumeId parent)
+			 VolumeId parent,
+			 int useFSYNC)
 {
     afs_int32 code = 0;
     char path[MAXPATHLEN];
@@ -692,15 +699,17 @@ VDestroyVolumeDiskHeader(struct DiskPartition64 * dp,
 
 #ifdef AFS_DEMAND_ATTACH_FS
     /* Remove the volume entry from the fileserver's volume group cache, if found. */
-    memset(&res, 0, sizeof(res));
-    code = FSYNC_VGCDel(dp->name, parent, volid, FSYNC_WHATEVER, &res);
-    if (code) {
-	Log("VDestroyVolumeDiskHeader: FSYNC_VGCDel(%s, %" AFS_VOLID_FMT ", %" AFS_VOLID_FMT ") failed "
-	    "with code %ld reason %ld\n", dp->name,
-	    afs_printable_VolumeId_lu(parent),
-	    afs_printable_VolumeId_lu(volid),
-	    afs_printable_int32_ld(code),
-	    afs_printable_int32_ld(res.hdr.reason));
+    if (useFSYNC) {
+	memset(&res, 0, sizeof(res));
+	code = FSYNC_VGCDel(dp->name, parent, volid, FSYNC_WHATEVER, &res);
+	if (code) {
+	    Log("VDestroyVolumeDiskHeader: FSYNC_VGCDel(%s, %" AFS_VOLID_FMT ", %" AFS_VOLID_FMT ") failed "
+		"with code %ld reason %ld\n", dp->name,
+		afs_printable_VolumeId_lu(parent),
+		afs_printable_VolumeId_lu(volid),
+		afs_printable_int32_ld(code),
+		afs_printable_int32_ld(res.hdr.reason));
+	}
     }
 #endif /* AFS_DEMAND_ATTACH_FS */
 
