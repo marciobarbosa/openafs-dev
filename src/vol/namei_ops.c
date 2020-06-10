@@ -3252,14 +3252,14 @@ namei_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
     h.largeVnodeIndex_hi = h.id;
     h.linkTable_hi = h.id;
 
-    if (VCreateVolumeDiskHeader(&h, partP)) {
+    if (VCreateVolumeDiskHeader(&h, partP, 1)) {
         Log("1 namei_ConvertROtoRWvolume: Couldn't write header for RW-volume %lu\n",
 	    afs_printable_uint32_lu(h.id));
 	code = EIO;
 	goto done;
     }
 
-    if (VDestroyVolumeDiskHeader(partP, volumeId, h.parent)) {
+    if (VDestroyVolumeDiskHeader(partP, volumeId, h.parent, 1)) {
         Log("1 namei_ConvertROtoRWvolume: Couldn't unlink header for RO-volume %lu\n",
 	    afs_printable_uint32_lu(volumeId));
     }

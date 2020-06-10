@@ -217,7 +217,7 @@ nuke(char *aname, VolumeId avolid)
 	 * system, and is a normal file.  As such, it is not stamped with the
 	 * volume's ID in its inode, and has to be removed explicitly.
 	 */
-	code = VDestroyVolumeDiskHeader(dp, avolid, 0);
+	code = VDestroyVolumeDiskHeader(dp, avolid, 0, 1);
     } else {
 	/* just free things */
 	for (ti = allInodes; ti; ti = ni) {

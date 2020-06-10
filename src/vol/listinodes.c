@@ -1450,14 +1450,14 @@ inode_ConvertROtoRWvolume(char *pname, VolumeId volumeId)
     }
 #endif
 
-    if (VCreateVolumeDiskHeader(&h, partP)) {
+    if (VCreateVolumeDiskHeader(&h, partP, 1)) {
         Log("1 inode_ConvertROtoRWvolume: Couldn't write header for RW-volume %lu\n",
 	    afs_printable_uint32_lu(h.id));
         code = EIO;
 	goto done;
     }
 
-    if (VDestroyVolumeDiskHeader(partP, volumeId, h.parent)) {
+    if (VDestroyVolumeDiskHeader(partP, volumeId, h.parent, 1)) {
         Log("1 inode_ConvertROtoRWvolume: Couldn't unlink header for RO-volume %lu\n",
 	    afs_printable_uint32_lu(volumeId));
     }

@@ -996,7 +996,8 @@ DeleteExtraVolumeHeaderFile(struct SalvInfo *salvinfo, struct VolumeSummary *vsp
 	     "(%sdeleted)\n", path, (Testing ? "would have been " : ""));
     if (!Testing) {
 	afs_int32 code;
-	code = VDestroyVolumeDiskHeader(salvinfo->fileSysPartition, vsp->header.id, vsp->header.parent);
+	code = VDestroyVolumeDiskHeader(salvinfo->fileSysPartition, vsp->header.id,
+					vsp->header.parent, salvinfo->useFSYNC);
 	if (code) {
 	    Log("Error %ld destroying volume disk header for volume %" AFS_VOLID_FMT "\n",
 	        afs_printable_int32_ld(code),
@@ -1263,7 +1264,8 @@ GetInodeSummary(struct SalvInfo *salvinfo, FD_t inodeFile, VolumeId singleVolume
 			 * e.g. something else created them and they're not in the
 			 * fileserver VGC) */
 			VDestroyVolumeDiskHeader(salvinfo->fileSysPartition,
-			                         singleVolumeNumber, 0 /*parent*/);
+			                         singleVolumeNumber, 0 /*parent*/,
+						 salvinfo->useFSYNC);
 			AskDelete(salvinfo, singleVolumeNumber);
 		    }
 		}
@@ -2267,7 +2269,7 @@ SalvageVolumeHeaderFile(struct SalvInfo *salvinfo, struct InodeSummary *isp,
     struct ViceInodeInfo *ip;
     int allinodesobsolete = 1;
     struct VolumeDiskHeader diskHeader;
-    afs_int32 (*writefunc)(VolumeDiskHeader_t *, struct DiskPartition64 *) = NULL;
+    afs_int32 (*writefunc)(VolumeDiskHeader_t *, struct DiskPartition64 *, int useFSYNC) = NULL;
     int *skip;
     struct VolumeHeader tempHeader;
     struct afs_inode_info stuff[MAXINODETYPE];
@@ -2484,7 +2486,7 @@ SalvageVolumeHeaderFile(struct SalvInfo *salvinfo, struct InodeSummary *isp,
 	} else {
 	    afs_int32 code;
 	    VolumeHeaderToDisk(&diskHeader, &tempHeader);
-	    code = (*writefunc)(&diskHeader, salvinfo->fileSysPartition);
+	    code = (*writefunc)(&diskHeader, salvinfo->fileSysPartition, salvinfo->useFSYNC);
 	    if (code) {
 		Log("Error %ld writing volume header file for volume %" AFS_VOLID_FMT "\n",
 		    afs_printable_int32_ld(code),
@@ -4421,7 +4423,8 @@ MaybeZapVolume(struct SalvInfo *salvinfo, struct InodeSummary *isp,
 		VolumeExternalName_r(isp->volumeId, filename, sizeof(filename));
 		sprintf(path, "%s" OS_DIRSEP "%s", salvinfo->fileSysPath, filename);
 
-		code = VDestroyVolumeDiskHeader(salvinfo->fileSysPartition, isp->volumeId, isp->RWvolumeId);
+		code = VDestroyVolumeDiskHeader(salvinfo->fileSysPartition, isp->volumeId,
+						isp->RWvolumeId, salvinfo->useFSYNC);
 		if (code) {
 		    Log("Error %ld destroying volume disk header for volume %" AFS_VOLID_FMT "\n",
 		        afs_printable_int32_ld(code),

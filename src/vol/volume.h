@@ -903,11 +903,14 @@ extern afs_int32 VReadVolumeDiskHeader(VolumeId volid,
 				       struct DiskPartition64 * dp,
 				       VolumeDiskHeader_t * hdr);
 extern afs_int32 VWriteVolumeDiskHeader(VolumeDiskHeader_t * hdr,
-					struct DiskPartition64 * dp);
+					struct DiskPartition64 * dp,
+					int useFSYNC);
 extern afs_int32 VCreateVolumeDiskHeader(VolumeDiskHeader_t * hdr,
-					 struct DiskPartition64 * dp);
+					 struct DiskPartition64 * dp,
+					 int useFSYNC);
 extern afs_int32 VDestroyVolumeDiskHeader(struct DiskPartition64 * dp,
-					  VolumeId volid, VolumeId parent);
+					  VolumeId volid, VolumeId parent,
+					  int useFSYNC);
 
 /**
  * VWalkVolumeHeaders header callback.
