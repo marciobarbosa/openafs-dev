@@ -1343,6 +1343,23 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	    afs_volume_ttl = parm2;
 	    code = 0;
 	}
+    } else if (parm == AFSOP_SOCKPROXY_HANDLER) {
+#ifdef AFS_DARWIN190_ENV
+	int reqsize = sizeof(afs_sockproxy_req);
+
+	/* get response from user space process */
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&afs_sockproxy_req, reqsize, code);
+
+	if (code == 0) {
+	    code = afs_SockProxyHandler(&afs_sockproxy_req);
+	}
+	if (code != 0) {
+	    goto out;
+	}
+
+	/* send request to user space process */
+	AFS_COPYOUT((caddr_t)&afs_sockproxy_req, AFSKPTR(parm2), reqsize, code);
+#endif
     } else {
 	code = EINVAL;
     }

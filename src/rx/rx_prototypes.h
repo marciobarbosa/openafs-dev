@@ -259,6 +259,9 @@ extern osi_socket rxi_GetHostUDPSocket(u_int host, u_short port);
 extern int osi_utoa(char *buf, size_t len, unsigned long val);
 extern void rxi_InitPeerParams(struct rx_peer *pp);
 extern void shutdown_rxkernel(void);
+#ifdef AFS_DARWIN190_ENV
+extern int rxk_SockProxyRequest(struct afs_sockproxy_request *areq);
+#endif
 # ifdef AFS_USERSPACE_IP_ADDR
 extern int rxi_GetcbiInfo(void);
 extern afs_int32 rxi_Findcbi(afs_uint32 addr);

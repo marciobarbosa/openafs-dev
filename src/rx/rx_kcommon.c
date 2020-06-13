@@ -127,6 +127,32 @@ rxi_GetUDPSocket(u_short port)
     return rxi_GetHostUDPSocket(htonl(INADDR_ANY), port);
 }
 
+#ifdef AFS_DARWIN190_ENV
+int
+rxk_SockProxyRequest(struct afs_sockproxy_request *areq)
+{
+    ObtainWriteLock(&areq->lock, 868);
+
+    /* <marcio> testing */
+    areq->socket = 5;
+
+    areq->pending = 1;
+    areq->complete = 0;
+    afs_osi_Wakeup(areq);
+    ConvertWToRLock(&areq->lock);
+
+    while (!areq->complete) {
+	ReleaseReadLock(&areq->lock);
+	afs_osi_Sleep(areq);
+	ObtainReadLock(&areq->lock);
+    }
+    printf("<marcio> rx: received %d\n", areq->socket);
+    ReleaseReadLock(&areq->lock);
+
+    return 0;
+}
+#endif
+
 /*
  * osi_utoa() - write the NUL-terminated ASCII decimal form of the given
  * unsigned long value into the given buffer.  Returns 0 on success,
@@ -869,6 +895,9 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
     code = socreate(AF_INET, &newSocket, SOCK_DGRAM, IPPROTO_UDP,
 		    afs_osi_credp, curthread);
 #elif defined(AFS_DARWIN80_ENV)
+#ifdef AFS_DARWIN190_ENV
+    (void)rxk_SockProxyRequest(&afs_sockproxy_req);
+#endif
 #ifdef RXK_LISTENER_ENV
     code = sock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, NULL, &newSocket);
 #else

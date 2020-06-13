@@ -544,6 +544,9 @@ afs_ResourceInit(int preallocs)
 #endif
     AFS_RWLOCK_INIT(&afs_xconn, "afs_xconn");
 
+    memset(&afs_sockproxy_req, 0, sizeof(afs_sockproxy_req));
+    AFS_RWLOCK_INIT(&afs_sockproxy_req.lock, "sockproxy_lock");
+
     afs_CellInit();
     afs_InitCBQueue(1);		/* initialize callback queues */
 

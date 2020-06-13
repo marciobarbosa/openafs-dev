@@ -183,6 +183,9 @@ static int event_pid;
 #undef	VIRTUE
 #undef	VICE
 
+#ifdef AFS_DARWIN190_ENV
+#include <sys/socket.h>
+#endif
 
 #define CACHEINFOFILE   "cacheinfo"
 #define	DCACHEFILE	"CacheItems"
@@ -1521,6 +1524,49 @@ AfsdbLookupHandler(void)
 #endif
 }
 
+#ifdef AFS_DARWIN190_ENV
+static void
+SockProxyHandler(void)
+{
+    /*
+     * socket_t
+     * struct msghdr
+     * mbuf_t - sock_receivembuf - m
+     * size_t - sock_receivembuf - nbytes
+     * int - sock_setsockopt - buflen
+     * int - sock_setsockopt - sizeof(buflen)
+     * struct sockaddr_in - sock_bind - myaddr
+     **/
+    struct afs_sockproxy_request sockproxy_req;
+    memset(&sockproxy_req, 0, sizeof(sockproxy_req));
+
+    while (1) {
+	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER, &sockproxy_req);
+	if (code) {
+	    sleep(1);
+	    continue;
+	}
+	printf("<marcio - debug> received: %d\n", sockproxy_req.socket);
+	sockproxy_req.socket = 7;
+    }
+}
+
+static void *
+sockproxy_thread(void *rock)
+{
+    /*
+     * Since the socket proxy handler runs as a user process, need to drop the
+     * controlling TTY, etc.
+     */
+    if (afsd_daemon(0, 0) == -1) {
+	printf("Error starting socket proxy handler: %s\n", strerror(errno));
+	exit(1);
+    }
+    SockProxyHandler();
+    return NULL;
+}
+#endif
+
 #ifdef AFS_NEW_BKG
 static void
 BkgHandler(void)
@@ -2210,6 +2256,11 @@ afsd_run(void)
     fork_rx_syscall(rn, AFSOP_RXEVENT_DAEMON);
 #endif
 
+#ifdef AFS_DARWIN190_ENV
+    printf("%s: Forking socket proxy handler.\n", rn);
+    afsd_fork(0, sockproxy_thread, NULL);
+#endif
+
     if (enable_afsdb) {
 	if (afsd_verbose)
 	    printf("%s: Forking AFSDB lookup handler.\n", rn);
@@ -2734,6 +2785,7 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
     case AFSOP_CACHEINFO:
     case AFSOP_CACHEINIT:
     case AFSOP_CELLINFO:
+    case AFSOP_SOCKPROXY_HANDLER:
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	break;
     case AFSOP_ADDCELLALIAS:

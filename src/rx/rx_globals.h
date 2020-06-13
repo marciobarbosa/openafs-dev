@@ -36,6 +36,9 @@
 
 /* Basic socket for client requests; other sockets (for receiving server requests) are in the service structures */
 EXT osi_socket rx_socket;
+#ifdef AFS_DARWIN190_ENV
+EXT struct afs_sockproxy_request afs_sockproxy_req;
+#endif
 
 /* The array of installed services.  Null terminated. */
 EXT struct rx_service *rx_services[RX_MAX_SERVICES + 1];

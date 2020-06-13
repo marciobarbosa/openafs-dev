@@ -1027,6 +1027,10 @@ extern afs_int32 afs_data_pointer_to_int32(const void *p);
 extern int afs_badop(void);
 extern int afs_noop(void);
 extern afs_int32 afs_data_pointer_to_int32(const void *p);
+#ifdef AFS_DARWIN190_ENV
+extern struct afs_sockproxy_request afs_sockproxy_req;
+extern int afs_SockProxyHandler(struct afs_sockproxy_request areq);
+#endif
 
 /* afs_warn.c */
 

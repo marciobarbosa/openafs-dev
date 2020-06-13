@@ -332,3 +332,32 @@ afs_calc_inum(afs_int32 cell, afs_int32 volume, afs_int32 vnode)
     ino &= 0x7fffffff;      /* Assumes 32 bit ino_t ..... */
     return ino;
 }
+
+#ifdef AFS_DARWIN190_ENV
+int
+afs_SockProxyHandler(struct afs_sockproxy_request *areq)
+{
+    ObtainSharedLock(&areq->lock, 866);
+    if (areq->pending) {
+	UpgradeSToWLock(&areq->lock, 867);
+	/* handle response given by user space process */
+	printf("<marcio - debug> received from user space: %d\n", areq->socket);
+	areq->pending = 0;
+	areq->complete = 1;
+	afs_osi_Wakeup(areq);
+	ConvertWToSLock(&areq->lock);
+    }
+    ConvertSToRLock(&areq->lock);
+
+    /* wait for a request */
+    while (areq->pending == 0) {
+	ReleaseReadLock(&areq->lock);
+	afs_osi_Sleep(areq);
+	ObtainReadLock(&areq->lock);
+    }
+    /* return request to user space */
+    ReleaseReadLock(&areq->lock);
+
+    return 0;
+}
+#endif

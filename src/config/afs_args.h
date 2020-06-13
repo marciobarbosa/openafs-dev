@@ -83,8 +83,9 @@
 /* AFSOP_STOP_RXK_LISTENER	217	   defined in osi.h */
 #define AFSOP_STOP_AFSDB	218	/* Stop AFSDB handler */
 #define AFSOP_STOP_NETIF	219	/* Stop Netif poller */
+#define AFSOP_SOCKPROXY_HANDLER	220	/* Userspace socket handler */
 
-#define AFSOP_MAX_OPCODE	AFSOP_STOP_NETIF /* Largest defined opcode. */
+#define AFSOP_MAX_OPCODE	AFSOP_SOCKPROXY_HANDLER /* Largest defined opcode. */
 
 /*
  * AFS system call types and flags.
@@ -173,6 +174,15 @@ struct afs_cacheParams {
     afs_int32 users;
     afs_int32 dynamic_vcaches;
 };
+
+#ifdef AFS_DARWIN190_ENV
+struct afs_sockproxy_request {
+    char pending;
+    char complete;
+    int socket;
+    afs_rwlock_t lock;
+};
+#endif
 
 /* Supported values for AFSOP_SET_INUMCALC. */
 enum {
