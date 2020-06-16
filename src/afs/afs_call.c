@@ -1345,20 +1345,25 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	}
     } else if (parm == AFSOP_SOCKPROXY_HANDLER) {
 #ifdef AFS_DARWIN190_ENV
-	int reqsize = sizeof(afs_sockproxy_req);
+	int socket;
 
+	socket = parm2;
+	code = 0;
+
+	afs_warn("<marcio> AFSOP_SOCKPROXY_HANDLER\n");
 	/* get response from user space process */
-	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&afs_sockproxy_req, reqsize, code);
+	/*AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&socket, sizeof(socket), code);*/
 
 	if (code == 0) {
-	    code = afs_SockProxyHandler(&afs_sockproxy_req);
+	    afs_warn("<marcio> calling rxk_SockProxyReply\n");
+	    code = rxk_SockProxyReply(socket);
 	}
 	if (code != 0) {
 	    goto out;
 	}
 
 	/* send request to user space process */
-	AFS_COPYOUT((caddr_t)&afs_sockproxy_req, AFSKPTR(parm2), reqsize, code);
+	/*AFS_COPYOUT((caddr_t)&socket, AFSKPTR(parm2), sizeof(socket), code);*/
 #endif
     } else {
 	code = EINVAL;

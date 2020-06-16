@@ -1537,17 +1537,17 @@ SockProxyHandler(void)
      * int - sock_setsockopt - sizeof(buflen)
      * struct sockaddr_in - sock_bind - myaddr
      **/
-    struct afs_sockproxy_request sockproxy_req;
-    memset(&sockproxy_req, 0, sizeof(sockproxy_req));
+    int code, socket;
 
     while (1) {
-	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER, &sockproxy_req);
+	printf("<marcio - debug> calling AFSOP_SOCKPROXY_HANDLER\n");
+	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER, socket);
 	if (code) {
 	    sleep(1);
 	    continue;
 	}
-	printf("<marcio - debug> received: %d\n", sockproxy_req.socket);
-	sockproxy_req.socket = 7;
+	printf("<marcio - debug> received: %d\n", socket);
+	socket = 7;
     }
 }
 
@@ -2259,6 +2259,7 @@ afsd_run(void)
 #ifdef AFS_DARWIN190_ENV
     printf("%s: Forking socket proxy handler.\n", rn);
     afsd_fork(0, sockproxy_thread, NULL);
+    printf("%s: Socket proxy handler started.\n", rn);
 #endif
 
     if (enable_afsdb) {
@@ -2776,6 +2777,7 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
     case AFSOP_SET_RMTSYS_FLAG:
     case AFSOP_SET_INUMCALC:
     case AFSOP_SET_VOLUME_TTL:
+    case AFSOP_SOCKPROXY_HANDLER:
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, int)));
 	break;
     case AFSOP_SET_THISCELL:
@@ -2785,7 +2787,6 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
     case AFSOP_CACHEINFO:
     case AFSOP_CACHEINIT:
     case AFSOP_CELLINFO:
-    case AFSOP_SOCKPROXY_HANDLER:
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	break;
     case AFSOP_ADDCELLALIAS:

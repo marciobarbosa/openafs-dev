@@ -175,15 +175,6 @@ struct afs_cacheParams {
     afs_int32 dynamic_vcaches;
 };
 
-#ifdef AFS_DARWIN190_ENV
-struct afs_sockproxy_request {
-    char pending;
-    char complete;
-    int socket;
-    afs_rwlock_t lock;
-};
-#endif
-
 /* Supported values for AFSOP_SET_INUMCALC. */
 enum {
     AFS_INUMCALC_COMPAT = 0,

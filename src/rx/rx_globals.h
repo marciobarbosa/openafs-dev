@@ -36,8 +36,16 @@
 
 /* Basic socket for client requests; other sockets (for receiving server requests) are in the service structures */
 EXT osi_socket rx_socket;
-#ifdef AFS_DARWIN190_ENV
-EXT struct afs_sockproxy_request afs_sockproxy_req;
+
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+struct rxk_sockproxy_request {
+    char pending;
+    char complete;
+    int socket;
+    afs_kmutex_t lock;
+    afs_kcondvar_t cv;
+};
+EXT struct rxk_sockproxy_request rxk_sockproxy_req;
 #endif
 
 /* The array of installed services.  Null terminated. */

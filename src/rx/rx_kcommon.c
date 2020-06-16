@@ -127,28 +127,48 @@ rxi_GetUDPSocket(u_short port)
     return rxi_GetHostUDPSocket(htonl(INADDR_ANY), port);
 }
 
-#ifdef AFS_DARWIN190_ENV
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
 int
-rxk_SockProxyRequest(struct afs_sockproxy_request *areq)
+rxk_SockProxyRequest(void)
 {
-    ObtainWriteLock(&areq->lock, 868);
+    MUTEX_ENTER(&rxk_sockproxy_req.lock);
 
     /* <marcio> testing */
-    areq->socket = 5;
+    rxk_sockproxy_req.socket = 5;
 
-    areq->pending = 1;
-    areq->complete = 0;
-    afs_osi_Wakeup(areq);
-    ConvertWToRLock(&areq->lock);
+    rxk_sockproxy_req.pending = 1;
+    rxk_sockproxy_req.complete = 0;
+    CV_BROADCAST(&rxk_sockproxy_req.cv);
 
-    while (!areq->complete) {
-	ReleaseReadLock(&areq->lock);
-	afs_osi_Sleep(areq);
-	ObtainReadLock(&areq->lock);
+    while (!rxk_sockproxy_req.complete) {
+	printf("<marcio> rx: going to the bed (rxk_SockProxyRequest)\n");
+	CV_WAIT(&rxk_sockproxy_req.cv, &rxk_sockproxy_req.lock);
     }
-    printf("<marcio> rx: received %d\n", areq->socket);
-    ReleaseReadLock(&areq->lock);
 
+    printf("<marcio> rx: received %d\n", rxk_sockproxy_req.socket);
+    MUTEX_EXIT(&rxk_sockproxy_req.lock);
+
+    return 0;
+}
+
+int
+rxk_SockProxyReply(int asocket)
+{
+    MUTEX_ENTER(&rxk_sockproxy_req.lock);
+
+    if (rxk_sockproxy_req.pending) {
+	rxk_sockproxy_req.socket = asocket;
+	rxk_sockproxy_req.pending = 0;
+	rxk_sockproxy_req.complete = 1;
+	CV_BROADCAST(&rxk_sockproxy_req.cv);
+    }
+
+    while (!rxk_sockproxy_req.pending) {
+	printf("<marcio> rx: going to the bed (rxk_SockProxyReply)\n");
+	CV_WAIT(&rxk_sockproxy_req.cv, &rxk_sockproxy_req.lock);
+    }
+
+    MUTEX_EXIT(&rxk_sockproxy_req.lock);
     return 0;
 }
 #endif
@@ -895,8 +915,8 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
     code = socreate(AF_INET, &newSocket, SOCK_DGRAM, IPPROTO_UDP,
 		    afs_osi_credp, curthread);
 #elif defined(AFS_DARWIN80_ENV)
-#ifdef AFS_DARWIN190_ENV
-    (void)rxk_SockProxyRequest(&afs_sockproxy_req);
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    (void)rxk_SockProxyRequest();
 #endif
 #ifdef RXK_LISTENER_ENV
     code = sock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, NULL, &newSocket);

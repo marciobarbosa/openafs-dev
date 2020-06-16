@@ -515,6 +515,11 @@ rx_InitHost(u_int host, u_int port)
     rxi_InitializeThreadSupport();
 #endif
 
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    MUTEX_INIT(&rxk_sockproxy_req.lock, "rxk_sockproxy_mutex", MUTEX_DEFAULT, 0);
+    CV_INIT(&rxk_sockproxy_req.cv, "rxk_sockproxy_cv", CV_DEFAULT, 0);
+#endif
+
     /* Allocate and initialize a socket for client and perhaps server
      * connections. */
 
