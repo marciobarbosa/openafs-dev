@@ -1345,25 +1345,34 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	}
     } else if (parm == AFSOP_SOCKPROXY_HANDLER) {
 #ifdef AFS_DARWIN190_ENV
-	int socket;
-
-	socket = parm2;
-	code = 0;
+	int socket, op;
+	void *addr, *iov, *payload;
+	int bsize, isize, psize;
+	char iov_buffer[2 * 16384];
 
 	afs_warn("<marcio> AFSOP_SOCKPROXY_HANDLER\n");
+	memset(iov_buffer, 0, sizeof(iov_buffer));
 	/* get response from user space process */
-	/*AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&socket, sizeof(socket), code);*/
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&op, sizeof(op), code);
+	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&socket, sizeof(socket), code);
+	AFS_COPYIN(AFSKPTR(parm6), (caddr_t)iov_buffer, sizeof(iov_buffer), code);
+	payload = iov_buffer;
 
 	if (code == 0) {
 	    afs_warn("<marcio> calling rxk_SockProxyReply\n");
-	    code = rxk_SockProxyReply(socket);
+	    code = rxk_SockProxyReply(&op, &socket, &addr, &bsize, &iov,
+		    		      &isize, &payload, &psize);
 	}
 	if (code != 0) {
 	    goto out;
 	}
 
 	/* send request to user space process */
-	/*AFS_COPYOUT((caddr_t)&socket, AFSKPTR(parm2), sizeof(socket), code);*/
+	AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
+	AFS_COPYOUT((caddr_t)&socket, AFSKPTR(parm3), sizeof(socket), code);
+	AFS_COPYOUT((caddr_t)addr, AFSKPTR(parm4), bsize, code);
+	AFS_COPYOUT((caddr_t)iov, AFSKPTR(parm5), isize, code);
+	AFS_COPYOUT((caddr_t)payload, AFSKPTR(parm6), psize, code);
 #endif
     } else {
 	code = EINVAL;

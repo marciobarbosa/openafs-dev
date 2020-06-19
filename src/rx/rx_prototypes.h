@@ -257,8 +257,9 @@ extern void rxk_shutdownPorts(void);
 extern osi_socket rxi_GetUDPSocket(u_short port);
 extern osi_socket rxi_GetHostUDPSocket(u_int host, u_short port);
 #if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
-extern int rxk_SockProxyRequest(void);
-extern int rxk_SockProxyReply(int asocket);
+extern int rxk_SockProxyRequest(int aop, void *addr, struct iovec *iov, int n_iov);
+extern int rxk_SockProxyReply(int *aop, int *asocket, void **addr, int *asize, void **iov, int *isize,
+			      void **payload, int *psize);
 #endif
 extern int osi_utoa(char *buf, size_t len, unsigned long val);
 extern void rxi_InitPeerParams(struct rx_peer *pp);

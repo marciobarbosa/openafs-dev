@@ -39,11 +39,18 @@ EXT osi_socket rx_socket;
 
 #if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
 struct rxk_sockproxy_request {
+    char op;
+    char ready;
     char pending;
     char complete;
     int socket;
     afs_kmutex_t lock;
     afs_kcondvar_t cv;
+    struct sockaddr_in *addr;
+    struct iovec *iov;
+    int n_iov;
+    void *payload;
+    int psize;
 };
 EXT struct rxk_sockproxy_request rxk_sockproxy_req;
 #endif

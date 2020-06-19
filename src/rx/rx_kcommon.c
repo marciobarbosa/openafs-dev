@@ -129,20 +129,55 @@ rxi_GetUDPSocket(u_short port)
 
 #if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
 int
-rxk_SockProxyRequest(void)
+rxk_SockProxyRequest(int aop, void *addr, struct iovec *iov, int n_iov)
 {
+    int i, total_size = 0;
+    void *payload;
+    int offset;
+
     MUTEX_ENTER(&rxk_sockproxy_req.lock);
 
-    /* <marcio> testing */
-    rxk_sockproxy_req.socket = 5;
+    while (!rxk_sockproxy_req.ready) {
+	printf("<marcio> not ready yet.. wait... (rxk_SockProxyRequest)\n");
+	CV_WAIT(&rxk_sockproxy_req.cv, &rxk_sockproxy_req.lock);
+    }
 
+    rxk_sockproxy_req.op = aop;
     rxk_sockproxy_req.pending = 1;
     rxk_sockproxy_req.complete = 0;
+    if (aop == 2 || aop == 3 || aop == 4) {
+	rxk_sockproxy_req.addr = addr;
+    }
+    if (aop == 3) {
+	rxk_sockproxy_req.iov = iov;
+	rxk_sockproxy_req.n_iov = n_iov;
+
+	for (i = 0; i < n_iov; i++) {
+	    total_size += iov[i].iov_len;
+	}
+	rxk_sockproxy_req.payload = rxi_Alloc(total_size);
+	rxk_sockproxy_req.psize = total_size;
+	payload = rxk_sockproxy_req.payload;
+	for (i = 0, offset = 0; i < n_iov; i++) {
+	    memcpy(payload + offset, iov[i].iov_base, iov[i].iov_len);
+	    offset += iov[i].iov_len;
+	}
+    }
+    if (aop == 4) {
+	rxk_sockproxy_req.iov = iov;
+	rxk_sockproxy_req.n_iov = n_iov;
+    }
     CV_BROADCAST(&rxk_sockproxy_req.cv);
 
     while (!rxk_sockproxy_req.complete) {
-	printf("<marcio> rx: going to the bed (rxk_SockProxyRequest)\n");
+	printf("<marcio> rx: going to the bed (rxk_SockProxyRequest) (op: %d)\n", aop);
 	CV_WAIT(&rxk_sockproxy_req.cv, &rxk_sockproxy_req.lock);
+    }
+
+    if (aop == 3) {
+	rxi_Free(rxk_sockproxy_req.payload, total_size);
+	rxk_sockproxy_req.payload = NULL;
+	rxk_sockproxy_req.payload = 0;
     }
 
     printf("<marcio> rx: received %d\n", rxk_sockproxy_req.socket);
@@ -152,20 +187,54 @@ rxk_SockProxyRequest(void)
 }
 
 int
-rxk_SockProxyReply(int asocket)
+rxk_SockProxyReply(int *aop, int *asocket, void **addr, int *asize, void **iov,
+		   int *isize, void **payload, int *psize)
 {
+    int i, offset;
+
     MUTEX_ENTER(&rxk_sockproxy_req.lock);
 
     if (rxk_sockproxy_req.pending) {
-	rxk_sockproxy_req.socket = asocket;
+	rxk_sockproxy_req.socket = *asocket;
+	rxk_sockproxy_req.op = -1;
 	rxk_sockproxy_req.pending = 0;
 	rxk_sockproxy_req.complete = 1;
+
+	if (*aop == 4) {
+	    for (i = 0, offset = 0; i < 2; i++) {
+		memcpy(rxk_sockproxy_req.iov[i].iov_base, *payload + offset,
+		       rxk_sockproxy_req.iov[i].iov_len);
+		offset += rxk_sockproxy_req.iov[i].iov_len;
+	    }
+	}
+
+	CV_BROADCAST(&rxk_sockproxy_req.cv);
+    }
+
+    if (!rxk_sockproxy_req.ready) {
+	rxk_sockproxy_req.ready = 1;
 	CV_BROADCAST(&rxk_sockproxy_req.cv);
     }
 
     while (!rxk_sockproxy_req.pending) {
 	printf("<marcio> rx: going to the bed (rxk_SockProxyReply)\n");
 	CV_WAIT(&rxk_sockproxy_req.cv, &rxk_sockproxy_req.lock);
+    }
+    *aop = rxk_sockproxy_req.op;
+    *asocket = rxk_sockproxy_req.socket;
+    if (*aop == 2 || *aop == 3 || *aop == 4) {
+	*addr = rxk_sockproxy_req.addr;
+	*asize = sizeof(*rxk_sockproxy_req.addr);
+    }
+    if (*aop == 3) {
+	*iov = rxk_sockproxy_req.iov;
+	*isize = rxk_sockproxy_req.n_iov * sizeof(rxk_sockproxy_req.iov[0]);
+	*payload = rxk_sockproxy_req.payload;
+	*psize = rxk_sockproxy_req.psize;
+    }
+    if (*aop == 4) {
+	*iov = rxk_sockproxy_req.iov;
+	*isize = rxk_sockproxy_req.n_iov * sizeof(rxk_sockproxy_req.iov[0]);
     }
 
     MUTEX_EXIT(&rxk_sockproxy_req.lock);
@@ -915,11 +984,12 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
     code = socreate(AF_INET, &newSocket, SOCK_DGRAM, IPPROTO_UDP,
 		    afs_osi_credp, curthread);
 #elif defined(AFS_DARWIN80_ENV)
-#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
-    (void)rxk_SockProxyRequest();
-#endif
 #ifdef RXK_LISTENER_ENV
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    (void)rxk_SockProxyRequest(0, NULL, NULL, 0);
+#else
     code = sock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, NULL, &newSocket);
+#endif
 #else
     code = sock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, rx_upcall, NULL, &newSocket);
 #endif
@@ -963,8 +1033,12 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
 #else /* AFS_HPUX110_ENV */
 #if defined(AFS_DARWIN80_ENV)
     {
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+	(void)rxk_SockProxyRequest(1, NULL, NULL, 0);
+#else
        int buflen = 50000;
        int i,code2;
+
        for (i=0;i<2;i++) {
            code = sock_setsockopt(newSocket, SOL_SOCKET, SO_SNDBUF,
                                   &buflen, sizeof(buflen));
@@ -976,6 +1050,7 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
 	      osi_Panic("osi_NewSocket: last attempt to reserve 32K failed!\n");
            buflen = 32766;
        }
+#endif
     }
 #else
 #if defined(AFS_NBSD_ENV)
@@ -995,7 +1070,11 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
 #if defined(AFS_FBSD_ENV)
     code = sobind(newSocket, (struct sockaddr *)&myaddr, curthread);
 #else
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    (void)rxk_SockProxyRequest(2, (void *)&myaddr, NULL, 0);
+#else
     code = sobind(newSocket, (struct sockaddr *)&myaddr);
+#endif
 #endif
     if (code) {
 	dpf(("sobind fails (%d)\n", (int)code));

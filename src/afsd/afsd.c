@@ -184,6 +184,7 @@ static int event_pid;
 #undef	VICE
 
 #ifdef AFS_DARWIN190_ENV
+#include <sys/types.h>
 #include <sys/socket.h>
 #endif
 
@@ -1528,6 +1529,7 @@ AfsdbLookupHandler(void)
 static void
 SockProxyHandler(void)
 {
+    FILE *fd = fopen("/Users/marcio/afsd_log", "a+");
     /*
      * socket_t
      * struct msghdr
@@ -1537,18 +1539,115 @@ SockProxyHandler(void)
      * int - sock_setsockopt - sizeof(buflen)
      * struct sockaddr_in - sock_bind - myaddr
      **/
-    int code, socket;
+    int code, i;
+    int op = -1, newSocket = -1;
+    int buflen = 50000;
+    struct sockaddr_in addr;
+    struct msghdr msg;
+
+    struct iovec iov[2];
+    int n_iov = 2;
+    char payload[32768];
+    int offset;
+    char iov_buffer[2][16384];
 
     while (1) {
-	printf("<marcio - debug> calling AFSOP_SOCKPROXY_HANDLER\n");
-	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER, socket);
+	fprintf(fd, "<marcio - debug> calling AFSOP_SOCKPROXY_HANDLER\n");
+
+	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
+			    &op,
+			    &newSocket,
+			    &addr,
+			    iov,
+			    payload,
+			    NULL,
+			    NULL);
 	if (code) {
 	    sleep(1);
 	    continue;
 	}
-	printf("<marcio - debug> received: %d\n", socket);
-	socket = 7;
+
+	fprintf(fd, "<marcio - debug> op: %d\n", op);
+	fprintf(fd, "<marcio - debug> received: %d\n", newSocket);
+
+	switch (op) {
+	    case 0:
+		fprintf(fd, "<marcio - debug> creating new socket\n");
+		newSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		fprintf(fd, "<marcio - debug> new socket: %d\n", newSocket);
+		break;
+	    case 1:
+		code = setsockopt(newSocket, SOL_SOCKET, SO_SNDBUF, &buflen, sizeof(buflen));
+		if (code == 0) {
+		    fprintf(fd, "<marcio - debug> setsockopt SO_SNDBUF worked!\n");
+		} else {
+		    fprintf(fd, "<marcio - debug> setsockopt SO_SNDBUF did not work.\n");
+		}
+		code = setsockopt(newSocket, SOL_SOCKET, SO_RCVBUF, &buflen, sizeof(buflen));
+		if (code == 0) {
+		    fprintf(fd, "<marcio - debug> setsockopt SO_RCVBUF worked!\n");
+		} else {
+		    fprintf(fd, "<marcio - debug> setsockopt SO_RCVBUF did not work.\n");
+		}
+		break;
+	    case 2:
+		code = bind(newSocket, (struct sockaddr *)&addr, sizeof(addr));
+		if (code == 0) {
+		    fprintf(fd, "<marcio - debug> bind worked!\n");
+		} else {
+		    fprintf(fd, "<marcio - debug> bind did not work.\n");
+		}
+		break;
+	    case 3:
+		/* send packets */
+		for (i = 0, offset = 0; i < n_iov; i++) {
+		    iov[i].iov_base = payload + offset;
+		    offset += iov[i].iov_len;
+		}
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_name = &addr;
+		msg.msg_namelen = ((struct sockaddr *)&addr)->sa_len;
+		msg.msg_iov = &iov[0];
+		msg.msg_iovlen = n_iov;
+		code = sendmsg(newSocket, &msg, 0);
+		fprintf(fd, "<marcio - debug> size: %d\n", code);
+		break;
+	    case 4:
+		/*
+		 * op
+		 * socket
+		 * addr
+		 * iov
+		 */
+		for (i = 0; i < n_iov; i++) {
+		    memset(iov_buffer[i], 0, sizeof(iov_buffer[i]));
+		    iov[i].iov_base = iov_buffer[i];
+		}
+		memset(&msg, 0, sizeof(msg));
+		memset(payload, 0, sizeof(payload));
+		msg.msg_name = &addr;
+		msg.msg_namelen = ((struct sockaddr *)&addr)->sa_len;
+		msg.msg_iov = &iov[0];
+		msg.msg_iovlen = 2;
+		code = recvmsg(newSocket, &msg, 0);
+
+		for (i = 0, offset = 0; i < n_iov; i++) {
+		    memcpy(payload + offset, iov[i].iov_base, iov[i].iov_len);
+		    offset += iov[i].iov_len;
+		}
+		/*
+		 * op
+		 * socket
+		 * payload
+		 */
+		break;
+	    default:
+		fprintf(fd, "<marcio - debug> op not found\n");
+	}
+	fflush(fd);
     }
+
+    fclose(fd);
 }
 
 static void *
@@ -2223,6 +2322,12 @@ afsd_run(void)
     /* Set realtime priority for most threads to same as for biod's. */
     afsd_set_afsd_rtpri();
 
+#ifdef AFS_DARWIN190_ENV
+    printf("%s: Forking socket proxy handler.\n", rn);
+    afsd_fork(0, sockproxy_thread, NULL);
+    printf("%s: Socket proxy handler started.\n", rn);
+#endif
+
     /* Start listener, then callback listener. Lastly, start rx event daemon.
      * Change in ordering is so that Linux port has socket fd in listener
      * process.
@@ -2254,12 +2359,6 @@ afsd_run(void)
     if (afsd_verbose)
 	printf("%s: Forking rxevent daemon.\n", rn);
     fork_rx_syscall(rn, AFSOP_RXEVENT_DAEMON);
-#endif
-
-#ifdef AFS_DARWIN190_ENV
-    printf("%s: Forking socket proxy handler.\n", rn);
-    afsd_fork(0, sockproxy_thread, NULL);
-    printf("%s: Socket proxy handler started.\n", rn);
 #endif
 
     if (enable_afsdb) {
@@ -2777,7 +2876,6 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
     case AFSOP_SET_RMTSYS_FLAG:
     case AFSOP_SET_INUMCALC:
     case AFSOP_SET_VOLUME_TTL:
-    case AFSOP_SOCKPROXY_HANDLER:
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, int)));
 	break;
     case AFSOP_SET_THISCELL:
@@ -2836,6 +2934,17 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, afs_uint32)));
 	break;
+#ifdef AFS_DARWIN190_ENV
+    case AFSOP_SOCKPROXY_HANDLER:
+	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[3] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[4] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[5] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[6] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	break;
+#endif
     default:
 	printf("Unknown syscall enountered: %d\n", syscall);
 	opr_Assert(0);
