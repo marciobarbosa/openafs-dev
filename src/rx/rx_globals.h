@@ -37,6 +37,33 @@
 /* Basic socket for client requests; other sockets (for receiving server requests) are in the service structures */
 EXT osi_socket rx_socket;
 
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+struct rx_sockproxy_proc {
+    char op;			/* operation to be performed */
+    char pending;		/* waiting for a reply from userspace */
+    char complete;		/* response received from userspace */
+    struct sockaddr *addr;	/* ip passed to userspace */
+    size_t asize;		/* size of addr */
+    void *payload;		/* payload passed to / received from userspace */
+    size_t psize;		/* size of payload */
+    afs_kcondvar_t cv_ready;	/* ready to receive requests */
+    afs_kcondvar_t cv_op;	/* request / reply received */
+    afs_kcondvar_t cv_pend;	/* proc in use */
+};
+struct rx_sockproxy_channel {
+    int socket;
+    /*
+     * processes running on userspace, each with a specific role:
+     * proc[0]: socket, setsockopt, bind, and sendmsg.
+     * proc[1]: recvmsg.
+     **/
+    struct rx_sockproxy_proc proc[2];
+    afs_kmutex_t lock;
+};
+/* communication channel between rx_SockProxyRequest and rx_SockProxyReply */
+EXT struct rx_sockproxy_channel rx_sockproxy_ch;
+#endif
+
 /* The array of installed services.  Null terminated. */
 EXT struct rx_service *rx_services[RX_MAX_SERVICES + 1];
 #ifdef RX_ENABLE_LOCKS
