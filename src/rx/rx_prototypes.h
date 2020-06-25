@@ -260,6 +260,7 @@ extern int rx_SockProxyReply(int *op,
 			     void **addr, int *asize,
 			     void **iov,int *isize,
 			     void **payload, int *psize);
+extern void rx_SockProxyTest(int op);
 #endif
 extern int osi_utoa(char *buf, size_t len, unsigned long val);
 extern void rxi_InitPeerParams(struct rx_peer *pp);

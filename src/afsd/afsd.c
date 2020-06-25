@@ -1718,6 +1718,24 @@ sockproxy_thread(void *rock)
     SockProxyHandler(*role);
     return NULL;
 }
+
+static void *
+sockproxy_thread_test(void *rock)
+{
+    int code;
+    int *op = (int *)rock;
+    /* Since the AFSDB lookup handler runs as a user process,
+     * need to drop the controlling TTY, etc.
+     */
+    if (afsd_daemon(0, 0) == -1) {
+	printf("Error starting AFSDB lookup handler: %s\n",
+	       strerror(errno));
+	exit(1);
+    }
+    code = afsd_syscall(AFSOP_SOCKPROXY_TEST, *op);
+
+    return NULL;
+}
 #endif
 
 static void *
@@ -2291,6 +2309,11 @@ afsd_run(void)
     afsd_fork(0, sockproxy_thread, &code);
     code = SOCKPROXY_RECVPKTS;	/* role to be performed */
     afsd_fork(0, sockproxy_thread, &code);
+
+    code = SOCKPROXY_SOCKET;
+    afsd_fork(0, sockproxy_thread_test, &code);
+    code = SOCKPROXY_RECV;
+    afsd_fork(0, sockproxy_thread_test, &code);
 #endif
 
     if (enable_afsdb) {
@@ -2808,6 +2831,7 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
     case AFSOP_SET_RMTSYS_FLAG:
     case AFSOP_SET_INUMCALC:
     case AFSOP_SET_VOLUME_TTL:
+    case AFSOP_SOCKPROXY_TEST:
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, int)));
 	break;
     case AFSOP_SET_THISCELL:

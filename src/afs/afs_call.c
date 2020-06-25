@@ -1391,6 +1391,16 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	AFS_COPYOUT((caddr_t)iov, AFSKPTR(parm5), isize, code);
 	AFS_COPYOUT((caddr_t)payload, AFSKPTR(parm6), psize, code);
 #endif
+    } else if (parm == AFSOP_SOCKPROXY_TEST) {
+#ifdef AFS_DARWIN190_ENV
+	int op;
+
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&op, sizeof(op), code);
+
+	AFS_GUNLOCK();
+	rx_SockProxyTest(op);
+	AFS_GLOCK();
+#endif
     } else {
 	code = EINVAL;
     }

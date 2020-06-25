@@ -188,6 +188,7 @@ afsd_init_syscall_opcodes(void)
     add_opcode(AFSOP_STOP_AFSDB);
     add_opcode(AFSOP_STOP_NETIF);
     add_opcode(AFSOP_SOCKPROXY_HANDLER);
+    add_opcode(AFSOP_SOCKPROXY_TEST);
 #undef add_opcode
 }
 

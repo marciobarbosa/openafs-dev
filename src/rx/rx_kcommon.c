@@ -294,6 +294,18 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize, void **iov,
     MUTEX_EXIT(&ch->lock);
     return 0;
 }
+
+void
+rx_SockProxyTest(int op)
+{
+    int code;
+
+    while (1) {
+	code = rx_SockProxyRequest(op, NULL, NULL);
+	printf("<marcio> request code: %d\n", code);
+	sleep(2);
+    }
+}
 #endif
 
 /*
