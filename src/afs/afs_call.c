@@ -1343,6 +1343,54 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	    afs_volume_ttl = parm2;
 	    code = 0;
 	}
+    } else if (parm == AFSOP_SOCKPROXY_HANDLER) {
+#ifdef AFS_DARWIN190_ENV
+	int op, rock;
+	void *addr, *iov, *payload, *buffer;
+	int asize, isize, psize, bsize;
+
+	op = rock = -1;
+	addr = iov = payload = buffer = NULL;
+	asize = isize = psize = bsize = 0;
+
+	/* get response from userspace */
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&op, sizeof(op), code);
+	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&rock, sizeof(rock), code);
+	AFS_COPYIN(AFSKPTR(parm6), (caddr_t)&psize, sizeof(psize), code);
+
+	/* if received payload from userspace (recvmsg), copy it to buffer */
+	if (psize > 0) {
+	    buffer = afs_osi_Alloc(psize);
+	    bsize = psize;
+	    payload = buffer;
+	    AFS_COPYIN(AFSKPTR(parm5), (caddr_t)payload, psize, code);
+	}
+
+	AFS_GUNLOCK();
+	/*
+	 * send response from userspace (if any) to the rx layer and wait for a
+	 * new request.
+	 */
+	code = rx_SockProxyReply(&op,
+				 &rock,
+				 &addr, &asize,
+				 &iov, &isize,
+				 &payload, &psize);
+	AFS_GLOCK();
+
+	if (buffer != NULL) {
+	    afs_osi_Free(buffer, bsize);
+	    buffer = NULL;
+	    bsize = 0;
+	}
+
+	/* send request to userspace process */
+	AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
+	AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);
+	AFS_COPYOUT((caddr_t)addr, AFSKPTR(parm4), asize, code);
+	AFS_COPYOUT((caddr_t)iov, AFSKPTR(parm5), isize, code);
+	AFS_COPYOUT((caddr_t)payload, AFSKPTR(parm6), psize, code);
+#endif
     } else {
 	code = EINVAL;
     }

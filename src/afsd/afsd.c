@@ -1647,6 +1647,79 @@ BkgHandler(void)
 }
 #endif
 
+#ifdef AFS_DARWIN190_ENV
+/* operations to be performed by us (also defined in rx_globals.h) */
+#define SOCKPROXY_SOCKET	2
+#define SOCKPROXY_SETOPT	4
+#define SOCKPROXY_BIND		8
+#define SOCKPROXY_SEND		16
+#define SOCKPROXY_RECV		32
+
+#define SOCKPROXY_SENDPKTS	0
+#define SOCKPROXY_RECVPKTS	1
+
+static void
+SockProxyHandler(int role)
+{
+    int code;
+    int op, rock;
+    void *buffer;
+
+    op = role;
+    rock = -1;
+    buffer = NULL;
+
+    while (1) {
+	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
+			    &op,
+			    &rock,
+			    NULL,
+			    NULL,
+			    NULL);
+	if (code) {
+	    sleep(1);
+	    continue;
+	}
+
+	switch (op) {
+	    case SOCKPROXY_SOCKET:
+		rock = 1;
+		break;
+	    case SOCKPROXY_SETOPT:
+		rock = 2;
+		break;
+	    case SOCKPROXY_BIND:
+		rock = 3;
+		break;
+	    case SOCKPROXY_SEND:
+		rock = 4;
+		break;
+	    case SOCKPROXY_RECV:
+		rock = 5;
+		break;
+	    default:
+		rock = -1;
+	}
+    }
+}
+
+static void *
+sockproxy_thread(void *rock)
+{
+    int *role = (int *)rock;
+    /* Since the AFSDB lookup handler runs as a user process,
+     * need to drop the controlling TTY, etc.
+     */
+    if (afsd_daemon(0, 0) == -1) {
+	printf("Error starting AFSDB lookup handler: %s\n",
+	       strerror(errno));
+	exit(1);
+    }
+    SockProxyHandler(*role);
+    return NULL;
+}
+#endif
+
 static void *
 afsdb_thread(void *rock)
 {
@@ -2208,6 +2281,16 @@ afsd_run(void)
     if (afsd_verbose)
 	printf("%s: Forking rxevent daemon.\n", rn);
     fork_rx_syscall(rn, AFSOP_RXEVENT_DAEMON);
+#endif
+
+#ifdef AFS_DARWIN190_ENV
+    if (afsd_verbose) {
+	printf("%s: Forking socket proxy handlers.\n", rn);
+    }
+    code = SOCKPROXY_SENDPKTS;	/* role to be performed */
+    afsd_fork(0, sockproxy_thread, &code);
+    code = SOCKPROXY_RECVPKTS;	/* role to be performed */
+    afsd_fork(0, sockproxy_thread, &code);
 #endif
 
     if (enable_afsdb) {
@@ -2783,6 +2866,15 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, afs_uint32)));
 	break;
+#ifdef AFS_DARWIN190_ENV
+    case AFSOP_SOCKPROXY_HANDLER:
+	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[3] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[4] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	break;
+#endif
     default:
 	printf("Unknown syscall enountered: %d\n", syscall);
 	opr_Assert(0);

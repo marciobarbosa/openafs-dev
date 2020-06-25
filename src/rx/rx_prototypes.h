@@ -255,9 +255,11 @@ extern osi_socket rxi_GetUDPSocket(u_short port);
 extern osi_socket rxi_GetHostUDPSocket(u_int host, u_short port);
 #if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
 extern int rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov);
-extern int rx_SockProxyReply(int *op, int *socket, void **addr, int *asize,
-			     void **iov,int *isize, void **payload, int *psize,
-			     int *ret);
+extern int rx_SockProxyReply(int *op,
+			     int *rock,
+			     void **addr, int *asize,
+			     void **iov,int *isize,
+			     void **payload, int *psize);
 #endif
 extern int osi_utoa(char *buf, size_t len, unsigned long val);
 extern void rxi_InitPeerParams(struct rx_peer *pp);

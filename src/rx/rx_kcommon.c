@@ -228,8 +228,8 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov)
 }
 
 int
-rx_SockProxyReply(int *op, int *socket, void **addr, int *asize, void **iov,
-		  int *isize, void **payload, int *psize, int *ret)
+rx_SockProxyReply(int *op, int *rock, void **addr, int *asize, void **iov,
+		  int *isize, void **payload, int *psize)
 {
     int offset, i;
     struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
@@ -244,12 +244,14 @@ rx_SockProxyReply(int *op, int *socket, void **addr, int *asize, void **iov,
 
     /* response received from userspace process */
     if (proc->pending) {
-	ch->socket = *socket;
+	if (*op == SOCKPROXY_SOCKET) {
+	    ch->socket = *rock;
+	}
 
 	proc->op = -1;
 	proc->pending = 0;
 	proc->complete = 1;
-	proc->ret = *ret;
+	proc->ret = *rock;
 
 	if (*op & (SOCKPROXY_RECV)) {
 	    for (i = 0, offset = 0; i < proc->niov; i++) {
@@ -272,7 +274,7 @@ rx_SockProxyReply(int *op, int *socket, void **addr, int *asize, void **iov,
     }
 
     /* request received */
-    *socket = ch->socket;
+    *rock = ch->socket;
     *op = proc->op;
 
     if (*op & (SOCKPROXY_BIND | SOCKPROXY_SEND | SOCKPROXY_RECV)) {

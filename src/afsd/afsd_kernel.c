@@ -187,6 +187,7 @@ afsd_init_syscall_opcodes(void)
     /* AFSOP_STOP_RXK_LISTENER -- not a syscall opcode */
     add_opcode(AFSOP_STOP_AFSDB);
     add_opcode(AFSOP_STOP_NETIF);
+    add_opcode(AFSOP_SOCKPROXY_HANDLER);
 #undef add_opcode
 }
 
