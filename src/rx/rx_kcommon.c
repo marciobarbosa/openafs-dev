@@ -127,6 +127,173 @@ rxi_GetUDPSocket(u_short port)
     return rxi_GetHostUDPSocket(htonl(INADDR_ANY), port);
 }
 
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+static struct rx_sockproxy_proc *
+rxi_SockProxyGetProc(int op)
+{
+    struct rx_sockproxy_proc *proc = NULL;
+
+    switch (op) {
+	case SOCKPROXY_SOCKET:
+	case SOCKPROXY_SETOPT:
+	case SOCKPROXY_BIND:
+	case SOCKPROXY_SEND:
+	    proc = &rx_sockproxy_ch.proc[0];
+	    break;
+	case SOCKPROXY_RECV:
+	    proc = &rx_sockproxy_ch.proc[1];
+	    break;
+    }
+    return proc;
+}
+
+int
+rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov)
+{
+    int ret, offset, i;
+    void *payload;
+    size_t psize;
+
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(op);
+
+    if (proc == NULL) {
+	printf("rx_SockProxyRequest: proc not found.\n");
+	return -1;
+    }
+
+    MUTEX_ENTER(&ch->lock);
+
+    while (!proc->ready) {
+	/* userspace process is not ready for requests yet */
+	CV_WAIT(&proc->cv_ready, &ch->lock);
+    }
+    while (proc->pending) {
+	/* userspace process is being used */
+	CV_WAIT(&proc->cv_pend, &ch->lock);
+    }
+
+    proc->op = op;
+    proc->pending = 1;
+    proc->complete = 0;
+
+    if (op & (SOCKPROXY_BIND | SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+	proc->addr = addr;
+	/* for now, assume IPv4 addresses */
+	proc->asize = sizeof(struct sockaddr_in);
+    }
+    if (op & (SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+	proc->iov = iov;
+	/* for now, assume we always have 2 (header / body) */
+	proc->niov = 2;
+    }
+    if (op & (SOCKPROXY_SEND)) {
+	for (i = 0, psize = 0; i < proc->niov; i++) {
+	    psize += proc->iov[i].iov_len;
+	}
+
+	proc->payload = rxi_Alloc(psize);
+	proc->psize = psize;
+	if (proc->payload == NULL) {
+	    printf("rx_SockProxyRequest: couldn't alloc memory for payload.\n");
+	    ret = -1;
+	    goto done;
+	}
+
+	memset(payload, 0, psize);
+	for (i = 0, offset = 0; i < proc->niov; i++) {
+	    memcpy(payload + offset, iov[i].iov_base, iov[i].iov_len);
+	    offset += iov[i].iov_len;
+	}
+    }
+
+    /* wait for response from userspace process */
+    CV_BROADCAST(&proc->cv_op);
+    while (!proc->complete) {
+	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
+    }
+
+    if (op & (SOCKPROXY_SEND)) {
+	rxi_Free(proc->payload, psize);
+	proc->payload = NULL;
+	proc->psize = 0;
+    }
+    ret = proc->ret;
+
+  done:
+    CV_BROADCAST(&proc->cv_pend);
+    MUTEX_EXIT(&ch->lock);
+
+    return ret;
+}
+
+int
+rx_SockProxyReply(int *op, int *socket, void **addr, int *asize, void **iov,
+		  int *isize, void **payload, int *psize, int *ret)
+{
+    int offset, i;
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(op);
+
+    if (proc == NULL) {
+	printf("rx_SockProxyReply: proc not found.\n");
+	return -1;
+    }
+
+    MUTEX_ENTER(&ch->lock);
+
+    /* response received from userspace process */
+    if (proc->pending) {
+	ch->socket = *socket;
+
+	proc->op = -1;
+	proc->pending = 0;
+	proc->complete = 1;
+	proc->ret = *ret;
+
+	if (*op & (SOCKPROXY_RECV)) {
+	    for (i = 0, offset = 0; i < proc->niov; i++) {
+		memcpy(proc->iov[i].iov_base, *payload + offset,
+		       proc->iov[i].iov_len);
+		offset += proc->iov[i].iov_len;
+	    }
+	}
+	CV_BROADCAST(&proc->cv_op);
+    }
+
+    if (!proc->ready) {
+	/* ready to receive requests */
+	proc->ready = 1;
+	CV_BROADCAST(&proc->cv_ready);
+    }
+    if (!proc->pending) {
+	/* wait for requests */
+	CV_WAIT(&proc->op, &ch->lock);
+    }
+
+    /* request received */
+    *socket = ch->socket;
+    *op = proc->op;
+
+    if (*op & (SOCKPROXY_BIND | SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+	*addr = proc->addr;
+	/* for now, assume IPv4 addresses */
+	*asize = sizeof(struct sockaddr_in);
+    }
+    if (*op & (SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+	*iov = proc->iov;
+	*isize = proc->niov * sizeof(proc->iov[0]);
+    }
+    if (*op & (SOCKPROXY_SEND)) {
+	*payload = proc->payload;
+	*psize = proc->psize;
+    }
+
+    MUTEX_EXIT(&ch->lock);
+    return 0;
+}
+#endif
+
 /*
  * osi_utoa() - write the NUL-terminated ASCII decimal form of the given
  * unsigned long value into the given buffer.  Returns 0 on success,

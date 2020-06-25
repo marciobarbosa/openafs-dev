@@ -38,14 +38,25 @@
 EXT osi_socket rx_socket;
 
 #if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+/* operations to be performed by userspace process */
+#define SOCKPROXY_SOCKET	2
+#define SOCKPROXY_SETOPT	4
+#define SOCKPROXY_BIND		8
+#define SOCKPROXY_SEND		16
+#define SOCKPROXY_RECV		32
+
 struct rx_sockproxy_proc {
     char op;			/* operation to be performed */
     char pending;		/* waiting for a reply from userspace */
     char complete;		/* response received from userspace */
+    char ready;			/* can receive requests */
+    int ret;			/* value returned by op executed on userspace */
     struct sockaddr *addr;	/* ip passed to userspace */
     size_t asize;		/* size of addr */
     void *payload;		/* payload passed to / received from userspace */
     size_t psize;		/* size of payload */
+    struct iovec *iov;		/* used to store the packets (sent / received) */
+    int niov;			/* number of iovs */
     afs_kcondvar_t cv_ready;	/* ready to receive requests */
     afs_kcondvar_t cv_op;	/* request / reply received */
     afs_kcondvar_t cv_pend;	/* proc in use */
