@@ -1655,8 +1655,8 @@ BkgHandler(void)
 #define SOCKPROXY_SEND		16
 #define SOCKPROXY_RECV		32
 
-#define SOCKPROXY_SENDPKTS	0
-#define SOCKPROXY_RECVPKTS	1
+#define SOCKPROXY_SENDPKTS	16
+#define SOCKPROXY_RECVPKTS	32
 
 static void
 SockProxyHandler(int role)
@@ -1665,17 +1665,32 @@ SockProxyHandler(int role)
     int op, rock;
     void *buffer;
 
+    struct sockaddr_in addr;
+    struct iovec iov[2];
+    char payload[2048];
+    char *payloadp;
+
+    char str1[1024];
+    char str2[1024];
+    char *ptr;
+
+    char *s1, *s2;
+    int len1, len2;
+
     op = role;
     rock = -1;
     buffer = NULL;
 
+    FILE *fd = fopen("/Users/marcio/afsd_log", "a+");
+
     while (1) {
+	fprintf(fd, "calling afsd_syscall (op: %d)\n", op);
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
 			    &op,
 			    &rock,
-			    NULL,
-			    NULL,
-			    NULL);
+			    &addr,
+			    &iov[0],
+			    payload);
 	if (code) {
 	    sleep(1);
 	    continue;
@@ -1683,24 +1698,73 @@ SockProxyHandler(int role)
 
 	switch (op) {
 	    case SOCKPROXY_SOCKET:
+		fprintf(fd, "SOCKPROXY_SOCKET\n");
 		rock = 1;
 		break;
 	    case SOCKPROXY_SETOPT:
+		fprintf(fd, "SOCKPROXY_SETOPT\n");
 		rock = 2;
 		break;
 	    case SOCKPROXY_BIND:
+		fprintf(fd, "SOCKPROXY_BIND\n");
 		rock = 3;
 		break;
 	    case SOCKPROXY_SEND:
+		fprintf(fd, "SOCKPROXY_SEND\n");
 		rock = 4;
+
+		fprintf(fd, "<addr> family: %d\n", addr.sin_family);
+		fprintf(fd, "<addr> port: %d\n", addr.sin_port);
+		fprintf(fd, "<addr> ip: %d\n", addr.sin_addr.s_addr);
+
+		ptr = payload;
+		memcpy(str1, ptr, iov[0].iov_len);
+		str1[iov[0].iov_len] = '\0';
+
+		ptr += iov[0].iov_len;
+		memcpy(str2, ptr, iov[1].iov_len);
+		str2[iov[1].iov_len] = '\0';
+
+		fprintf(fd, "<payload> msg1: %s\n", str1);
+		fprintf(fd, "<payload> msg2: %s\n", str2);
 		break;
 	    case SOCKPROXY_RECV:
+		fprintf(fd, "SOCKPROXY_RECV\n");
 		rock = 5;
+
+		fprintf(fd, "received len1: %d\n", iov[0].iov_len);
+		fprintf(fd, "received len2: %d\n", iov[1].iov_len);
+
+		payloadp = payload;
+		iov[0].iov_base = payloadp;
+
+		s1 = "msg from userspace!\0";
+		len1 = strlen(s1);
+		s2 = "hello, I wanna talk to the openafs kext.\0";
+		len2 = strlen(s2);
+
+		iov[1].iov_base = payloadp + len1;
+
+		strncpy(iov[0].iov_base, s1, len1);
+		strncpy(iov[1].iov_base, s2, len2);
+
+		iov[0].iov_len = len1;
+		iov[1].iov_len = len2;
+
+		memcpy(str1, iov[0].iov_base, iov[0].iov_len);
+		memcpy(str2, iov[1].iov_base, iov[1].iov_len);
+		str1[iov[0].iov_len] = '\0';
+		str2[iov[1].iov_len] = '\0';
+		fprintf(fd, "<str1 recv> %s\n", str1);
+		fprintf(fd, "<str2 recv> %s\n", str2);
+		fprintf(fd, "----\n");
 		break;
 	    default:
 		rock = -1;
 	}
+	fflush(fd);
     }
+    fclose(fd);
 }
 
 static void *
@@ -2310,10 +2374,12 @@ afsd_run(void)
     code = SOCKPROXY_RECVPKTS;	/* role to be performed */
     afsd_fork(0, sockproxy_thread, &code);
 
-    code = SOCKPROXY_SOCKET;
-    afsd_fork(0, sockproxy_thread_test, &code);
     code = SOCKPROXY_RECV;
     afsd_fork(0, sockproxy_thread_test, &code);
+    /*
+    code = SOCKPROXY_RECV;
+    afsd_fork(0, sockproxy_thread_test, &code);
+    */
 #endif
 
     if (enable_afsdb) {

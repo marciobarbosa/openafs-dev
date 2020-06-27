@@ -166,11 +166,15 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov)
 
     while (!proc->ready) {
 	/* userspace process is not ready for requests yet */
+	printf("<marcio> not ready (%d)\n", op);
 	CV_WAIT(&proc->cv_ready, &ch->lock);
+	printf("<marcio> ready! (%d)\n", op);
     }
     while (proc->pending) {
 	/* userspace process is being used */
+	printf("<marcio> waiting for other request (%d)\n", op);
 	CV_WAIT(&proc->cv_pend, &ch->lock);
+	printf("<marcio> my turn! (%d)\n", op);
     }
 
     proc->op = op;
@@ -200,6 +204,7 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov)
 	    goto done;
 	}
 
+	payload = proc->payload;
 	memset(payload, 0, psize);
 	for (i = 0, offset = 0; i < proc->niov; i++) {
 	    memcpy(payload + offset, iov[i].iov_base, iov[i].iov_len);
@@ -210,7 +215,9 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov)
     /* wait for response from userspace process */
     CV_BROADCAST(&proc->cv_op);
     while (!proc->complete) {
+	printf("<marcio> waiting for response (%d)\n", op);
 	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
+	printf("<marcio> response received! (%d)\n", op);
     }
 
     if (op & (SOCKPROXY_SEND)) {
@@ -233,7 +240,9 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize, void **iov,
 {
     int offset, i;
     struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
-    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(op);
+    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(*op);
+    struct iovec *iovp;
+    char *payloadp;
 
     if (proc == NULL) {
 	printf("rx_SockProxyReply: proc not found.\n");
@@ -254,10 +263,16 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize, void **iov,
 	proc->ret = *rock;
 
 	if (*op & (SOCKPROXY_RECV)) {
+	    iovp = (struct iovec *)*iov;
+	    payloadp = (char *)*payload;
+	    /* proc->iov[i].iov_base must be pre-allocated by requestor */
 	    for (i = 0, offset = 0; i < proc->niov; i++) {
-		memcpy(proc->iov[i].iov_base, *payload + offset,
-		       proc->iov[i].iov_len);
-		offset += proc->iov[i].iov_len;
+		memcpy(proc->iov[i].iov_base, payloadp, iovp[i].iov_len);
+		printf("<marcio> out: %s\n", payloadp);
+		payloadp += iovp[i].iov_len;
+		printf("<marcio> len of payload: %d\n", strlen(payloadp));
+		proc->iov[i].iov_len = iovp[i].iov_len;
+		printf("<marcio> copying (%d)\n", iovp[i].iov_len);
 	    }
 	}
 	CV_BROADCAST(&proc->cv_op);
@@ -269,8 +284,10 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize, void **iov,
 	CV_BROADCAST(&proc->cv_ready);
     }
     if (!proc->pending) {
+	printf("<marcio> waiting for request\n");
 	/* wait for requests */
-	CV_WAIT(&proc->op, &ch->lock);
+	CV_WAIT(&proc->cv_op, &ch->lock);
+	printf("<marcio> request received!\n");
     }
 
     /* request received */
@@ -299,11 +316,59 @@ void
 rx_SockProxyTest(int op)
 {
     int code;
+    struct sockaddr_in addr;
+    struct iovec iov[2];
+    char *str1, *str2;
+    size_t len1, len2;
 
-    while (1) {
-	code = rx_SockProxyRequest(op, NULL, NULL);
+    char result1[1024];
+    char result2[1024];
+
+    addr.sin_family = 1;
+    addr.sin_port = 2;
+    addr.sin_addr.s_addr = 700;
+
+    if (op == SOCKPROXY_SEND) {
+	str1 = "fist message\0";
+	len1 = strlen(str1);
+	str2 = "second message. this time, a little longer\0";
+	len2 = strlen(str2);
+
+	iov[0].iov_base = rxi_Alloc(len1);
+	iov[0].iov_len  = len1;
+	strncpy(iov[0].iov_base, str1, len1);
+
+	iov[1].iov_base = rxi_Alloc(len2);
+	iov[1].iov_len  = len2;
+	strncpy(iov[1].iov_base, str2, len2);
+    }
+    if (op == SOCKPROXY_RECV) {
+	len1 = len2 = 1024;
+	iov[0].iov_base = rxi_Alloc(len1);
+	iov[0].iov_len  = len1;
+	iov[1].iov_base = rxi_Alloc(len2);
+	iov[1].iov_len  = len2;
+    }
+
+//    while (1) {
+	code = rx_SockProxyRequest(op, &addr, iov);
 	printf("<marcio> request code: %d\n", code);
-	sleep(2);
+	if (op == SOCKPROXY_RECV) {
+	    memcpy(result1, iov[0].iov_base, iov[0].iov_len);
+	    result1[iov[0].iov_len] = '\0';
+	    memcpy(result2, iov[1].iov_base, iov[1].iov_len);
+	    result2[iov[1].iov_len] = '\0';
+
+	    printf("<marcio> received str1: %s\n", result1);
+	    printf("<marcio> received str2: %s\n", result2);
+	    printf("<marcio> len1: %d\n", iov[0].iov_len);
+	    printf("<marcio> len2: %d\n", iov[1].iov_len);
+	}
+//    }
+
+    if (op & (SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+	rxi_Free(iov[0].iov_base, len1);
+	rxi_Free(iov[1].iov_base, len2);
     }
 }
 #endif
