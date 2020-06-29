@@ -1661,25 +1661,25 @@ BkgHandler(void)
 static void
 SockProxyHandler(int role)
 {
-    int code;
+    int code, i;
     int op, rock;
-    void *buffer;
 
     struct sockaddr_in addr;
-    struct iovec iov[2];
-    char payload[2048];
     char *payloadp;
+    struct iovec iov[16];
+    int niov;
+
+    struct afs_sockproxy_payload payload;
 
     char str1[1024];
     char str2[1024];
-    char *ptr;
 
     char *s1, *s2;
     int len1, len2;
+    char *s[15];
 
     op = role;
     rock = -1;
-    buffer = NULL;
 
     FILE *fd = fopen("/Users/marcio/afsd_log", "a+");
 
@@ -1689,8 +1689,7 @@ SockProxyHandler(int role)
 			    &op,
 			    &rock,
 			    &addr,
-			    &iov[0],
-			    payload);
+			    &payload);
 	if (code) {
 	    sleep(1);
 	    continue;
@@ -1717,47 +1716,62 @@ SockProxyHandler(int role)
 		fprintf(fd, "<addr> port: %d\n", addr.sin_port);
 		fprintf(fd, "<addr> ip: %d\n", addr.sin_addr.s_addr);
 
-		ptr = payload;
-		memcpy(str1, ptr, iov[0].iov_len);
-		str1[iov[0].iov_len] = '\0';
-
-		ptr += iov[0].iov_len;
-		memcpy(str2, ptr, iov[1].iov_len);
-		str2[iov[1].iov_len] = '\0';
-
-		fprintf(fd, "<payload> msg1: %s\n", str1);
-		fprintf(fd, "<payload> msg2: %s\n", str2);
+		niov = payload.nentries;
+		payloadp = payload.data;
+		for (i = 0; i < niov; i++) {
+		    memcpy(str1, payloadp, payload.len[i]);
+		    payloadp += payload.len[i];
+		    str1[payload.len[i]] = '\0';
+		    fprintf(fd, "<str> %s\n", str1);
+		}
 		break;
 	    case SOCKPROXY_RECV:
 		fprintf(fd, "SOCKPROXY_RECV\n");
 		rock = 5;
 
-		fprintf(fd, "received len1: %d\n", iov[0].iov_len);
-		fprintf(fd, "received len2: %d\n", iov[1].iov_len);
+		fprintf(fd, "nentries: %u\n", payload.nentries);
+		for (i = 0; i < payload.nentries; i++) {
+		    iov[i].iov_base = malloc(payload.len[i]);
+		    iov[i].iov_len = payload.len[i];
+		}
+		niov = payload.nentries;
 
-		payloadp = payload;
-		iov[0].iov_base = payloadp;
-
+		/* emulate recvmsg */
 		s1 = "msg from userspace!\0";
 		len1 = strlen(s1);
-		s2 = "hello, I wanna talk to the openafs kext.\0";
-		len2 = strlen(s2);
 
-		iov[1].iov_base = payloadp + len1;
+		s[0] = "hello everybody! i am glad to talk to you all!!\0";
+		s[1] = "another message down here.. hihi\0";
+		s[2] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
+		s[3] = "guyysssssssssssssssssssssss, it is me!!\0";
+		s[4] = "okay, last message..\0";
 
-		strncpy(iov[0].iov_base, s1, len1);
-		strncpy(iov[1].iov_base, s2, len2);
+		s[5] = "hello everybody! i am glad to talk to you all!!\0";
+		s[6] = "another message down here.. hihi\0";
+		s[7] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
+		s[8] = "guyysssssssssssssssssssssss, it is me!!\0";
+		s[9] = "okay, last message..\0";
 
-		iov[0].iov_len = len1;
-		iov[1].iov_len = len2;
+		s[10] = "hello everybody! i am glad to talk to you all!!\0";
+		s[11] = "another message down here.. hihi\0";
+		s[12] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
+		s[13] = "guyysssssssssssssssssssssss, it is me!!\0";
+		s[14] = "okay, last message..\0";
 
-		memcpy(str1, iov[0].iov_base, iov[0].iov_len);
-		memcpy(str2, iov[1].iov_base, iov[1].iov_len);
-		str1[iov[0].iov_len] = '\0';
-		str2[iov[1].iov_len] = '\0';
-		fprintf(fd, "<str1 recv> %s\n", str1);
-		fprintf(fd, "<str2 recv> %s\n", str2);
-		fprintf(fd, "----\n");
+		for (i = 0; i < niov; i++) {
+		    len1 = strlen(s[i]);
+		    strncpy(iov[i].iov_base, s[i], len1);
+		    iov[i].iov_len = len1;
+		}
+
+		payloadp = payload.data;
+		for (i = 0; i < niov; i++) {
+		    memcpy(payloadp, iov[i].iov_base, iov[i].iov_len);
+		    payloadp += iov[i].iov_len;
+		    payload.len[i] = iov[i].iov_len;
+		    free(iov[i].iov_base);
+		}
+		payload.nentries = niov;
 		break;
 	    default:
 		rock = -1;
@@ -2374,7 +2388,7 @@ afsd_run(void)
     code = SOCKPROXY_RECVPKTS;	/* role to be performed */
     afsd_fork(0, sockproxy_thread, &code);
 
-    code = SOCKPROXY_RECV;
+    code = SOCKPROXY_SEND;
     afsd_fork(0, sockproxy_thread_test, &code);
     /*
     code = SOCKPROXY_RECV;
@@ -2962,7 +2976,6 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
 	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[3] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
-	params[4] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	break;
 #endif
     default:

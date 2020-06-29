@@ -1346,55 +1346,21 @@ afs_syscall_call(long parm, long parm2, long parm3,
     } else if (parm == AFSOP_SOCKPROXY_HANDLER) {
 #ifdef AFS_DARWIN190_ENV
 	int op, rock;
-	void *addr, *iov, *payload;
-	int asize, isize, psize;
-
-	struct iovec iov_buffer[2];
-	char pl_buffer[2048];
-
-	/* remove this */
-	char str1[1024];
-	char str2[1024];
-	char *payloadp;
+	void *addr;
+	int asize, psize;
+	struct afs_sockproxy_payload payload;
 
 	op = rock = -1;
-	addr = iov = payload = NULL;
-	asize = isize = psize = 0;
-	memset(iov_buffer, 0, sizeof(iov_buffer));
+	addr = NULL;
+	asize = psize = 0;
 
 	/* get response from userspace */
 	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&op, sizeof(op), code);
 	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&rock, sizeof(rock), code);
 
-	iov = &iov_buffer[0];
-	isize = sizeof(iov_buffer);
-	AFS_COPYIN(AFSKPTR(parm5), (caddr_t)iov, isize, code);
-
-	payload = pl_buffer;
-	psize = iov_buffer[0].iov_len;
-	afs_warn("<marcio> psize 0: %d\n", psize);
-	psize = iov_buffer[1].iov_len;
-	afs_warn("<marcio> psize 1: %d\n", psize);
-
-	psize = sizeof(pl_buffer);
-	afs_warn("<marcio> psize 2: %d\n", psize);
-	AFS_COPYIN(AFSKPTR(parm6), (caddr_t)payload, psize, code);
-
-	/* remove this */
-	if (iov_buffer[1].iov_len == 40) {
-	    payloadp = (char *)payload;
-	    afs_warn("<marcio> addr1: %x\n", payloadp);
-	    memcpy(str1, payloadp, iov_buffer[0].iov_len);
-	    payloadp += iov_buffer[0].iov_len;
-	    afs_warn("<marcio> char: %c\n", *payloadp);
-	    afs_warn("<marcio> addr2: %x\n", payloadp);
-	    afs_warn("<marcio> final addr: %x\n", &pl_buffer[2047]);
-	    strncpy(str2, payloadp, iov_buffer[1].iov_len);
-	    str1[iov_buffer[0].iov_len] = '\0';
-	    str2[iov_buffer[1].iov_len] = '\0';
-	    afs_warn("<marcio> afs_call: str1: %s\n", str1);
-	    afs_warn("<marcio> afs_call: str2: %s\n", str2);
-	}
+	psize = sizeof(payload);
+	afs_warn("<marcio> psize: %d\n", psize);
+	AFS_COPYIN(AFSKPTR(parm5), (caddr_t)&payload, psize, code);
 
 	AFS_GUNLOCK();
 	/*
@@ -1404,16 +1370,14 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	code = rx_SockProxyReply(&op,
 				 &rock,
 				 &addr, &asize,
-				 &iov, &isize,
-				 &payload, &psize);
+				 &payload);
 	AFS_GLOCK();
 
 	/* send request to userspace process */
 	AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
 	AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);
 	AFS_COPYOUT((caddr_t)addr, AFSKPTR(parm4), asize, code);
-	AFS_COPYOUT((caddr_t)iov, AFSKPTR(parm5), isize, code);
-	AFS_COPYOUT((caddr_t)payload, AFSKPTR(parm6), psize, code);
+	AFS_COPYOUT((caddr_t)&payload, AFSKPTR(parm5), psize, code);
 #endif
     } else if (parm == AFSOP_SOCKPROXY_TEST) {
 #ifdef AFS_DARWIN190_ENV
