@@ -84,9 +84,8 @@
 #define AFSOP_STOP_AFSDB	218	/* Stop AFSDB handler */
 #define AFSOP_STOP_NETIF	219	/* Stop Netif poller */
 #define AFSOP_SOCKPROXY_HANDLER	220	/* Userspace socket handler */
-#define AFSOP_SOCKPROXY_TEST	221	/* Test AFSOP_SOCKPROXY_HANDLER */
 
-#define AFSOP_MAX_OPCODE	AFSOP_SOCKPROXY_TEST /* Largest defined opcode. */
+#define AFSOP_MAX_OPCODE	AFSOP_SOCKPROXY_HANDLER /* Largest defined opcode. */
 
 /*
  * AFS system call types and flags.

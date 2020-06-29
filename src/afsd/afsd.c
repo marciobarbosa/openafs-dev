@@ -183,6 +183,10 @@ static int event_pid;
 #undef	VIRTUE
 #undef	VICE
 
+#ifdef AFS_DARWIN190_ENV
+#include <sys/types.h>
+#include <sys/socket.h>
+#endif
 
 #define CACHEINFOFILE   "cacheinfo"
 #define	DCACHEFILE	"CacheItems"
@@ -1654,6 +1658,7 @@ BkgHandler(void)
 #define SOCKPROXY_BIND		8
 #define SOCKPROXY_SEND		16
 #define SOCKPROXY_RECV		32
+#define SOCKPROXY_CLOSE		64
 
 #define SOCKPROXY_SENDPKTS	16
 #define SOCKPROXY_RECVPKTS	32
@@ -1663,28 +1668,19 @@ SockProxyHandler(int role)
 {
     int code, i;
     int op, rock;
-
     struct sockaddr_in addr;
-    char *payloadp;
     struct iovec iov[16];
     int niov;
-
+    char *payloadp;
     struct afs_sockproxy_payload payload;
 
-    char str1[1024];
-    char str2[1024];
-
-    char *s1, *s2;
-    int len1, len2;
-    char *s[15];
+    int buflen =  50000;
+    struct msghdr msg;
 
     op = role;
     rock = -1;
 
-    FILE *fd = fopen("/Users/marcio/afsd_log", "a+");
-
     while (1) {
-	fprintf(fd, "calling afsd_syscall (op: %d)\n", op);
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
 			    &op,
 			    &rock,
@@ -1697,95 +1693,83 @@ SockProxyHandler(int role)
 
 	switch (op) {
 	    case SOCKPROXY_SOCKET:
-		fprintf(fd, "SOCKPROXY_SOCKET\n");
-		rock = 1;
+		rock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		break;
 	    case SOCKPROXY_SETOPT:
-		fprintf(fd, "SOCKPROXY_SETOPT\n");
-		rock = 2;
+		code = setsockopt(rock, SOL_SOCKET, SO_SNDBUF, &buflen, sizeof(buflen));
+		code = setsockopt(rock, SOL_SOCKET, SO_RCVBUF, &buflen, sizeof(buflen));
+		rock = code;
 		break;
 	    case SOCKPROXY_BIND:
-		fprintf(fd, "SOCKPROXY_BIND\n");
-		rock = 3;
+		code = bind(rock, (struct sockaddr *)&addr, sizeof(addr));
+		rock = code;
 		break;
 	    case SOCKPROXY_SEND:
-		fprintf(fd, "SOCKPROXY_SEND\n");
-		rock = 4;
-
-		fprintf(fd, "<addr> family: %d\n", addr.sin_family);
-		fprintf(fd, "<addr> port: %d\n", addr.sin_port);
-		fprintf(fd, "<addr> ip: %d\n", addr.sin_addr.s_addr);
-
-		niov = payload.nentries;
 		payloadp = payload.data;
+		niov = payload.nentries;
+		for (i = 0; i < payload.nentries; i++) {
+		    iov[i].iov_base = malloc(payload.len[i]);
+		    iov[i].iov_len = payload.len[i];
+		    memcpy(iov[i].iov_base, payloadp, iov[i].iov_len);
+		    payloadp += iov[i].iov_len;
+		}
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_name = &addr;
+		msg.msg_namelen = ((struct sockaddr *)&addr)->sa_len;
+		msg.msg_iov = &iov[0];
+		msg.msg_iovlen = niov;
+
+		code = sendmsg(rock, &msg, 0);
+		rock = code;
+
 		for (i = 0; i < niov; i++) {
-		    memcpy(str1, payloadp, payload.len[i]);
-		    payloadp += payload.len[i];
-		    str1[payload.len[i]] = '\0';
-		    fprintf(fd, "<str> %s\n", str1);
+		    free(iov[i].iov_base);
+		    iov[i].iov_base = NULL;
+		    iov[i].iov_len = 0;
 		}
 		break;
 	    case SOCKPROXY_RECV:
-		fprintf(fd, "SOCKPROXY_RECV\n");
-		rock = 5;
-
-		fprintf(fd, "nentries: %u\n", payload.nentries);
+		payloadp = payload.data;
+		niov = payload.nentries;
 		for (i = 0; i < payload.nentries; i++) {
 		    iov[i].iov_base = malloc(payload.len[i]);
 		    iov[i].iov_len = payload.len[i];
 		}
-		niov = payload.nentries;
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_name = &addr;
+		msg.msg_namelen = ((struct sockaddr *)&addr)->sa_len;
+		msg.msg_iov = &iov[0];
+		msg.msg_iovlen = niov;
 
-		/* emulate recvmsg */
-		s1 = "msg from userspace!\0";
-		len1 = strlen(s1);
+		code = recvmsg(rock, &msg, 0);
+		rock = code;
 
-		s[0] = "hello everybody! i am glad to talk to you all!!\0";
-		s[1] = "another message down here.. hihi\0";
-		s[2] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
-		s[3] = "guyysssssssssssssssssssssss, it is me!!\0";
-		s[4] = "okay, last message..\0";
-
-		s[5] = "hello everybody! i am glad to talk to you all!!\0";
-		s[6] = "another message down here.. hihi\0";
-		s[7] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
-		s[8] = "guyysssssssssssssssssssssss, it is me!!\0";
-		s[9] = "okay, last message..\0";
-
-		s[10] = "hello everybody! i am glad to talk to you all!!\0";
-		s[11] = "another message down here.. hihi\0";
-		s[12] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
-		s[13] = "guyysssssssssssssssssssssss, it is me!!\0";
-		s[14] = "okay, last message..\0";
-
-		for (i = 0; i < niov; i++) {
-		    len1 = strlen(s[i]);
-		    strncpy(iov[i].iov_base, s[i], len1);
-		    iov[i].iov_len = len1;
-		}
-
-		payloadp = payload.data;
 		for (i = 0; i < niov; i++) {
 		    memcpy(payloadp, iov[i].iov_base, iov[i].iov_len);
 		    payloadp += iov[i].iov_len;
 		    payload.len[i] = iov[i].iov_len;
 		    free(iov[i].iov_base);
+		    iov[i].iov_base = NULL;
+		    iov[i].iov_len = 0;
 		}
-		payload.nentries = niov;
+		payload.nentries = msg.msg_iovlen;
+		break;
+	    case SOCKPROXY_CLOSE:
+		code = close(rock);
+		rock = code;
 		break;
 	    default:
 		rock = -1;
 	}
-	fflush(fd);
     }
-    fclose(fd);
+    /* return */
 }
 
 static void *
 sockproxy_thread(void *rock)
 {
     int *role = (int *)rock;
-    /* Since the AFSDB lookup handler runs as a user process,
+    /* Since the socket proxy handler runs as a user process,
      * need to drop the controlling TTY, etc.
      */
     if (afsd_daemon(0, 0) == -1) {
@@ -1794,24 +1778,6 @@ sockproxy_thread(void *rock)
 	exit(1);
     }
     SockProxyHandler(*role);
-    return NULL;
-}
-
-static void *
-sockproxy_thread_test(void *rock)
-{
-    int code;
-    int *op = (int *)rock;
-    /* Since the AFSDB lookup handler runs as a user process,
-     * need to drop the controlling TTY, etc.
-     */
-    if (afsd_daemon(0, 0) == -1) {
-	printf("Error starting AFSDB lookup handler: %s\n",
-	       strerror(errno));
-	exit(1);
-    }
-    code = afsd_syscall(AFSOP_SOCKPROXY_TEST, *op);
-
     return NULL;
 }
 #endif
@@ -2387,13 +2353,6 @@ afsd_run(void)
     afsd_fork(0, sockproxy_thread, &code);
     code = SOCKPROXY_RECVPKTS;	/* role to be performed */
     afsd_fork(0, sockproxy_thread, &code);
-
-    code = SOCKPROXY_SEND;
-    afsd_fork(0, sockproxy_thread_test, &code);
-    /*
-    code = SOCKPROXY_RECV;
-    afsd_fork(0, sockproxy_thread_test, &code);
-    */
 #endif
 
     if (enable_afsdb) {
@@ -2911,7 +2870,6 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
     case AFSOP_SET_RMTSYS_FLAG:
     case AFSOP_SET_INUMCALC:
     case AFSOP_SET_VOLUME_TTL:
-    case AFSOP_SOCKPROXY_TEST:
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, int)));
 	break;
     case AFSOP_SET_THISCELL:

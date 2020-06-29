@@ -1359,7 +1359,6 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&rock, sizeof(rock), code);
 
 	psize = sizeof(payload);
-	afs_warn("<marcio> psize: %d\n", psize);
 	AFS_COPYIN(AFSKPTR(parm5), (caddr_t)&payload, psize, code);
 
 	AFS_GUNLOCK();
@@ -1378,12 +1377,6 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);
 	AFS_COPYOUT((caddr_t)addr, AFSKPTR(parm4), asize, code);
 	AFS_COPYOUT((caddr_t)&payload, AFSKPTR(parm5), psize, code);
-#endif
-    } else if (parm == AFSOP_SOCKPROXY_TEST) {
-#ifdef AFS_DARWIN190_ENV
-	AFS_GUNLOCK();
-	rx_SockProxyTest(parm2);
-	AFS_GLOCK();
 #endif
     } else {
 	code = EINVAL;

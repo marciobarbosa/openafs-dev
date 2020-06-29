@@ -166,15 +166,11 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
 
     while (!proc->ready) {
 	/* userspace process is not ready for requests yet */
-	printf("<marcio> not ready (%d)\n", op);
 	CV_WAIT(&proc->cv_ready, &ch->lock);
-	printf("<marcio> ready! (%d)\n", op);
     }
     while (proc->pending) {
 	/* userspace process is being used */
-	printf("<marcio> waiting for other request (%d)\n", op);
 	CV_WAIT(&proc->cv_pend, &ch->lock);
-	printf("<marcio> my turn! (%d)\n", op);
     }
 
     proc->op = op;
@@ -215,9 +211,7 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
     /* wait for response from userspace process */
     CV_BROADCAST(&proc->cv_op);
     while (!proc->complete) {
-	printf("<marcio> waiting for response (%d)\n", op);
 	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
-	printf("<marcio> response received! (%d)\n", op);
     }
 
     if (op & (SOCKPROXY_SEND)) {
@@ -279,10 +273,8 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
 	CV_BROADCAST(&proc->cv_ready);
     }
     if (!proc->pending) {
-	printf("<marcio> waiting for request\n");
 	/* wait for requests */
 	CV_WAIT(&proc->cv_op, &ch->lock);
-	printf("<marcio> request received!\n");
     }
 
     /* request received */
@@ -306,81 +298,6 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
 
     MUTEX_EXIT(&ch->lock);
     return 0;
-}
-
-void
-rx_SockProxyTest(int op)
-{
-    int code, i;
-    struct sockaddr_in addr;
-    struct iovec iov[15];
-    int niov;
-    char *s[15];
-    size_t len1, len2;
-
-    char result1[1024];
-    char result2[1024];
-
-    addr.sin_family = 1;
-    addr.sin_port = 2;
-    addr.sin_addr.s_addr = 700;
-
-    if (op == SOCKPROXY_SEND) {
-	niov = 15;
-
-	s[0] = "hello everybody! i am glad to talk to you all!!\0";
-	s[1] = "another message down here.. hihi\0";
-	s[2] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
-	s[3] = "guyysssssssssssssssssssssss, it is me!!\0";
-	s[4] = "okay, last message..\0";
-
-	s[5] = "hello everybody! i am glad to talk to you all!!\0";
-	s[6] = "another message down here.. hihi\0";
-	s[7] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
-	s[8] = "guyysssssssssssssssssssssss, it is me!!\0";
-	s[9] = "okay, last message..\0";
-
-	s[10] = "hello everybody! i am glad to talk to you all!!\0";
-	s[11] = "another message down here.. hihi\0";
-	s[12] = "i am so happyyyyy this is working as expecteddddddd! ihuuuu\0";
-	s[13] = "guyysssssssssssssssssssssss, it is me!!\0";
-	s[14] = "okay, last message..\0";
-
-	for (i = 0; i < niov; i++) {
-	    len1 = strlen(s[i]);
-	    iov[i].iov_base = rxi_Alloc(len1);
-	    iov[i].iov_len = len1;
-	    strncpy(iov[i].iov_base, s[i], len1);
-	}
-    }
-    if (op == SOCKPROXY_RECV) {
-	niov = 15;
-	len1 = 1024;
-
-	for (i = 0; i < niov; i++) {
-	    iov[i].iov_base = rxi_Alloc(len1);
-	    iov[i].iov_len  = len1;
-	}
-    }
-
-//    while (1) {
-	code = rx_SockProxyRequest(op, &addr, iov, niov);
-	printf("<marcio> request code: %d\n", code);
-	if (op == SOCKPROXY_RECV) {
-	    for (i = 0; i < niov; i++) {
-		memcpy(result1, iov[i].iov_base, iov[i].iov_len);
-		result1[iov[i].iov_len] = '\0';
-		printf("<marcio> received str%d: %s\n", i + 1, result1);
-		printf("<marcio> len: %d\n", iov[i].iov_len);
-	    }
-	}
-//    }
-
-    if (op & (SOCKPROXY_RECV | SOCKPROXY_SEND)) {
-	for (i = 0; i < niov; i++) {
-	    rxi_Free(iov[i].iov_base, len1);
-	}
-    }
 }
 #endif
 
