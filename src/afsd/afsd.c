@@ -1663,6 +1663,8 @@ BkgHandler(void)
 #define SOCKPROXY_SENDPKTS	16
 #define SOCKPROXY_RECVPKTS	32
 
+static void *sockproxy_thread(void *rock);
+
 static void
 SockProxyHandler(int role)
 {
@@ -1677,10 +1679,22 @@ SockProxyHandler(int role)
     int buflen =  50000;
     struct msghdr msg;
 
+    struct sockaddr_in *saddr;
+    int recv_len;
+    int copy_len;
+    int n_entries;
+
     op = role;
     rock = -1;
 
+    FILE *fd = fopen("/Users/marcio/afsd_log", "a+");
+
     while (1) {
+	if (op & (SOCKPROXY_RECV)) {
+	    fprintf(fd, "calling afsd_syscall\n");
+	    fflush(fd);
+	}
+
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
 			    &op,
 			    &rock,
@@ -1694,14 +1708,29 @@ SockProxyHandler(int role)
 	switch (op) {
 	    case SOCKPROXY_SOCKET:
 		rock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		fprintf(fd, "socket: %d\n", rock);
+		fflush(fd);
 		break;
 	    case SOCKPROXY_SETOPT:
 		code = setsockopt(rock, SOL_SOCKET, SO_SNDBUF, &buflen, sizeof(buflen));
 		code = setsockopt(rock, SOL_SOCKET, SO_RCVBUF, &buflen, sizeof(buflen));
+		fprintf(fd, "setsockopt: %d\n", code);
+		fprintf(fd, "setsockopt socket: %d\n", rock);
+		fflush(fd);
 		rock = code;
 		break;
 	    case SOCKPROXY_BIND:
 		code = bind(rock, (struct sockaddr *)&addr, sizeof(addr));
+		fprintf(fd, "bind: %d\n", code);
+		fprintf(fd, "bind socket: %d\n", rock);
+		fflush(fd);
+		if (role == SOCKPROXY_SENDPKTS && code == 0) {
+		    fprintf(fd, "creating new process for listener\n");
+		    fflush(fd);
+		    /* create process for recvmsg */
+    		    role = SOCKPROXY_RECVPKTS;
+    		    afsd_fork(0, sockproxy_thread, &role);
+		}
 		rock = code;
 		break;
 	    case SOCKPROXY_SEND:
@@ -1720,6 +1749,9 @@ SockProxyHandler(int role)
 		msg.msg_iovlen = niov;
 
 		code = sendmsg(rock, &msg, 0);
+		fprintf(fd, "sendmsg: %d\n", code);
+		fprintf(fd, "sendmsg socket: %d\n", rock);
+		fflush(fd);
 		rock = code;
 
 		for (i = 0; i < niov; i++) {
@@ -1729,40 +1761,88 @@ SockProxyHandler(int role)
 		}
 		break;
 	    case SOCKPROXY_RECV:
+		fprintf(fd, "sleeping\n");
+		fflush(fd);
+		sleep(5);
+#if 0
+		memset(&addr, 0, sizeof(addr));
 		payloadp = payload.data;
 		niov = payload.nentries;
 		for (i = 0; i < payload.nentries; i++) {
+		    fprintf(fd, "<marcio> allocing %d\n", payload.len[i]);
+		    /*
 		    iov[i].iov_base = malloc(payload.len[i]);
 		    iov[i].iov_len = payload.len[i];
+		    */
+		    iov[i].iov_base = malloc(2048);
+		    iov[i].iov_len = 2048;
 		}
 		memset(&msg, 0, sizeof(msg));
 		msg.msg_name = &addr;
-		msg.msg_namelen = ((struct sockaddr *)&addr)->sa_len;
-		msg.msg_iov = &iov[0];
+		msg.msg_namelen = sizeof(addr);
+		/*
+		msg.msg_name = NULL;
+		msg.msg_namelen = 0;
+		*/
+
+		msg.msg_iov = iov;
 		msg.msg_iovlen = niov;
 
+		saddr = (struct sockaddr_in *)&addr;
+		fprintf(fd, "addr: %d\n", saddr->sin_addr.s_addr);
+		fprintf(fd, "port: %d\n", saddr->sin_port);
+		fflush(fd);
+
 		code = recvmsg(rock, &msg, 0);
+		recv_len = code;
+		fprintf(fd, "recvmsg: %d\n", code);
+		fprintf(fd, "recv socket: %d\n", rock);
+		fprintf(fd, "recv errno: %d\n", errno);
+		fprintf(fd, "addr after: %d\n", saddr->sin_addr.s_addr);
+		fprintf(fd, "port after: %d\n", saddr->sin_port);
+		fflush(fd);
 		rock = code;
 
-		for (i = 0; i < niov; i++) {
-		    memcpy(payloadp, iov[i].iov_base, iov[i].iov_len);
-		    payloadp += iov[i].iov_len;
-		    payload.len[i] = iov[i].iov_len;
-		    free(iov[i].iov_base);
-		    iov[i].iov_base = NULL;
-		    iov[i].iov_len = 0;
+		fprintf(fd, "niov returned: %d\n", msg.msg_iovlen);
+		fprintf(fd, "niov: %d\n", niov);
+		fflush(fd);
+		/*
+		for (i = 0, n_entries = 0; i < niov && recv_len; i++, n_entries++) {
+		    fprintf(fd, "loop begin\n");
+		    fflush(fd);
+		    if (recv_len > iov[i].iov_len) {
+			copy_len = iov[i].iov_len;
+		    } else {
+			copy_len = recv_len;
+		    }
+		    recv_len -= copy_len;
+		    memcpy(payloadp, iov[i].iov_base, copy_len);
+		    fprintf(fd, "copying %d\n", copy_len);
+		    fflush(fd);
+		    payloadp += copy_len;
+		    payload.len[i] = copy_len;
+		    fprintf(fd, "loop end\n");
+		    fflush(fd);
 		}
-		payload.nentries = msg.msg_iovlen;
+		payload.nentries = n_entries;
+		*/
+		for (i = 0; i < niov; i++) {
+		    free(iov[i].iov_base);
+		}
+#endif
 		break;
 	    case SOCKPROXY_CLOSE:
 		code = close(rock);
 		rock = code;
 		break;
 	    default:
+		fprintf(fd, "op not found: %d\n", op);
+		fflush(fd);
 		rock = -1;
 	}
     }
     /* return */
+    fclose(fd);
 }
 
 static void *
@@ -2350,8 +2430,6 @@ afsd_run(void)
 	printf("%s: Forking socket proxy handlers.\n", rn);
     }
     code = SOCKPROXY_SENDPKTS;	/* role to be performed */
-    afsd_fork(0, sockproxy_thread, &code);
-    code = SOCKPROXY_RECVPKTS;	/* role to be performed */
     afsd_fork(0, sockproxy_thread, &code);
 #endif
 

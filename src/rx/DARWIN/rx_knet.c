@@ -176,7 +176,9 @@ osi_NetReceive(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
     struct msghdr msg;
     struct sockaddr_storage ss;
     int rlen;
+    /*
     mbuf_t m;
+    */
 #else
     struct socket *asocket = (struct socket *)so;
     struct uio u;
@@ -206,6 +208,12 @@ osi_NetReceive(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
     msg.msg_name = &ss;
     msg.msg_namelen = sizeof(struct sockaddr_storage);
     sa =(struct sockaddr *) &ss;
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    code = rx_SockProxyRequest(SOCKPROXY_RECV, (struct sockaddr *)msg.msg_name, &iov[0], nvecs);
+    resid = *alength - code;
+    code = 0;
+#endif
+    /*
     code = sock_receivembuf(asocket, &msg, &m, 0, alength);
     if (!code) {
         size_t offset=0,sz;
@@ -220,6 +228,7 @@ osi_NetReceive(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
         }
     }
     mbuf_freem(m);
+    */
 #else
 
     u.uio_iov = &iov[0];
@@ -322,7 +331,13 @@ osi_NetSend(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
     msg.msg_namelen = ((struct sockaddr *)addr)->sa_len;
     msg.msg_iov = &iov[0];
     msg.msg_iovlen = nvecs;
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    (void)rx_SockProxyRequest(SOCKPROXY_SEND, (struct sockadd *)addr, msg.msg_iov, nvecs);
+    code = 0;
+#endif
+    /*
     code = sock_send(asocket, &msg, 0, &slen);
+    */
 #else
     u.uio_iov = &iov[0];
     u.uio_iovcnt = nvecs;

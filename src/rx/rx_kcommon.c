@@ -138,6 +138,7 @@ rxi_SockProxyGetProc(int op)
 	case SOCKPROXY_SETOPT:
 	case SOCKPROXY_BIND:
 	case SOCKPROXY_SEND:
+	case SOCKPROXY_CLOSE:
 	    proc = &rx_sockproxy_ch.proc[0];
 	    break;
 	case SOCKPROXY_RECV:
@@ -179,7 +180,7 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
 
     if (op & (SOCKPROXY_BIND | SOCKPROXY_SEND | SOCKPROXY_RECV)) {
 	proc->addr = addr;
-	/* for now, assume IPv4 addresses */
+	/* for now, assume we always have ipv4 addresses */
 	proc->asize = sizeof(struct sockaddr_in);
     }
     if (op & (SOCKPROXY_SEND | SOCKPROXY_RECV)) {
@@ -238,7 +239,7 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
     char *payloadp;
 
     if (proc == NULL) {
-	printf("rx_SockProxyReply: proc not found.\n");
+	printf("rx_SockProxyReply: proc not found (op = %d).\n", *op);
 	return -1;
     }
 
@@ -263,6 +264,7 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
 		payloadp += payload->len[i];
 		proc->iov[i].iov_len = payload->len[i];
 	    }
+	    memcpy(proc->addr, *addr, proc->asize);
 	}
 	CV_BROADCAST(&proc->cv_op);
     }
@@ -274,16 +276,20 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
     }
     if (!proc->pending) {
 	/* wait for requests */
+	if (*op & (SOCKPROXY_RECV))
+	    printf("<marcio> reply waiting for request\n");
 	CV_WAIT(&proc->cv_op, &ch->lock);
+	if (*op & (SOCKPROXY_RECV))
+	    printf("<marcio> request received\n");
     }
 
     /* request received */
     *rock = ch->socket;
     *op = proc->op;
 
-    if (*op & (SOCKPROXY_BIND | SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+    if (*op & (SOCKPROXY_BIND | SOCKPROXY_SEND)) {
 	*addr = proc->addr;
-	/* for now, assume IPv4 addresses */
+	/* for now, assume we always have ipv4 addresses */
 	*asize = sizeof(struct sockaddr_in);
     }
     if (*op & (SOCKPROXY_SEND | SOCKPROXY_RECV)) {
@@ -1043,11 +1049,17 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
     code = socreate(AF_INET, &newSocket, SOCK_DGRAM, IPPROTO_UDP,
 		    afs_osi_credp, curthread);
 #elif defined(AFS_DARWIN80_ENV)
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    (void)rx_SockProxyRequest(SOCKPROXY_SOCKET, NULL, NULL, 0);
+    code = 0;
+#endif
+    /*
 #ifdef RXK_LISTENER_ENV
     code = sock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, NULL, &newSocket);
 #else
     code = sock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, rx_upcall, NULL, &newSocket);
 #endif
+    */
 #elif defined(AFS_NBSD50_ENV)
     code = socreate(AF_INET, &newSocket, SOCK_DGRAM, 0, osi_curproc(), NULL);
 #elif defined(AFS_NBSD40_ENV)
@@ -1088,6 +1100,11 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
 #else /* AFS_HPUX110_ENV */
 #if defined(AFS_DARWIN80_ENV)
     {
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+	(void)rx_SockProxyRequest(SOCKPROXY_SETOPT, NULL, NULL, 0);
+	code = 0;
+#endif
+	/*
        int buflen = 50000;
        int i,code2;
        for (i=0;i<2;i++) {
@@ -1101,6 +1118,7 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
 	      osi_Panic("osi_NewSocket: last attempt to reserve 32K failed!\n");
            buflen = 32766;
        }
+       */
     }
 #else
 #if defined(AFS_NBSD_ENV)
@@ -1120,7 +1138,10 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
 #if defined(AFS_FBSD_ENV)
     code = sobind(newSocket, (struct sockaddr *)&myaddr, curthread);
 #else
+    (void)rx_SockProxyRequest(SOCKPROXY_BIND, (struct sockaddr *)&myaddr, NULL, 0);
+    /*
     code = sobind(newSocket, (struct sockaddr *)&myaddr);
+    */
 #endif
     if (code) {
 	dpf(("sobind fails (%d)\n", (int)code));

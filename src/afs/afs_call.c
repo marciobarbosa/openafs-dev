@@ -35,6 +35,10 @@
 #endif
 #include <hcrypto/rand.h>
 
+#ifdef AFS_DARWIN190_ENV
+#include <netinet/in.h>
+#endif
+
 #if defined(AFS_SUN5_ENV) || defined(AFS_AIX_ENV) || defined(AFS_SGI_ENV) || defined(AFS_HPUX_ENV)
 #define	AFS_MINBUFFERS	100
 #else
@@ -1349,14 +1353,20 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	void *addr;
 	int asize, psize;
 	struct afs_sockproxy_payload payload;
+	/*struct sockaddr_in saddr;*/
 
 	op = rock = -1;
 	addr = NULL;
 	asize = psize = 0;
+	/*
+	addr = &saddr;
+	asize = sizeof(saddr);
+	*/
 
 	/* get response from userspace */
 	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&op, sizeof(op), code);
 	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&rock, sizeof(rock), code);
+	/*AFS_COPYIN(AFSKPTR(parm4), (caddr_t)&saddr, sizeof(saddr), code);*/
 
 	psize = sizeof(payload);
 	AFS_COPYIN(AFSKPTR(parm5), (caddr_t)&payload, psize, code);
