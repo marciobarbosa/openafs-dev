@@ -233,7 +233,7 @@ int
 rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
 		  struct afs_sockproxy_payload *payload)
 {
-    int offset, i;
+    int i;
     struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
     struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(*op);
     char *payloadp;
@@ -259,7 +259,7 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
 	if (*op & (SOCKPROXY_RECV)) {
 	    payloadp = (char *)payload->data;
 	    /* proc->iov[i].iov_base must be pre-allocated by requestor */
-	    for (i = 0, offset = 0; i < proc->niov; i++) {
+	    for (i = 0; i < payload->nentries; i++) {
 		memcpy(proc->iov[i].iov_base, payloadp, payload->len[i]);
 		payloadp += payload->len[i];
 		proc->iov[i].iov_len = payload->len[i];

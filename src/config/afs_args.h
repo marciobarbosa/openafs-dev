@@ -324,7 +324,7 @@ struct afssysargs32 {
 #endif
 
 #ifdef AFS_DARWIN190_ENV
-#define SOCKPROXY_PAYLOAD_MAX	2048	/* 2 * (RX_JUMBOBUFFERSIZE + RX_JUMBOHEADERSIZE) */
+#define SOCKPROXY_PAYLOAD_MAX	2832	/* 2 * (RX_JUMBOBUFFERSIZE + RX_JUMBOHEADERSIZE) */
 #define SOCKPROXY_LEN_MAX	16	/* RX_MAXIOVECS */
 struct afs_sockproxy_payload {
     char data[SOCKPROXY_PAYLOAD_MAX];		/* data of each iovec */

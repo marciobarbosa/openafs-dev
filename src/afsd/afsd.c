@@ -1761,30 +1761,16 @@ SockProxyHandler(int role)
 		}
 		break;
 	    case SOCKPROXY_RECV:
-		fprintf(fd, "sleeping\n");
-		fflush(fd);
-		sleep(5);
-#if 0
 		memset(&addr, 0, sizeof(addr));
 		payloadp = payload.data;
 		niov = payload.nentries;
 		for (i = 0; i < payload.nentries; i++) {
-		    fprintf(fd, "<marcio> allocing %d\n", payload.len[i]);
-		    /*
 		    iov[i].iov_base = malloc(payload.len[i]);
 		    iov[i].iov_len = payload.len[i];
-		    */
-		    iov[i].iov_base = malloc(2048);
-		    iov[i].iov_len = 2048;
 		}
 		memset(&msg, 0, sizeof(msg));
 		msg.msg_name = &addr;
 		msg.msg_namelen = sizeof(addr);
-		/*
-		msg.msg_name = NULL;
-		msg.msg_namelen = 0;
-		*/
-
 		msg.msg_iov = iov;
 		msg.msg_iovlen = niov;
 
@@ -1806,7 +1792,6 @@ SockProxyHandler(int role)
 		fprintf(fd, "niov returned: %d\n", msg.msg_iovlen);
 		fprintf(fd, "niov: %d\n", niov);
 		fflush(fd);
-		/*
 		for (i = 0, n_entries = 0; i < niov && recv_len; i++, n_entries++) {
 		    fprintf(fd, "loop begin\n");
 		    fflush(fd);
@@ -1825,11 +1810,9 @@ SockProxyHandler(int role)
 		    fflush(fd);
 		}
 		payload.nentries = n_entries;
-		*/
 		for (i = 0; i < niov; i++) {
 		    free(iov[i].iov_base);
 		}
-#endif
 		break;
 	    case SOCKPROXY_CLOSE:
 		code = close(rock);
