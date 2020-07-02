@@ -274,6 +274,12 @@ osi_StopListener(void)
     thread_funnel_switch(KERNEL_FUNNEL, NETWORK_FUNNEL);
 #endif
     soclose(rx_socket);
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    AFS_GUNLOCK();
+    (void)rx_SockProxyRequest(SOCKPROXY_SHUTDOWN, NULL, NULL, 0);
+    AFS_GLOCK();
+    /* wait here */
+#endif
 #if defined(KERNEL_FUNNEL)
     thread_funnel_switch(NETWORK_FUNNEL, KERNEL_FUNNEL);
 #endif

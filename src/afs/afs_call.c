@@ -1380,6 +1380,11 @@ afs_syscall_call(long parm, long parm2, long parm3,
 				 &payload);
 	AFS_GLOCK();
 
+	/* shutting down */
+	if (code == -2) {
+	    /* notify caller */
+	}
+
 	/* send request to userspace process */
 	AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
 	AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);

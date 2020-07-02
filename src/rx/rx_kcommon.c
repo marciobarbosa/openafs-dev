@@ -139,6 +139,7 @@ rxi_SockProxyGetProc(int op)
 	case SOCKPROXY_BIND:
 	case SOCKPROXY_SEND:
 	case SOCKPROXY_CLOSE:
+	case SOCKPROXY_SHUTDOWN:
 	    proc = &rx_sockproxy_ch.proc[0];
 	    break;
 	case SOCKPROXY_RECV:
@@ -165,13 +166,17 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
 
     MUTEX_ENTER(&ch->lock);
 
-    while (!proc->ready) {
+    while (!ch->shutdown && !proc->ready) {
 	/* userspace process is not ready for requests yet */
 	CV_WAIT(&proc->cv_ready, &ch->lock);
     }
-    while (proc->pending) {
+    while (!ch->shutdown && proc->pending) {
 	/* userspace process is being used */
 	CV_WAIT(&proc->cv_pend, &ch->lock);
+    }
+    if (ch->shutdown) {
+	ret = -1;
+	goto done;
     }
 
     proc->op = op;
@@ -209,8 +214,15 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
 	}
     }
 
-    /* wait for response from userspace process */
     CV_BROADCAST(&proc->cv_op);
+    /* if shutting down, there is no need to wait for the response from the
+     * userspace process since it will exit and never return. */
+    if (proc->op == SOCKPROXY_SHUTDOWN) {
+	ch->shutdown = 1;
+	ret = 0;
+	goto done;
+    }
+    /* wait for response from userspace process */
     while (!proc->complete) {
 	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
     }
@@ -245,6 +257,10 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
 
     MUTEX_ENTER(&ch->lock);
 
+    if (ch->shutdown) {
+	MUTEX_EXIT(&ch->lock);
+	return -1;
+    }
     /* response received from userspace process */
     if (proc->pending) {
 	if (*op == SOCKPROXY_SOCKET) {
@@ -276,17 +292,20 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
     }
     if (!proc->pending) {
 	/* wait for requests */
-	if (*op & (SOCKPROXY_RECV))
-	    printf("<marcio> reply waiting for request\n");
 	CV_WAIT(&proc->cv_op, &ch->lock);
-	if (*op & (SOCKPROXY_RECV))
-	    printf("<marcio> request received\n");
     }
 
     /* request received */
     *rock = ch->socket;
     *op = proc->op;
 
+    if (*op & (SOCKPROXY_SHUTDOWN)) {
+	MUTEX_EXIT(&ch->lock);
+	return -2;
+    }
+    if (ch->shutdown) {
+	*op = SOCKPROXY_SHUTDOWN;
+    }
     if (*op & (SOCKPROXY_BIND | SOCKPROXY_SEND)) {
 	*addr = proc->addr;
 	/* for now, assume we always have ipv4 addresses */

@@ -65,6 +65,7 @@ struct rx_sockproxy_proc {
 };
 struct rx_sockproxy_channel {
     int socket;
+    int shutdown;
     /*
      * processes running on userspace, each with a specific role:
      * proc[0]: socket, setsockopt, bind, and sendmsg.
