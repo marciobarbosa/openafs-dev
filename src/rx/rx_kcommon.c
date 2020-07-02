@@ -158,6 +158,7 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
 
     struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
     struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(op);
+    struct rx_sockproxy_proc *recvproc;
 
     if (proc == NULL) {
 	printf("rx_SockProxyRequest: proc not found.\n");
@@ -219,7 +220,14 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
      * userspace process since it will exit and never return. */
     if (proc->op == SOCKPROXY_SHUTDOWN) {
 	ch->shutdown = 1;
+	proc->pending = 0;
 	ret = 0;
+
+	recvproc = rxi_SockProxyGetProc(SOCKPROXY_RECV);
+	recvproc->complete = 1;
+	recvproc->pending = 1;
+	recvproc->ret = -1;
+	CV_BROADCAST(&recvproc->cv_op);
 	goto done;
     }
     /* wait for response from userspace process */
@@ -304,7 +312,9 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
 	return -2;
     }
     if (ch->shutdown) {
-	*op = SOCKPROXY_SHUTDOWN;
+	/* recv proc */
+	MUTEX_EXIT(&ch->lock);
+	return -1;
     }
     if (*op & (SOCKPROXY_BIND | SOCKPROXY_SEND)) {
 	*addr = proc->addr;

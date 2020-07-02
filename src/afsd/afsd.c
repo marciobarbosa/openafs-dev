@@ -1683,11 +1683,15 @@ SockProxyHandler(int role)
 
     int blen, bsize;
     int nbytes, cbytes;
+
     int shutdown;
+    int recvpid;
 
     op = role;
     rock = -1;
+
     shutdown = 0;
+    recvpid = -1;
 
     while (!shutdown) {
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
@@ -1735,8 +1739,11 @@ SockProxyHandler(int role)
 		if (role == SOCKPROXY_SENDPKTS && code == 0) {
 		    /* at this point, we can start receiving packets. notice
 		     * that this child inherits our socket. */
-		    role = SOCKPROXY_RECVPKTS;
-		    afsd_fork(0, sockproxy_thread, &role);
+		    recvpid = fork();
+		    if (recvpid == 0) {
+			SockProxyHandler(SOCKPROXY_RECVPKTS);
+			exit(1);
+		    }
 		}
 		rock = code;
 		break;
@@ -1828,12 +1835,17 @@ SockProxyHandler(int role)
 		rock = code;
 		break;
 	    case SOCKPROXY_SHUTDOWN:
-		/* kill this process */
+		/*
+		 * receiver has to be killed since it can be blocked in recvmsg
+		 * waiting for packets.
+		 */
+		kill(recvpid, SIGTERM);
 		shutdown = 1;
 		break;
 	    default:
 		/* operation not found */
 		rock = -1;
+		sleep(1);
 	}
     }
     exit(0);

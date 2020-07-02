@@ -273,12 +273,17 @@ osi_StopListener(void)
 #if defined(KERNEL_FUNNEL)
     thread_funnel_switch(KERNEL_FUNNEL, NETWORK_FUNNEL);
 #endif
-    soclose(rx_socket);
+//    soclose(rx_socket);
 #if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    (void)rx_SockProxyRequest(SOCKPROXY_CLOSE, NULL, NULL, 0);
+    afs_termState = AFSOP_STOP_SOCKPROXY;
     AFS_GUNLOCK();
     (void)rx_SockProxyRequest(SOCKPROXY_SHUTDOWN, NULL, NULL, 0);
     AFS_GLOCK();
-    /* wait here */
+    while (afs_termState == AFSOP_STOP_SOCKPROXY) {
+	afs_warn("Waiting for socket proxy... ");
+	afs_osi_Sleep(&afs_termState);
+    }
 #endif
 #if defined(KERNEL_FUNNEL)
     thread_funnel_switch(NETWORK_FUNNEL, KERNEL_FUNNEL);

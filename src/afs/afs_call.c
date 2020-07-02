@@ -1382,14 +1382,17 @@ afs_syscall_call(long parm, long parm2, long parm3,
 
 	/* shutting down */
 	if (code == -2) {
-	    /* notify caller */
+	    afs_termState = AFSOP_STOP_RXK_LISTENER;
+	    afs_osi_Wakeup(&afs_termState);
 	}
 
 	/* send request to userspace process */
-	AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
-	AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);
-	AFS_COPYOUT((caddr_t)addr, AFSKPTR(parm4), asize, code);
-	AFS_COPYOUT((caddr_t)&payload, AFSKPTR(parm5), psize, code);
+	if (code != -1) {
+	    AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
+	    AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);
+	    AFS_COPYOUT((caddr_t)addr, AFSKPTR(parm4), asize, code);
+	    AFS_COPYOUT((caddr_t)&payload, AFSKPTR(parm5), psize, code);
+	}
 #endif
     } else {
 	code = EINVAL;
