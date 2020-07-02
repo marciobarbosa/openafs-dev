@@ -1659,6 +1659,7 @@ BkgHandler(void)
 #define SOCKPROXY_SEND		16
 #define SOCKPROXY_RECV		32
 #define SOCKPROXY_CLOSE		64
+#define SOCKPROXY_SHUTDOWN	128
 
 #define SOCKPROXY_SENDPKTS	16
 #define SOCKPROXY_RECVPKTS	32
@@ -1669,32 +1670,26 @@ static void
 SockProxyHandler(int role)
 {
     int code, i;
+
     int op, rock;
     struct sockaddr_in addr;
+    struct afs_sockproxy_payload payload;
+    char *payloadp;
+
+    struct msghdr msg;
+    /* max number of iovecs is 16 (RX_MAXIOVECS) */
     struct iovec iov[16];
     int niov;
-    char *payloadp;
-    struct afs_sockproxy_payload payload;
 
-    int buflen =  50000;
-    struct msghdr msg;
-
-    struct sockaddr_in *saddr;
-    int recv_len;
-    int copy_len;
-    int n_entries;
+    int blen, bsize;
+    int nbytes, cbytes;
+    int shutdown;
 
     op = role;
     rock = -1;
+    shutdown = 0;
 
-    FILE *fd = fopen("/Users/marcio/afsd_log", "a+");
-
-    while (1) {
-	if (op & (SOCKPROXY_RECV)) {
-	    fprintf(fd, "calling afsd_syscall\n");
-	    fflush(fd);
-	}
-
+    while (!shutdown) {
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
 			    &op,
 			    &rock,
@@ -1707,125 +1702,141 @@ SockProxyHandler(int role)
 
 	switch (op) {
 	    case SOCKPROXY_SOCKET:
+		/**
+		 * param[out] rock  socket
+		 */
 		rock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-		fprintf(fd, "socket: %d\n", rock);
-		fflush(fd);
 		break;
 	    case SOCKPROXY_SETOPT:
-		code = setsockopt(rock, SOL_SOCKET, SO_SNDBUF, &buflen, sizeof(buflen));
-		code = setsockopt(rock, SOL_SOCKET, SO_RCVBUF, &buflen, sizeof(buflen));
-		fprintf(fd, "setsockopt: %d\n", code);
-		fprintf(fd, "setsockopt socket: %d\n", rock);
-		fflush(fd);
+		/**
+		 * param[in]  rock  socket
+		 * param[out] rock  code returned by setsockopt
+		 */
+		blen = 5000;
+		bsize = sizeof(blen);
+		for (i = 0; i < 2; i++) {
+		    code  = setsockopt(rock, SOL_SOCKET, SO_SNDBUF, &blen, bsize);
+		    code |= setsockopt(rock, SOL_SOCKET, SO_RCVBUF, &blen, bsize);
+		    if (code == 0) {
+			break;
+		    }
+		    /* setsockopt didn't succeed. try a smaller size. */
+		    blen = 32766;
+		}
 		rock = code;
 		break;
 	    case SOCKPROXY_BIND:
+		/**
+		 * param[in]  rock  socket
+		 * param[in]  addr  IPv4 to be bound to the socket
+		 * param[out] rock  code returned by bind
+		 */
 		code = bind(rock, (struct sockaddr *)&addr, sizeof(addr));
-		fprintf(fd, "bind: %d\n", code);
-		fprintf(fd, "bind socket: %d\n", rock);
-		fflush(fd);
 		if (role == SOCKPROXY_SENDPKTS && code == 0) {
-		    fprintf(fd, "creating new process for listener\n");
-		    fflush(fd);
-		    /* create process for recvmsg */
-    		    role = SOCKPROXY_RECVPKTS;
-    		    afsd_fork(0, sockproxy_thread, &role);
+		    /* at this point, we can start receiving packets. notice
+		     * that this child inherits our socket. */
+		    role = SOCKPROXY_RECVPKTS;
+		    afsd_fork(0, sockproxy_thread, &role);
 		}
 		rock = code;
 		break;
 	    case SOCKPROXY_SEND:
+		/**
+		 * param[in]  rock    socket
+		 * param[in]  addr    IPv4 of the target
+		 * param[in]  payload data to be sent
+		 * param[out] rock    number of bytes sent
+		 */
+
+		/* reconstruct iovecs from blob sent by kext */
 		payloadp = payload.data;
-		niov = payload.nentries;
 		for (i = 0; i < payload.nentries; i++) {
 		    iov[i].iov_base = malloc(payload.len[i]);
 		    iov[i].iov_len = payload.len[i];
 		    memcpy(iov[i].iov_base, payloadp, iov[i].iov_len);
 		    payloadp += iov[i].iov_len;
 		}
+
 		memset(&msg, 0, sizeof(msg));
 		msg.msg_name = &addr;
 		msg.msg_namelen = ((struct sockaddr *)&addr)->sa_len;
-		msg.msg_iov = &iov[0];
-		msg.msg_iovlen = niov;
+		msg.msg_iov = iov;
+		msg.msg_iovlen = payload.nentries;
 
 		code = sendmsg(rock, &msg, 0);
-		fprintf(fd, "sendmsg: %d\n", code);
-		fprintf(fd, "sendmsg socket: %d\n", rock);
-		fflush(fd);
 		rock = code;
 
-		for (i = 0; i < niov; i++) {
+		for (i = 0; i < payload.nentries; i++) {
 		    free(iov[i].iov_base);
 		    iov[i].iov_base = NULL;
 		    iov[i].iov_len = 0;
 		}
 		break;
 	    case SOCKPROXY_RECV:
-		memset(&addr, 0, sizeof(addr));
-		payloadp = payload.data;
-		niov = payload.nentries;
+		/**
+		 * param[in]  rock    socket
+		 * param[out] addr    IPv4 of the source
+		 * param[out] payload data received
+		 * param[out] rock    number of bytes received
+		 */
+
+		/*
+		 * alloc space for the packets that will be received. notice
+		 * that the number and the size of each iovec is provided by the
+		 * caller (kext).
+		 */
 		for (i = 0; i < payload.nentries; i++) {
 		    iov[i].iov_base = malloc(payload.len[i]);
 		    iov[i].iov_len = payload.len[i];
 		}
+		niov = payload.nentries;
+
 		memset(&msg, 0, sizeof(msg));
 		msg.msg_name = &addr;
 		msg.msg_namelen = sizeof(addr);
 		msg.msg_iov = iov;
-		msg.msg_iovlen = niov;
-
-		saddr = (struct sockaddr_in *)&addr;
-		fprintf(fd, "addr: %d\n", saddr->sin_addr.s_addr);
-		fprintf(fd, "port: %d\n", saddr->sin_port);
-		fflush(fd);
+		msg.msg_iovlen = payload.nentries;
 
 		code = recvmsg(rock, &msg, 0);
-		recv_len = code;
-		fprintf(fd, "recvmsg: %d\n", code);
-		fprintf(fd, "recv socket: %d\n", rock);
-		fprintf(fd, "recv errno: %d\n", errno);
-		fprintf(fd, "addr after: %d\n", saddr->sin_addr.s_addr);
-		fprintf(fd, "port after: %d\n", saddr->sin_port);
-		fflush(fd);
 		rock = code;
 
-		fprintf(fd, "niov returned: %d\n", msg.msg_iovlen);
-		fprintf(fd, "niov: %d\n", niov);
-		fflush(fd);
-		for (i = 0, n_entries = 0; i < niov && recv_len; i++, n_entries++) {
-		    fprintf(fd, "loop begin\n");
-		    fflush(fd);
-		    if (recv_len > iov[i].iov_len) {
-			copy_len = iov[i].iov_len;
-		    } else {
-			copy_len = recv_len;
-		    }
-		    recv_len -= copy_len;
-		    memcpy(payloadp, iov[i].iov_base, copy_len);
-		    fprintf(fd, "copying %d\n", copy_len);
-		    fflush(fd);
-		    payloadp += copy_len;
-		    payload.len[i] = copy_len;
-		    fprintf(fd, "loop end\n");
-		    fflush(fd);
+		/*
+		 * bundle received packets into a blob that will be passed to
+		 * the caller (kext).
+		 */
+		nbytes = code;
+		payloadp = payload.data;
+		for (i = 0; i < niov && nbytes && (code > 0); i++) {
+		    cbytes = (nbytes < iov[i].iov_len) ? nbytes : iov[i].iov_len;
+		    memcpy(payloadp, iov[i].iov_base, cbytes);
+		    payloadp += cbytes;
+		    payload.len[i] = cbytes;
+		    nbytes -= cbytes;
 		}
-		payload.nentries = n_entries;
+		payload.nentries = i;
+
 		for (i = 0; i < niov; i++) {
 		    free(iov[i].iov_base);
 		}
 		break;
 	    case SOCKPROXY_CLOSE:
+		/**
+		 * param[in]  rock  socket
+		 * param[out] rock  code returned by close
+		 */
 		code = close(rock);
 		rock = code;
 		break;
+	    case SOCKPROXY_SHUTDOWN:
+		/* kill this process */
+		shutdown = 1;
+		break;
 	    default:
-		fprintf(fd, "op not found: %d\n", op);
-		fflush(fd);
+		/* operation not found */
 		rock = -1;
 	}
     }
-    /* return */
-    fclose(fd);
+    exit(0);
 }
 
 static void *
@@ -1836,7 +1847,7 @@ sockproxy_thread(void *rock)
      * need to drop the controlling TTY, etc.
      */
     if (afsd_daemon(0, 0) == -1) {
-	printf("Error starting AFSDB lookup handler: %s\n",
+	printf("Error starting socket proxy handler: %s\n",
 	       strerror(errno));
 	exit(1);
     }

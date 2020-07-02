@@ -45,6 +45,7 @@ EXT osi_socket rx_socket;
 #define SOCKPROXY_SEND		16
 #define SOCKPROXY_RECV		32
 #define SOCKPROXY_CLOSE		64
+#define SOCKPROXY_SHUTDOWN	128
 
 struct rx_sockproxy_proc {
     char op;			/* operation to be performed */
