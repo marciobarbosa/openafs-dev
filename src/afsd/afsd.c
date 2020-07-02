@@ -1839,7 +1839,9 @@ SockProxyHandler(int role)
 		 * receiver has to be killed since it can be blocked in recvmsg
 		 * waiting for packets.
 		 */
-		kill(recvpid, SIGTERM);
+		if (recvpid > 0) {
+		    kill(recvpid, SIGTERM);
+		}
 		shutdown = 1;
 		break;
 	    default:

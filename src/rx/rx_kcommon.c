@@ -220,18 +220,15 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
      * userspace process since it will exit and never return. */
     if (proc->op == SOCKPROXY_SHUTDOWN) {
 	ch->shutdown = 1;
-	proc->pending = 0;
 	ret = 0;
 
 	recvproc = rxi_SockProxyGetProc(SOCKPROXY_RECV);
-	recvproc->complete = 1;
-	recvproc->pending = 1;
 	recvproc->ret = -1;
 	CV_BROADCAST(&recvproc->cv_op);
 	goto done;
     }
     /* wait for response from userspace process */
-    while (!proc->complete) {
+    while (!proc->complete && !ch->shutdown) {
 	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
     }
 
@@ -298,7 +295,7 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
 	proc->ready = 1;
 	CV_BROADCAST(&proc->cv_ready);
     }
-    if (!proc->pending) {
+    if (!proc->pending && !ch->shutdown) {
 	/* wait for requests */
 	CV_WAIT(&proc->cv_op, &ch->lock);
     }
@@ -313,6 +310,7 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
     }
     if (ch->shutdown) {
 	/* recv proc */
+	*op = SOCKPROXY_SHUTDOWN;
 	MUTEX_EXIT(&ch->lock);
 	return -1;
     }
