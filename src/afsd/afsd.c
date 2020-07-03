@@ -1693,6 +1693,8 @@ SockProxyHandler(int role)
     shutdown = 0;
     recvpid = -1;
 
+    FILE *fd = fopen("/Users/marcio/afsd_log", "a+");
+
     while (!shutdown) {
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
 			    &op,
@@ -1831,6 +1833,8 @@ SockProxyHandler(int role)
 		 * param[in]  rock  socket
 		 * param[out] rock  code returned by close
 		 */
+		fprintf(fd, "closing socket\n");
+		fflush(fd);
 		code = close(rock);
 		rock = code;
 		break;
@@ -1839,7 +1843,10 @@ SockProxyHandler(int role)
 		 * receiver has to be killed since it can be blocked in recvmsg
 		 * waiting for packets.
 		 */
+		fprintf(fd, "shutting down\n");
+		fflush(fd);
 		if (recvpid > 0) {
+		    fprintf(fd, "killing process %d\n", recvpid);
 		    kill(recvpid, SIGTERM);
 		}
 		shutdown = 1;
@@ -1850,6 +1857,8 @@ SockProxyHandler(int role)
 		sleep(1);
 	}
     }
+    fprintf(fd, "good bye!\n");
+    fclose(fd);
     exit(0);
 }
 

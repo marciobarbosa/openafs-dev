@@ -172,6 +172,7 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
 	CV_WAIT(&proc->cv_ready, &ch->lock);
     }
     while (!ch->shutdown && proc->pending) {
+	printf("<marcio> waiting for my turn...\n");
 	/* userspace process is being used */
 	CV_WAIT(&proc->cv_pend, &ch->lock);
     }
@@ -219,6 +220,7 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
     /* if shutting down, there is no need to wait for the response from the
      * userspace process since it will exit and never return. */
     if (proc->op == SOCKPROXY_SHUTDOWN) {
+	printf("<marcio> i am shutting down!\n");
 	ch->shutdown = 1;
 	ret = 0;
 
@@ -305,11 +307,13 @@ rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
     *op = proc->op;
 
     if (*op & (SOCKPROXY_SHUTDOWN)) {
+	printf("<marcio> send: shutting down...\n");
 	MUTEX_EXIT(&ch->lock);
 	return -2;
     }
     if (ch->shutdown) {
 	/* recv proc */
+	printf("<marcio> recv: shutting down...\n");
 	*op = SOCKPROXY_SHUTDOWN;
 	MUTEX_EXIT(&ch->lock);
 	return -1;

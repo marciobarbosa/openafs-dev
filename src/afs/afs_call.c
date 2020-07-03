@@ -1382,7 +1382,8 @@ afs_syscall_call(long parm, long parm2, long parm3,
 
 	/* shutting down */
 	if (code == -2) {
-	    afs_termState = AFSOP_STOP_RXK_LISTENER;
+	    afs_warn("<marcio> Socket proxy is going away...\n");
+	    afs_termState = AFSOP_STOP_COMPLETE;
 	    afs_osi_Wakeup(&afs_termState);
 	}
 
@@ -1529,6 +1530,17 @@ afs_shutdown(void)
 	afs_warn("Sleep... ");
 	afs_osi_Sleep(&afs_termState);
     }
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    /* cancel socket proxy */
+    afs_warn("<marcio> current state: %d\n", afs_termState);
+    afs_warn("Socket Proxy... ");
+    afs_termState = AFSOP_STOP_SOCKPROXY;
+    osi_StopSockProxy();
+    while (afs_termState == AFSOP_STOP_SOCKPROXY) {
+	afs_warn("Sleep... ");
+	afs_osi_Sleep(&afs_termState);
+    }
+#endif
 # endif
 #endif
 

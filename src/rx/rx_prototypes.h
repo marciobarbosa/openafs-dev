@@ -321,6 +321,9 @@ extern void osi_StopNetIfPoller(void);
 extern struct afs_ifinfo afsifinfo[ADDRSPERSITE];
 # endif
 extern void osi_StopListener(void);
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+extern void osi_StopSockProxy(void);
+#endif
 extern int rxi_FindIfMTU(afs_uint32 addr);
 # if defined(UKERNEL)
 extern void rxi_ListenerProc(osi_socket usockp, int *tnop,
