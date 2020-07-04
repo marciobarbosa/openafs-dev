@@ -274,6 +274,17 @@ osi_StopListener(void)
     thread_funnel_switch(KERNEL_FUNNEL, NETWORK_FUNNEL);
 #endif
 //    soclose(rx_socket);
+
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    AFS_GUNLOCK();
+    //(void)rx_SockProxyRequest(SOCKPROXY_CLOSE, NULL, NULL, 0);
+    printf("<marcio> calling SOCKPROXY_SHUTDOWN\n");
+    (void)rx_SockProxyRequest(SOCKPROXY_SHUTDOWN, NULL, NULL, 0);
+    printf("<marcio> leaving SOCKPROXY_SHUTDOWN\n");
+    AFS_GLOCK();
+    printf("<marcio> have the lock\n");
+#endif
+
 #if defined(KERNEL_FUNNEL)
     thread_funnel_switch(NETWORK_FUNNEL, KERNEL_FUNNEL);
 #endif
@@ -285,15 +296,6 @@ osi_StopListener(void)
 #endif
 }
 
-#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
-void
-osi_StopSockProxy(void)
-{
-    AFS_GUNLOCK();
-    (void)rx_SockProxyRequest(SOCKPROXY_SHUTDOWN, NULL, NULL, 0);
-    AFS_GLOCK();
-}
-#endif
 #else
 #error need upcall or listener
 #endif

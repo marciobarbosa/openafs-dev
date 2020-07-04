@@ -1382,9 +1382,14 @@ afs_syscall_call(long parm, long parm2, long parm3,
 
 	/* shutting down */
 	if (code == -2) {
-	    afs_warn("<marcio> Socket proxy is going away...\n");
+	    while (afs_termState != AFSOP_STOP_SOCKPROXY) {
+		afs_warn("Socket Proxy Sleep... ");
+		afs_osi_Sleep(&afs_termState);
+	    }
+	    afs_warn("<marcio> Socket proxy is going away... (op = %d)\n", op);
 	    afs_termState = AFSOP_STOP_COMPLETE;
 	    afs_osi_Wakeup(&afs_termState);
+	    code = 0;
 	}
 
 	/* send request to userspace process */
@@ -1523,20 +1528,20 @@ afs_shutdown(void)
     afs_warn("UnmaskRxkSignals... ");
     afs_osi_UnmaskRxkSignals();
 #  endif
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    /* cancel rx listener */
+    afs_warn("RxListener and Socket Proxy... ");
+    osi_StopListener();		/* This closes rx_socket. */
+    while (afs_termState == AFSOP_STOP_RXK_LISTENER || afs_termState == AFSOP_STOP_SOCKPROXY) {
+	afs_warn("Sleep... ");
+	afs_osi_Sleep(&afs_termState);
+    }
+    afs_warn("\nRxListener and Socket Proxy: DONE!\n");
+#else
     /* cancel rx listener */
     afs_warn("RxListener... ");
     osi_StopListener();		/* This closes rx_socket. */
     while (afs_termState == AFSOP_STOP_RXK_LISTENER) {
-	afs_warn("Sleep... ");
-	afs_osi_Sleep(&afs_termState);
-    }
-#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
-    /* cancel socket proxy */
-    afs_warn("<marcio> current state: %d\n", afs_termState);
-    afs_warn("Socket Proxy... ");
-    afs_termState = AFSOP_STOP_SOCKPROXY;
-    osi_StopSockProxy();
-    while (afs_termState == AFSOP_STOP_SOCKPROXY) {
 	afs_warn("Sleep... ");
 	afs_osi_Sleep(&afs_termState);
     }

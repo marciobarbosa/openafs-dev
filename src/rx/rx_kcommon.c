@@ -166,8 +166,10 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
     }
 
     MUTEX_ENTER(&ch->lock);
+    printf("<marcio> rx_SockProxyRequest\n");
 
     while (!ch->shutdown && !proc->ready) {
+	printf("<marcio> not ready\n");
 	/* userspace process is not ready for requests yet */
 	CV_WAIT(&proc->cv_ready, &ch->lock);
     }
@@ -180,6 +182,7 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
 	ret = -1;
 	goto done;
     }
+    printf("<marcio> inside\n");
 
     proc->op = op;
     proc->pending = 1;
@@ -219,7 +222,7 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
     CV_BROADCAST(&proc->cv_op);
     /* if shutting down, there is no need to wait for the response from the
      * userspace process since it will exit and never return. */
-    if (proc->op == SOCKPROXY_SHUTDOWN) {
+    if (proc->op & (SOCKPROXY_SHUTDOWN)) {
 	printf("<marcio> i am shutting down!\n");
 	ch->shutdown = 1;
 	ret = 0;
@@ -231,7 +234,9 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
     }
     /* wait for response from userspace process */
     while (!proc->complete && !ch->shutdown) {
+	printf("<marcio> going to the bed\n");
 	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
+	printf("<marcio> waking up\n");
     }
 
     if (op & (SOCKPROXY_SEND)) {
@@ -240,6 +245,10 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
 	proc->psize = 0;
     }
     ret = proc->ret;
+
+    if (ret == -1 && ch->shutdown) {
+	printf("<marcio> recv returning...\n");
+    }
 
   done:
     CV_BROADCAST(&proc->cv_pend);
@@ -1457,6 +1466,7 @@ rxk_Listener(void)
 #ifdef RX_ENABLE_LOCKS
     AFS_GUNLOCK();
 #endif /* RX_ENABLE_LOCKS */
+    printf("<marcio> rxk_Listener begin\n");
     while (afs_termState != AFSOP_STOP_RXK_LISTENER) {
         /* See if a check for additional packets was issued */
         rx_CheckPackets();
@@ -1472,15 +1482,18 @@ rxk_Listener(void)
 	    rxp = rxi_ReceivePacket(rxp, rx_socket, host, port, 0, 0);
 	}
     }
+    printf("<marcio> rxk_Listener end\n");
 
 #ifdef RX_ENABLE_LOCKS
     AFS_GLOCK();
 #endif /* RX_ENABLE_LOCKS */
+    printf("<marcio> have lock\n");
     if (afs_termState == AFSOP_STOP_RXK_LISTENER) {
 #ifdef AFS_SUN510_ENV
 	afs_termState = AFSOP_STOP_NETIF;
 #else
-	afs_termState = AFSOP_STOP_COMPLETE;
+	printf("<marcio> setting rxk_Listener to AFSOP_STOP_SOCKPROXY\n");
+	afs_termState = AFSOP_STOP_SOCKPROXY;
 #endif
 	osi_rxWakeup(&afs_termState);
     }

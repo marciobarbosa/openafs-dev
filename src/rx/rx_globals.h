@@ -48,10 +48,10 @@ EXT osi_socket rx_socket;
 #define SOCKPROXY_SHUTDOWN	128
 
 struct rx_sockproxy_proc {
-    char op;			/* operation to be performed */
-    char pending;		/* waiting for a reply from userspace */
-    char complete;		/* response received from userspace */
-    char ready;			/* can receive requests */
+    unsigned char op;		/* operation to be performed */
+    unsigned char pending;	/* waiting for a reply from userspace */
+    unsigned char complete;	/* response received from userspace */
+    unsigned char ready;	/* can receive requests */
     int ret;			/* value returned by op executed on userspace */
     struct sockaddr *addr;	/* ip passed to userspace */
     size_t asize;		/* size of addr */

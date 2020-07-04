@@ -1702,6 +1702,8 @@ SockProxyHandler(int role)
 			    &addr,
 			    &payload);
 	if (code) {
+	    fprintf(fd, "sleep\n");
+	    fflush(fd);
 	    sleep(1);
 	    continue;
 	}
@@ -1712,12 +1714,16 @@ SockProxyHandler(int role)
 		 * param[out] rock  socket
 		 */
 		rock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		fprintf(fd, "socket\n");
+		fflush(fd);
 		break;
 	    case SOCKPROXY_SETOPT:
 		/**
 		 * param[in]  rock  socket
 		 * param[out] rock  code returned by setsockopt
 		 */
+		fprintf(fd, "opt\n");
+		fflush(fd);
 		blen = 5000;
 		bsize = sizeof(blen);
 		for (i = 0; i < 2; i++) {
@@ -1737,6 +1743,8 @@ SockProxyHandler(int role)
 		 * param[in]  addr  IPv4 to be bound to the socket
 		 * param[out] rock  code returned by bind
 		 */
+		fprintf(fd, "bind\n");
+		fflush(fd);
 		code = bind(rock, (struct sockaddr *)&addr, sizeof(addr));
 		if (role == SOCKPROXY_SENDPKTS && code == 0) {
 		    /* at this point, we can start receiving packets. notice
@@ -1758,6 +1766,8 @@ SockProxyHandler(int role)
 		 */
 
 		/* reconstruct iovecs from blob sent by kext */
+		fprintf(fd, "send\n");
+		fflush(fd);
 		payloadp = payload.data;
 		for (i = 0; i < payload.nentries; i++) {
 		    iov[i].iov_base = malloc(payload.len[i]);
@@ -1794,6 +1804,8 @@ SockProxyHandler(int role)
 		 * that the number and the size of each iovec is provided by the
 		 * caller (kext).
 		 */
+		fprintf(fd, "recv\n");
+		fflush(fd);
 		for (i = 0; i < payload.nentries; i++) {
 		    iov[i].iov_base = malloc(payload.len[i]);
 		    iov[i].iov_len = payload.len[i];
@@ -1853,6 +1865,8 @@ SockProxyHandler(int role)
 		break;
 	    default:
 		/* operation not found */
+		fprintf(fd, "op not found (%d)\n", op);
+		fflush(fd);
 		rock = -1;
 		sleep(1);
 	}
