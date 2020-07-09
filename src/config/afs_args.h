@@ -83,8 +83,10 @@
 /* AFSOP_STOP_RXK_LISTENER	217	   defined in osi.h */
 #define AFSOP_STOP_AFSDB	218	/* Stop AFSDB handler */
 #define AFSOP_STOP_NETIF	219	/* Stop Netif poller */
+#define AFSOP_SOCKPROXY_HANDLER	220	/* Userspace socket handler */
+#define AFSOP_STOP_SOCKPROXY	221	/* Stop socket proxy daemon */
 
-#define AFSOP_MAX_OPCODE	AFSOP_STOP_NETIF /* Largest defined opcode. */
+#define AFSOP_MAX_OPCODE	AFSOP_STOP_SOCKPROXY /* Largest defined opcode. */
 
 /*
  * AFS system call types and flags.
@@ -282,6 +284,7 @@ struct afssysargs64 {
     unsigned int syscall;
     unsigned int retval;
 };
+
 #define VIOC_SYSCALL_TYPE 'C'
 #define VIOC_SYSCALL _IOWR(VIOC_SYSCALL_TYPE,1,struct afssysargs)
 #define VIOC_SYSCALL64 _IOWR(VIOC_SYSCALL_TYPE,2,struct afssysargs64)
@@ -319,6 +322,16 @@ struct afssysargs32 {
 #define AFS_CACHE_CELLS_INODE -2
 #define AFS_CACHE_ITEMS_INODE -3
 #define AFS_CACHE_VOLUME_INODE -4
+#endif
+
+#ifdef AFS_DARWIN190_ENV
+#define SOCKPROXY_PAYLOAD_MAX	2832	/* 2 * (RX_JUMBOBUFFERSIZE + RX_JUMBOHEADERSIZE) */
+#define SOCKPROXY_LEN_MAX	16	/* RX_MAXIOVECS */
+struct afs_sockproxy_payload {
+    char data[SOCKPROXY_PAYLOAD_MAX];		/* data of each iovec */
+    unsigned int len[SOCKPROXY_LEN_MAX];	/* size of each iovec */
+    unsigned int nentries;			/* number of iovecs */
+};
 #endif
 
 #endif /* _AFS_ARGS_H_ */

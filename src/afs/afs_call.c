@@ -35,6 +35,10 @@
 #endif
 #include <hcrypto/rand.h>
 
+#ifdef AFS_DARWIN190_ENV
+#include <netinet/in.h>
+#endif
+
 #if defined(AFS_SUN5_ENV) || defined(AFS_AIX_ENV) || defined(AFS_SGI_ENV) || defined(AFS_HPUX_ENV)
 #define	AFS_MINBUFFERS	100
 #else
@@ -1343,6 +1347,57 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	    afs_volume_ttl = parm2;
 	    code = 0;
 	}
+    } else if (parm == AFSOP_SOCKPROXY_HANDLER) {
+#ifdef AFS_DARWIN190_ENV
+	int op, rock;
+	void *addr;
+	int asize, psize;
+	struct afs_sockproxy_payload payload;
+	struct sockaddr_in saddr;
+
+	op = rock = -1;
+	addr = NULL;
+	asize = psize = 0;
+	addr = &saddr;
+	asize = sizeof(saddr);
+
+	/* get response from userspace */
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&op, sizeof(op), code);
+	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&rock, sizeof(rock), code);
+	AFS_COPYIN(AFSKPTR(parm4), (caddr_t)&saddr, sizeof(saddr), code);
+
+	psize = sizeof(payload);
+	AFS_COPYIN(AFSKPTR(parm5), (caddr_t)&payload, psize, code);
+
+	AFS_GUNLOCK();
+	/*
+	 * send response from userspace (if any) to the rx layer and wait for a
+	 * new request.
+	 */
+	code = rx_SockProxyReply(&op,
+				 &rock,
+				 &addr, &asize,
+				 &payload);
+	AFS_GLOCK();
+
+	/* shutting down */
+	if (code == -2) {
+	    while (afs_termState != AFSOP_STOP_SOCKPROXY) {
+		afs_osi_Sleep(&afs_termState);
+	    }
+	    afs_termState = AFSOP_STOP_COMPLETE;
+	    afs_osi_Wakeup(&afs_termState);
+	    code = 0;
+	}
+
+	/* send request to userspace process */
+	if (code != -1) {
+	    AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
+	    AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);
+	    AFS_COPYOUT((caddr_t)addr, AFSKPTR(parm4), asize, code);
+	    AFS_COPYOUT((caddr_t)&payload, AFSKPTR(parm5), psize, code);
+	}
+#endif
     } else {
 	code = EINVAL;
     }
@@ -1471,6 +1526,16 @@ afs_shutdown(void)
     afs_warn("UnmaskRxkSignals... ");
     afs_osi_UnmaskRxkSignals();
 #  endif
+#if defined(AFS_DARWIN190_ENV) && defined(KERNEL)
+    /* cancel rx listener */
+    afs_warn("RxListener and Socket Proxy... ");
+    osi_StopListener();		/* This closes rx_socket. */
+    while (afs_termState == AFSOP_STOP_RXK_LISTENER || afs_termState == AFSOP_STOP_SOCKPROXY) {
+	afs_warn("Sleep... ");
+	afs_osi_Sleep(&afs_termState);
+    }
+    afs_warn("\nRxListener and Socket Proxy: DONE!\n");
+#else
     /* cancel rx listener */
     afs_warn("RxListener... ");
     osi_StopListener();		/* This closes rx_socket. */
@@ -1478,6 +1543,7 @@ afs_shutdown(void)
 	afs_warn("Sleep... ");
 	afs_osi_Sleep(&afs_termState);
     }
+#endif
 # endif
 #endif
 

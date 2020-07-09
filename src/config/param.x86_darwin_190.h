@@ -122,8 +122,9 @@
 #endif
 #define AFS_HAVE_FFS    1	/* Use system's ffs. */
 
+#define AFS_USERSPACE_IP_ADDR    1
 #define AFS_GCPAGS               0
-#define RXK_UPCALL_ENV         1
+#define RXK_LISTENER_ENV         1
 #define RXK_TIMEDSLEEP_ENV       1
 
 #ifdef KERNEL
@@ -264,6 +265,7 @@
 #define AFS_UIOSYS      UIO_SYSSPACE
 #define AFS_UIOUSER     UIO_USERSPACE
 
+#define AFS_USERSPACE_IP_ADDR     1
 #define AFS_GCPAGS                0	/* if nonzero, garbage collect PAGs */
 #define RXK_LISTENER_ENV          1
 
