@@ -1172,7 +1172,8 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
 #endif
     if (code) {
 	dpf(("sobind fails (%d)\n", (int)code));
-	soclose(newSocket);
+	rx_SockProxyRequest(SOCKPROXY_CLOSE, NULL, NULL, 0);
+	//soclose(newSocket);
 	goto bad;
     }
 #else /* defined(AFS_DARWIN_ENV) || defined(AFS_FBSD_ENV) */
@@ -1245,7 +1246,8 @@ rxk_FreeSocket(struct socket *asocket)
 #endif
     }
 #endif /* AFS_HPUX110_ENV */
-    soclose(asocket);
+    //soclose(asocket);
+    rx_SockProxyRequest(SOCKPROXY_CLOSE, NULL, NULL, 0);
 #if defined(AFS_DARWIN_ENV) && defined(KERNEL_FUNNEL)
     thread_funnel_switch(NETWORK_FUNNEL, KERNEL_FUNNEL);
 #endif
