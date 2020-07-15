@@ -14,6 +14,9 @@
 #include <afsconfig.h>
 #include <afs/param.h>
 
+#ifdef AFS_SOCKPROXY
+#include <afs/afs_args.h>
+#endif
 
 #include "rx/rx_kcommon.h"
 #include "rx_atomic.h"
@@ -126,6 +129,244 @@ rxi_GetUDPSocket(u_short port)
 {
     return rxi_GetHostUDPSocket(htonl(INADDR_ANY), port);
 }
+
+#ifdef AFS_SOCKPROXY
+/**
+ * Return process that provides the given operation.
+ *
+ * @param[in]  op  operation
+ *
+ * @return process on success; NULL otherwise.
+ */
+static struct rx_sockproxy_proc *
+rxi_SockProxyGetProc(int op)
+{
+    struct rx_sockproxy_proc *proc = NULL;
+
+    switch (op) {
+	case SOCKPROXY_SOCKET:
+	case SOCKPROXY_SETOPT:
+	case SOCKPROXY_BIND:
+	case SOCKPROXY_SEND:
+	case SOCKPROXY_CLOSE:
+	case SOCKPROXY_SHUTDOWN:
+	    proc = &rx_sockproxy_ch.proc[0];
+	    break;
+	case SOCKPROXY_RECV:
+	    proc = &rx_sockproxy_ch.proc[1];
+	    break;
+    }
+    return proc;
+}
+
+/**
+ * Delegate given operation to user space process.
+ *
+ * @param[in]     op    operation
+ * @param[inout]  addr  ip addr sent to or received from user space
+ * @param[inout]  iov   io vector used if op is send[in] or recv[out]
+ * @param[in]     niov  number of iov entries  
+ *
+ * @return value returned by the requested operation.
+ */
+int
+rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
+{
+    int ret, offset, i;
+    void *payload;
+    size_t psize;
+
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(op);
+    struct rx_sockproxy_proc *recvproc;
+
+    if (proc == NULL) {
+	printf("rx_SockProxyRequest: proc not found.\n");
+	return -1;
+    }
+
+    MUTEX_ENTER(&ch->lock);
+
+    while (!ch->shutdown && !proc->ready) {
+	/* userspace process is not ready for requests yet */
+	CV_WAIT(&proc->cv_ready, &ch->lock);
+    }
+    while (!ch->shutdown && proc->pending) {
+	/* userspace process is being used */
+	CV_WAIT(&proc->cv_pend, &ch->lock);
+    }
+    if (ch->shutdown) {
+	ret = -1;
+	goto done;
+    }
+
+    proc->op = op;
+    proc->pending = 1;
+    proc->complete = 0;
+
+    if (op & (SOCKPROXY_BIND | SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+	proc->addr = addr;
+	/* for now, assume we always have ipv4 addresses */
+	proc->asize = sizeof(struct sockaddr_in);
+    }
+    if (op & (SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+	proc->iov = iov;
+	/* for now, assume we always have 2 entries (header / body) */
+	proc->niov = niov;
+    }
+    if (op & (SOCKPROXY_SEND)) {
+	for (i = 0, psize = 0; i < proc->niov; i++) {
+	    psize += proc->iov[i].iov_len;
+	}
+
+	proc->payload = rxi_Alloc(psize);
+	proc->psize = psize;
+	if (proc->payload == NULL) {
+	    printf("rx_SockProxyRequest: couldn't alloc memory for payload.\n");
+	    ret = -1;
+	    goto done;
+	}
+
+	payload = proc->payload;
+	memset(payload, 0, psize);
+	for (i = 0, offset = 0; i < proc->niov; i++) {
+	    memcpy(payload + offset, iov[i].iov_base, iov[i].iov_len);
+	    offset += iov[i].iov_len;
+	}
+    }
+
+    CV_BROADCAST(&proc->cv_op);
+    /* if shutting down, there is no need to wait for the response from the
+     * userspace process since it will exit and never return. */
+    if (proc->op & (SOCKPROXY_SHUTDOWN)) {
+	ch->shutdown = 1;
+	ret = 0;
+
+	/* if the receiver is sleeping waiting for a request, wake it up so it
+	 * can finalize itself. notice that if the receiver is stuck on user
+	 * space waiting for packets, it will get killed by proc[0]. */
+	recvproc = rxi_SockProxyGetProc(SOCKPROXY_RECV);
+	recvproc->ret = -1;
+	CV_BROADCAST(&recvproc->cv_op);
+	goto done;
+    }
+    /* wait for response from userspace process */
+    while (!proc->complete && !ch->shutdown) {
+	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
+    }
+
+    if (op & (SOCKPROXY_SEND)) {
+	rxi_Free(proc->payload, psize);
+	proc->payload = NULL;
+	proc->psize = 0;
+    }
+    ret = proc->ret;
+
+  done:
+    CV_BROADCAST(&proc->cv_pend);
+    MUTEX_EXIT(&ch->lock);
+
+    return ret;
+}
+
+/**
+ * Receive response from user space process.
+ *
+ * @param[inout]  op       operation
+ * @param[inout]  rock     generic argument sent to or received from user space
+ * @param[inout]  addr     ip addr sent to or received from user space
+ * @param[out]    asize    size of addr
+ * @param[inout]  payload  data sent to or received from user space
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+rx_SockProxyReply(int *op, int *rock, void **addr, int *asize,
+		  struct afs_sockproxy_payload *payload)
+{
+    int i;
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(*op);
+    char *payloadp;
+
+    if (proc == NULL) {
+	printf("rx_SockProxyReply: proc not found (op = %d).\n", *op);
+	return -1;
+    }
+
+    MUTEX_ENTER(&ch->lock);
+
+    if (ch->shutdown) {
+	MUTEX_EXIT(&ch->lock);
+	return -1;
+    }
+    /* response received from userspace process */
+    if (proc->pending) {
+	if (*op == SOCKPROXY_SOCKET) {
+	    ch->socket = *rock;
+	}
+
+	proc->op = -1;
+	proc->pending = 0;
+	proc->complete = 1;
+	proc->ret = *rock;
+
+	if (*op & (SOCKPROXY_RECV)) {
+	    payloadp = (char *)payload->data;
+	    /* proc->iov[i].iov_base must be pre-allocated by requestor */
+	    for (i = 0; i < payload->nentries; i++) {
+		memcpy(proc->iov[i].iov_base, payloadp, payload->len[i]);
+		payloadp += payload->len[i];
+		proc->iov[i].iov_len = payload->len[i];
+	    }
+	    memcpy(proc->addr, *addr, proc->asize);
+	}
+	CV_BROADCAST(&proc->cv_op);
+    }
+
+    if (!proc->ready) {
+	/* ready to receive requests */
+	proc->ready = 1;
+	CV_BROADCAST(&proc->cv_ready);
+    }
+    if (!proc->pending && !ch->shutdown) {
+	/* wait for requests */
+	CV_WAIT(&proc->cv_op, &ch->lock);
+    }
+
+    /* request received */
+    *rock = ch->socket;
+    *op = proc->op;
+
+    if (*op & (SOCKPROXY_SHUTDOWN)) {
+	/* send proc */
+	MUTEX_EXIT(&ch->lock);
+	return -2;
+    }
+    if (ch->shutdown) {
+	/* recv proc */
+	MUTEX_EXIT(&ch->lock);
+	return -1;
+    }
+    if (*op & (SOCKPROXY_BIND | SOCKPROXY_SEND)) {
+	*addr = proc->addr;
+	/* for now, assume we always have ipv4 addresses */
+	*asize = sizeof(struct sockaddr_in);
+    }
+    if (*op & (SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+	payload->nentries = proc->niov;
+	for (i = 0; i < proc->niov; i++) {
+	    payload->len[i] = proc->iov[i].iov_len;
+	}
+    }
+    if (*op & (SOCKPROXY_SEND)) {
+	memcpy(payload->data, proc->payload, proc->psize);
+    }
+
+    MUTEX_EXIT(&ch->lock);
+    return 0;
+}
+#endif
 
 /*
  * osi_utoa() - write the NUL-terminated ASCII decimal form of the given
@@ -809,7 +1050,7 @@ rxi_FindIfnet(afs_uint32 addr, afs_uint32 * maskp)
  * most of it is simple to follow common code.
  */
 #if !defined(UKERNEL)
-#if !defined(AFS_SUN5_ENV) && !defined(AFS_LINUX20_ENV)
+#if !defined(AFS_SUN5_ENV) && !defined(AFS_LINUX20_ENV) && !defined(AFS_SOCKPROXY)
 /* rxk_NewSocket creates a new socket on the specified port. The port is
  * in network byte order.
  */
@@ -1029,7 +1270,7 @@ rxk_FreeSocket(struct socket *asocket)
 #endif
     return 0;
 }
-#endif /* !SUN5 && !LINUX20 */
+#endif /* !SUN5 && !LINUX20 && !AFS_SOCKPROXY */
 
 #if defined(RXK_LISTENER_ENV) || defined(AFS_SUN5_ENV) || defined(RXK_UPCALL_ENV)
 #ifdef RXK_TIMEDSLEEP_ENV
@@ -1253,6 +1494,8 @@ rxk_Listener(void)
     if (afs_termState == AFSOP_STOP_RXK_LISTENER) {
 #ifdef AFS_SUN510_ENV
 	afs_termState = AFSOP_STOP_NETIF;
+#elif AFS_SOCKPROXY
+	afs_termState = AFSOP_STOP_SOCKPROXY;
 #else
 	afs_termState = AFSOP_STOP_COMPLETE;
 #endif

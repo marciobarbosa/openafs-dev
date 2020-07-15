@@ -123,10 +123,12 @@
 #define AFS_HAVE_FFS    1	/* Use system's ffs. */
 
 #define AFS_GCPAGS               0
-#define RXK_UPCALL_ENV         1
+#define RXK_LISTENER_ENV         1
 #define RXK_TIMEDSLEEP_ENV       1
+#define AFS_USERSPACE_IP_ADDR    1
 
 #ifdef KERNEL
+#define AFS_SOCKPROXY            1
 #undef MACRO_BEGIN
 #undef MACRO_END
 #include <kern/macro_help.h>
