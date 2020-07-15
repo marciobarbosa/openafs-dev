@@ -10,6 +10,8 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 #if defined(HAVE_LINUX_KTHREAD_RUN) && !defined(UKERNEL)
 #  include "h/kthread.h"
 #endif

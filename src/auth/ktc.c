@@ -12,6 +12,8 @@
 #include <afsconfig.h>
 #include <afs/param.h>
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 #include <roken.h>
 
 #include <afs/stds.h>

@@ -16,6 +16,7 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
 
 #include "afs/stds.h"
 #include "afs/sysincludes.h"	/* Standard vendor system headers */
