@@ -281,6 +281,14 @@ extern void afs_rxevent_daemon(void);
 # endif
 extern rx_ifnet_t rxi_FindIfnet(afs_uint32 addr, afs_uint32 * maskp);
 extern void osi_StopListener(void);
+# ifdef AFS_SOCKPROXY
+extern int rx_SockProxyRequest(int op,
+			       struct sockaddr *addr,
+			       struct iovec *iov, int niov);
+extern int rx_SockProxyReply(int *op, int *rock,
+			     void **addr, int *asize,
+			     struct afs_sockproxy_payload *payload);
+# endif
 
 /* ARCH/rx_kmutex.c */
 # if defined(AFS_LINUX20_ENV)
