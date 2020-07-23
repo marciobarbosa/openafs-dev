@@ -623,7 +623,7 @@ VolDeleteVolume(struct rx_call *acid, afs_int32 atrans)
 	    callerAddress(acid, buffer), afs_printable_VolumeId_lu(tt->volid));
     }
     TSetRxCall(tt, acid, "DeleteVolume");
-    VPurgeVolume(&error, tt->volume);	/* don't check error code, it is not set! */
+    VPurgeVolume(&error, tt->volume, 1);	/* don't check error code, it is not set! */
     V_destroyMe(tt->volume) = DESTROY_ME;
     if (tt->volume->needsPutBack) {
 	tt->volume->needsPutBack = VOL_PUTBACK_DELETE; /* so endtrans does the right fssync opcode */

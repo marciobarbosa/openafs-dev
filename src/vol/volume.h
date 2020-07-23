@@ -893,7 +893,7 @@ extern int VVolOpLeaveOnline_r(Volume * vp, FSSYNC_VolOp_info * vopinfo);
 extern int VVolOpLeaveOnlineNoHeader_r(Volume * vp, FSSYNC_VolOp_info * vopinfo);
 extern int VVolOpSetVBusy_r(Volume * vp, FSSYNC_VolOp_info * vopinfo);
 
-extern void VPurgeVolume(Error * ec, Volume * vp);
+extern void VPurgeVolume(Error * ec, Volume * vp, int useFSYNC);
 
 extern afs_int32 VCanScheduleSalvage(void);
 extern afs_int32 VCanUseFSSYNC(void);

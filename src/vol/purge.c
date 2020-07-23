@@ -54,7 +54,7 @@ static void PurgeHeader_r(Volume * vp);
  * can have a given volume (volid/partition pair) in use at a time
  */
 void
-VPurgeVolume(Error * ec, Volume * vp)
+VPurgeVolume(Error * ec, Volume * vp, int useFSYNC)
 {
     struct DiskPartition64 *tpartp = vp->partition;
     VolumeId volid, parent;
@@ -75,7 +75,7 @@ VPurgeVolume(Error * ec, Volume * vp)
     PurgeIndex_r(vp, vSmall);
     PurgeHeader_r(vp);
 
-    code = VDestroyVolumeDiskHeader(tpartp, volid, parent, 1);
+    code = VDestroyVolumeDiskHeader(tpartp, volid, parent, useFSYNC);
     if (code) {
 	Log("VPurgeVolume: Error %ld when destroying volume %lu header\n",
 	    afs_printable_int32_ld(code),
@@ -85,7 +85,8 @@ VPurgeVolume(Error * ec, Volume * vp)
     /*
      * Call the fileserver to break all call backs for that volume
      */
-    FSYNC_VolOp(V_id(vp), tpartp->name, FSYNC_VOL_BREAKCBKS, 0, NULL);
+    if (useFSYNC)
+	FSYNC_VolOp(V_id(vp), tpartp->name, FSYNC_VOL_BREAKCBKS, 0, NULL);
 }
 
 #define MAXOBLITATONCE	200
