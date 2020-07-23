@@ -204,7 +204,7 @@ GCTrans(void)
 		VTRANS_OBJ_UNLOCK(tt);
 
 		VTRANS_UNLOCK;
-		VPurgeVolume(&error, tt->volume);
+		VPurgeVolume(&error, tt->volume, 1);
 		/*
 		 * While the lock was dropped, tt->next may have changed.
 		 * Therefore, defer reading tt->next until _after_ we regain the lock.
