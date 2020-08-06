@@ -35,6 +35,10 @@
 #endif
 #include <hcrypto/rand.h>
 
+#ifdef AFS_SOCKPROXY
+#include <netinet/in.h>
+#endif
+
 #if defined(AFS_SUN5_ENV) || defined(AFS_AIX_ENV) || defined(AFS_SGI_ENV) || defined(AFS_HPUX_ENV)
 #define	AFS_MINBUFFERS	100
 #else
@@ -52,6 +56,10 @@ struct afsop_cell {
     afs_int32 hosts[AFS_MAXCELLHOSTS];
     char cellName[100];
 };
+
+#ifdef AFS_SOCKPROXY
+struct afs_sockproxy_packet *pkts;
+#endif
 
 char afs_zeros[AFS_ZEROS];
 char afs_rootVolumeName[64] = "";
@@ -124,6 +132,10 @@ afs_InitSetup(int preallocs)
 #endif /* AFS_NOSTATS */
 
     memset(afs_zeros, 0, AFS_ZEROS);
+
+#ifdef AFS_SOCKPROXY
+    pkts = afs_osi_Alloc(SOCKPROXY_PKT_MAX * sizeof(*pkts));
+#endif
 
     /* start RX */
     if(!afscall_set_rxpck_received)
@@ -1343,6 +1355,62 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	    afs_volume_ttl = parm2;
 	    code = 0;
 	}
+    } else if (parm == AFSOP_SOCKPROXY_HANDLER) {
+#ifdef AFS_SOCKPROXY
+	int op, rock;
+	//int psize;
+	//struct afs_sockproxy_packet *pkts;
+	int npkts;
+
+	op = rock = -1;
+	//psize = 0;
+	//pkts = NULL;
+
+	/* get response from userspace */
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&op, sizeof(op), code);
+	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&rock, sizeof(rock), code);
+	AFS_COPYIN(AFSKPTR(parm4), (caddr_t)&npkts, sizeof(npkts), code);
+
+	//psize = SOCKPROXY_PKT_MAX * sizeof(*pkts);
+	//pkts = afs_osi_Alloc(psize);
+	if ((op & 32))
+	    AFS_COPYIN(AFSKPTR(parm5), (caddr_t)pkts, npkts * sizeof(*pkts), code);
+
+	/*
+	 * send response from userspace (if any) to the rx layer and wait for a
+	 * new request.
+	 */
+	AFS_GUNLOCK();
+	code = rx_SockProxyReply(&op, &rock, &npkts, pkts);
+	AFS_GLOCK();
+
+	/* shutting down */
+	if (code == -2) {
+	    while (afs_termState != AFSOP_STOP_SOCKPROXY) {
+		afs_osi_Sleep(&afs_termState);
+	    }
+	    afs_termState = AFSOP_STOP_COMPLETE;
+	    afs_osi_Wakeup(&afs_termState);
+	    code = 0;
+	}
+
+	/* send request to userspace process */
+	if (code != -1) {
+	    AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
+	    AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);
+	    AFS_COPYOUT((caddr_t)&npkts, AFSKPTR(parm4), sizeof(npkts), code);
+	    if (!(op & 32)) {
+		/* assume 1 for now */
+		npkts = 1;
+		AFS_COPYOUT((caddr_t)pkts, AFSKPTR(parm5), npkts * sizeof(*pkts), code);
+	    }
+	}
+	/*
+	if (pkts) {
+	    afs_osi_Free(pkts, psize);
+	}
+	*/
+#endif
     } else {
 	code = EINVAL;
     }
@@ -1471,6 +1539,16 @@ afs_shutdown(void)
     afs_warn("UnmaskRxkSignals... ");
     afs_osi_UnmaskRxkSignals();
 #  endif
+#  ifdef AFS_SOCKPROXY
+    /* cancel rx listener and socket proxy */
+    afs_warn("RxListener and Socket Proxy... ");
+    osi_StopListener();
+    while (afs_termState == AFSOP_STOP_RXK_LISTENER ||
+	   afs_termState == AFSOP_STOP_SOCKPROXY) {
+	afs_warn("Sleep... ");
+	afs_osi_Sleep(&afs_termState);
+    }
+#  else
     /* cancel rx listener */
     afs_warn("RxListener... ");
     osi_StopListener();		/* This closes rx_socket. */
@@ -1478,6 +1556,7 @@ afs_shutdown(void)
 	afs_warn("Sleep... ");
 	afs_osi_Sleep(&afs_termState);
     }
+#  endif
 # endif
 #endif
 
