@@ -7,9 +7,13 @@ fs_setcell - Configures permissions for setuid programs from specified cells
 =for html
 <div class="synopsis">
 
-B<fs setcell> S<<< B<-cell> <I<cell name>>+ >>> [B<-suid>] [B<-nosuid>] [B<-help>]
+B<fs setcell> S<<< B<-cell> <I<cell name>>+ >>>
+    S<<< [B<-updaddrs> <I<primary servers>>+] >>>
+    [B<-suid>] [B<-nosuid>] [B<-help>]
 
-B<fs setce> S<<< B<-c> <I<cell name>>+ >>> [B<-s>] [B<-n>] [B<-h>]
+B<fs setce> S<<< B<-c> <I<cell name>>+ >>>
+    S<<< [B<-u> <I<primary servers>>+] >>>
+    [B<-s>] [B<-n>] [B<-h>]
 
 =for html
 </div>
@@ -38,6 +42,11 @@ initialization file.
 
 To display a cell's setuid status, issue the B<fs getcellstatus> command.
 
+The B<fs setcell> command also allows updates of the Cache Manager's
+kernel-resident list of database server machines for existing cells through the
+B<-updaddrs> flag. Since this option does not change the F<CellServDB> file, the
+new addresses do not persist across reboots of the machine.
+
 =head1 CAUTIONS
 
 AFS does not recognize effective UID: if a setuid program accesses AFS
@@ -62,6 +71,11 @@ enabled for the cell in which the file resides.
 Names each cell for which to set setuid status. Provide the fully
 qualified domain name, or a shortened form that disambiguates it from the
 other cells listed in the local F</usr/vice/etc/CellServDB> file.
+
+=item B<-updaddrs> <I<primary servers>>+
+
+Specifies the fully-qualified hostnames of all AFS database server
+machines for the existing cell named by the B<-cell> argument.
 
 =item B<-suid>
 
@@ -88,6 +102,12 @@ The following command enables executable files from the Example Organization
 cell to run with setuid privilege on the local machine:
 
    % fs setcell -cell example.org -suid
+
+The following example changes the machine's kernel-resident list of
+database server machines for the Example Corporation cell to include the
+machines C<db1.example.com> and C<db2.example.com>:
+
+   % fs setcell -cell example.com -updaddrs db1.example.com db2.example.com
 
 =head1 PRIVILEGE REQUIRED
 

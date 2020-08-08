@@ -3036,6 +3036,40 @@ SetCellCmd(struct cmd_syndesc *as, void *arock)
 	return 1;
     }
 
+    /* update db servers of a given cell (-updaddrs) */
+    if (as->parms[3].items) {
+	char *cellname = as->parms[0].items->data;
+
+	if (as->parms[1].items || as->parms[2].items) {
+	    fprintf(stderr, "Cannot specify -updaddrs with other flags.\n");
+	    return 1;
+	}
+	if (as->parms[0].items->next) {
+	    fprintf(stderr, "Cannot update more than one cell at a time.\n");
+	    return 1;
+	}
+
+	code = GetCellName(cellname, &info);
+	if (code) {
+	    return 1;
+	}
+	/* check if given cell exists */
+	blob.in_size = 1 + strlen(info.name);
+	blob.in = info.name;
+	blob.out_size = sizeof(args);
+	blob.out = (caddr_t)&args;
+	code = pioctl(0, VIOC_GETCELLSTATUS, &blob, 1);
+	if (code) {
+	    if (errno == ENOENT) {
+		fprintf(stderr, "Cell %s does not exist.\n", cellname);
+	    } else {
+		Die(errno, cellname);
+	    }
+	    return 1;
+	}
+	return NewCell(info.name, as->parms[3].items /* servers */, NULL, 0, 0);
+    }
+
     /* figure stuff to set */
     args.stat = 0;
     args.junk = 0;
@@ -3894,6 +3928,7 @@ defect 3069
     cmd_AddParm(ts, "-suid", CMD_FLAG, CMD_OPTIONAL, "allow setuid programs");
     cmd_AddParm(ts, "-nosuid", CMD_FLAG, CMD_OPTIONAL,
 		"disallow setuid programs");
+    cmd_AddParm(ts, "-updaddrs", CMD_LIST, CMD_OPTIONAL, "update list of db servers");
 
     ts = cmd_CreateSyntax("flushvolume", FlushVolumeCmd, NULL, 0,
 			  "flush all data in volume");
