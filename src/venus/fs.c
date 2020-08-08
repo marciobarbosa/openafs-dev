@@ -2510,14 +2510,14 @@ NukeNFSCredsCmd(struct cmd_syndesc *as, void *arock)
 }
 
 static int
-NewCellCmd(struct cmd_syndesc *as, void *arock)
+NewCell(char *acellname, struct cmd_item *aservers, char *alinkedcell,
+	int avlport, int afsport)
 {
     afs_int32 code, linkedstate = 0, size = 0, *lp;
     struct ViceIoctl blob;
     struct cmd_item *ti;
     char *tp, *cellname = 0;
     struct hostent *thp;
-    afs_int32 fsport = 0, vlport = 0;
     afs_int32 scount;		/* Number of servers to pass in pioctl call */
 
     /* Yuck!
@@ -2556,7 +2556,7 @@ NewCellCmd(struct cmd_syndesc *as, void *arock)
     lp = (afs_int32 *) tp;
     *lp++ = 0x12345678;
     tp += sizeof(afs_int32);
-    for (ti = as->parms[1].items; ti; ti = ti->next) {
+    for (ti = aservers; ti; ti = ti->next) {
 	thp = hostutil_GetHostByName(ti->data);
 	if (!thp) {
 	    fprintf(stderr,
@@ -2567,13 +2567,53 @@ NewCellCmd(struct cmd_syndesc *as, void *arock)
 	    tp += sizeof(afs_int32);
 	}
     }
-    if (as->parms[2].items) {
+    if (alinkedcell) {
 	/*
 	 * Link the cell, for the purposes of volume location, to the specified
 	 * cell.
 	 */
-	cellname = as->parms[2].items->data;
+	cellname = alinkedcell;
 	linkedstate = 1;
+    }
+    tp = (char *)(space + (scount + 1) * sizeof(afs_int32));
+    lp = (afs_int32 *) tp;
+    *lp++ = afsport;
+    *lp++ = avlport;
+    *lp = linkedstate;
+    strcpy(space + ((scount + 4) * sizeof(afs_int32)), acellname);
+    size = ((scount + 4) * sizeof(afs_int32)) + strlen(acellname)
+	+ 1 /* for null */ ;
+    tp = (char *)(space + size);
+    if (linkedstate) {
+	strcpy(tp, cellname);
+	size += strlen(cellname) + 1;
+    }
+    blob.in_size = size;
+    blob.in = space;
+    blob.out_size = 0;
+    code = pioctl(0, VIOCNEWCELL, &blob, 1);
+    if (code < 0) {
+	Die(errno, 0);
+	return 1;
+    }
+    return 0;
+}
+
+static int
+NewCellCmd(struct cmd_syndesc *as, void *arock)
+{
+    char *cellname, *linkedcell;
+    struct cmd_item *servers;
+    int vlport, fsport;
+
+    linkedcell = NULL;
+    vlport = fsport = 0;
+
+    cellname = as->parms[0].items->data;
+    servers = as->parms[1].items;
+
+    if (as->parms[2].items) {
+	linkedcell = as->parms[2].items->data;
     }
 #ifdef FS_ENABLE_SERVER_DEBUG_PORTS
     if (as->parms[3].items) {
@@ -2595,30 +2635,7 @@ NewCellCmd(struct cmd_syndesc *as, void *arock)
 	}
     }
 #endif
-    tp = (char *)(space + (scount + 1) * sizeof(afs_int32));
-    lp = (afs_int32 *) tp;
-    *lp++ = fsport;
-    *lp++ = vlport;
-    *lp = linkedstate;
-    strcpy(space + ((scount + 4) * sizeof(afs_int32)),
-	   as->parms[0].items->data);
-    size = ((scount + 4) * sizeof(afs_int32))
-	+ strlen(as->parms[0].items->data)
-	+ 1 /* for null */ ;
-    tp = (char *)(space + size);
-    if (linkedstate) {
-	strcpy(tp, cellname);
-	size += strlen(cellname) + 1;
-    }
-    blob.in_size = size;
-    blob.in = space;
-    blob.out_size = 0;
-    code = pioctl(0, VIOCNEWCELL, &blob, 1);
-    if (code < 0) {
-	Die(errno, 0);
-	return 1;
-    }
-    return 0;
+    return NewCell(cellname, servers, linkedcell, vlport, fsport);
 }
 
 static int
