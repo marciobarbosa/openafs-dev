@@ -1679,36 +1679,140 @@ SockProxyHandler(int role)
     struct msghdr msg;
     struct iovec iov[SOCKPROXY_LEN_MAX];
 
-    int blen, bsize;
+    struct afs_sockproxy_packet *pkt;
     int nbytes, cbytes;
 
     int shutdown;
-    int recvpid;
     int npkts = 1;
 
-    struct sockaddr *addr;
     struct afs_sockproxy_packet pkts[SOCKPROXY_PKT_MAX];
-    struct afs_sockproxy_packet *pkt;
+
+    /* version 2 - args */
+    struct afs_uspc_param uspc;
+    int recvpid;
+    /* end */
 
     op = role;
     rock = -1;
 
     shutdown = 0;
-    recvpid = -1;
     memset(&pkts, 0, sizeof(pkts));
+
+    /* version 2 - init */
+    memset(&uspc, 0, sizeof(uspc));
+    uspc.reqtype = role;
+    uspc.req.usp.socket = -1;
+    recvpid = -1;
+    /* end */
 
     while (!shutdown) {
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
+			    &uspc,
 			    &op,
 			    &rock,
 			    &npkts,
 			    &pkts);
 	if (code) {
+	    /* on failure, try again */
+	    uspc.retval = -1;
 	    sleep(1);
 	    continue;
 	}
 
+	switch (uspc.reqtype) {
+	    case AFS_USPC_SOCKPROXY_START: {
+		int sock, attempt_i;
+		int blen, bsize;
+		struct sockaddr_in ip4;
+
+		/* create an endpoint for communication */
+		uspc.retval = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		if (uspc.retval < 0) {
+		    continue;
+		}
+		uspc.req.usp.socket = sock = uspc.retval;
+
+		/* set options on socket */
+		blen = 50000;
+		bsize = sizeof(blen);
+		for (attempt_i = 0; attempt_i < 2; attempt_i++) {
+		    code  = setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &blen, bsize);
+		    code |= setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &blen, bsize);
+		    if (code == 0) {
+			break;
+		    }
+		    /* setsockopt didn't succeed. try a smaller size. */
+		    blen = 32766;
+		}
+		uspc.retval = code;
+		if (uspc.retval != 0) {
+		    close(uspc.req.usp.socket);
+		    uspc.req.usp.socket = -1;
+		    continue;
+		}
+		/* assign addr to the socket */
+		ip4.sin_family = AF_INET;
+		ip4.sin_port = uspc.req.usp.port;
+		ip4.sin_addr.s_addr = uspc.req.usp.addr;
+
+		code = bind(sock, (struct sockaddr *)&ip4, sizeof(ip4));
+		if (role == AFS_USPC_SOCKPROXY_SEND && code == 0) {
+		    /*
+		     * at this point, we can start receiving packets. notice
+		     * that this child inherits our socket.
+		     */
+		    recvpid = fork();
+		    if (recvpid == 0) {
+			/* <marcio> change this role to AFS_USPC_SOCKPROXY_RECV */
+			SockProxyHandler(SOCKPROXY_RECVPKTS);
+			exit(1);
+		    }
+		}
+		if (code != 0) {
+		    close(uspc.req.usp.socket);
+		    uspc.req.usp.socket = -1;
+		}
+		uspc.retval = code;
+		uspc.bufSz = 0;
+		continue; /* <marcio> remove later */
+		break;
+	    }
+	    case AFS_USPC_SOCKPROXY_SEND: {
+		int pkts_i, tbytes;
+		struct iovec iov;
+		struct sockaddr *addr;
+		struct afs_sockproxy_packet *pkt;
+		struct msghdr msg;
+
+		for (pkts_i = 0, tbytes = 0; pkts_i < npkts; pkts_i++) {
+		    pkt = &pkts[pkts_i];
+		    addr = (struct sockaddr *)&pkt->addr;
+
+		    memset(&iov, 0, sizeof(iov));
+		    memset(&msg, 0, sizeof(msg));
+
+		    iov.iov_base = pkt->data;
+		    iov.iov_len = pkt->size;
+
+		    msg.msg_name = addr;
+		    msg.msg_namelen = addr->sa_len;
+		    msg.msg_iov = &iov;
+		    msg.msg_iovlen = 1;
+
+		    code = sendmsg(uspc.req.usp.socket, &msg, 0);
+		    if (code < 0) {
+			break;
+		    }
+		    tbytes += code;
+		}
+		uspc.retval = (code < 0) ? code : tbytes;
+		continue; /* <marcio> remove this */
+		break;
+	    }
+	}
+
 	switch (op) {
+#if 0
 	    case SOCKPROXY_SOCKET:
 		/**
 		 * param[out] rock  socket
@@ -1753,7 +1857,7 @@ SockProxyHandler(int role)
 		}
 		rock = code;
 		break;
-	    case SOCKPROXY_SEND:
+	    case AFS_USPC_SOCKPROXY_SEND:
 		/**
 		 * param[in]  rock  socket
 		 * param[in]  addr  IPv4 of the target
@@ -1787,6 +1891,7 @@ SockProxyHandler(int role)
 		    iov[i].iov_len = 0;
 		}
 		break;
+#endif
 	    case SOCKPROXY_RECV:
 		/**
 		 * param[in]  rock  socket
@@ -2432,7 +2537,7 @@ afsd_run(void)
     if (afsd_verbose) {
 	printf("%s: Forking socket proxy handlers.\n", rn);
     }
-    code = SOCKPROXY_SENDPKTS;	/* role to be performed */
+    code = AFS_USPC_SOCKPROXY_SEND;	/* role to be performed */
     afsd_fork(0, sockproxy_thread, &code);
 #endif
 
@@ -3015,6 +3120,7 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
 	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[3] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
+	params[4] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	break;
 #endif
     default:

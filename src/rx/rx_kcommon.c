@@ -144,12 +144,10 @@ rxi_SockProxyGetProc(int op)
     struct rx_sockproxy_proc *proc = NULL;
 
     switch (op) {
-	case SOCKPROXY_SOCKET:
-	case SOCKPROXY_SETOPT:
-	case SOCKPROXY_BIND:
-	case SOCKPROXY_SEND:
 	case SOCKPROXY_CLOSE:
 	case SOCKPROXY_SHUTDOWN:
+	case AFS_USPC_SOCKPROXY_START:
+	case AFS_USPC_SOCKPROXY_SEND:
 	    proc = &rx_sockproxy_ch.proc[0];
 	    break;
 	case SOCKPROXY_RECV:
@@ -162,15 +160,15 @@ rxi_SockProxyGetProc(int op)
 /**
  * Delegate given operation to user space process.
  *
- * @param[in]     op    operation
- * @param[inout]  addr  ip addr sent to or received from user space
- * @param[inout]  iov   io vector used if op is send[in] or recv[out]
- * @param[in]     niov  number of iov entries
+ * @param[in]  op    operation
+ * @param[in]  addr  ip addr sent to user space
+ * @param[in]  iov   io vector used if op is send
+ * @param[in]  niov  number of iov entries
  *
  * @return value returned by the requested operation.
  */
 int
-rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
+rx_SockProxyRequest(int op, struct sockaddr *addr, struct afs_sockproxy_packet *pkts, int npkts)
 {
     int ret, offset, i;
     void *payload;
@@ -204,35 +202,14 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
     proc->pending = 1;
     proc->complete = 0;
 
-    if (op & (SOCKPROXY_BIND | SOCKPROXY_SEND | SOCKPROXY_RECV)) {
+    if (op & (AFS_USPC_SOCKPROXY_START)) {
 	proc->addr = addr;
 	/* for now, assume we always have ipv4 addresses */
 	proc->asize = sizeof(struct sockaddr_in);
     }
-    if (op & (SOCKPROXY_SEND | SOCKPROXY_RECV)) {
-	proc->iov = iov;
-	/* for now, assume we always have 2 entries (header / body) */
-	proc->niov = niov;
-    }
-    if (op & (SOCKPROXY_SEND)) {
-	for (i = 0, psize = 0; i < proc->niov; i++) {
-	    psize += proc->iov[i].iov_len;
-	}
-
-	proc->payload = rxi_Alloc(psize);
-	proc->psize = psize;
-	if (proc->payload == NULL) {
-	    printf("rx_SockProxyRequest: couldn't alloc memory for payload.\n");
-	    ret = -1;
-	    goto done;
-	}
-
-	payload = proc->payload;
-	memset(payload, 0, psize);
-	for (i = 0, offset = 0; i < proc->niov; i++) {
-	    memcpy(payload + offset, iov[i].iov_base, iov[i].iov_len);
-	    offset += iov[i].iov_len;
-	}
+    if (op & (AFS_USPC_SOCKPROXY_SEND)) {
+	proc->pkts = pkts;
+	proc->npkts = npkts;
     }
 
     CV_BROADCAST(&proc->cv_op);
@@ -253,12 +230,6 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
     /* wait for response from userspace process */
     while (!proc->complete && !ch->shutdown) {
 	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
-    }
-
-    if (op & (SOCKPROXY_SEND)) {
-	rxi_Free(proc->payload, psize);
-	proc->payload = NULL;
-	proc->psize = 0;
     }
     ret = proc->ret;
 
@@ -281,13 +252,12 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct iovec *iov, int niov)
  * @return 0 on success; -1 otherwise.
  */
 int
-rx_SockProxyReply(int *op, int *rock, int *npkts,
-		  struct afs_sockproxy_packet *pkts)
+rx_SockProxyReply(struct afs_uspc_param *uspc, int *op, int *rock, int *npkts,
+		  struct afs_sockproxy_packet **pkts)
 {
     int i;
     struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
     struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(*op);
-    struct afs_sockproxy_packet *pkt = &pkts[0];
 
     if (proc == NULL) {
 	printf("rx_SockProxyReply: proc not found (op = %d).\n", *op);
@@ -303,18 +273,22 @@ rx_SockProxyReply(int *op, int *rock, int *npkts,
     if (*op & (SOCKPROXY_RECV)) {
 	*rock = ch->socket;
 	MUTEX_EXIT(&ch->lock);
-	rx_SockProxyUpCall(*npkts, pkts);
+	rx_SockProxyUpCall(*npkts, *pkts);
 	return 0;
     }
     /* response received from userspace process */
     if (proc->pending) {
-	if (*op == SOCKPROXY_SOCKET) {
-	    ch->socket = *rock;
+	if (uspc->reqtype == AFS_USPC_SOCKPROXY_START) {
+	    ch->socket = uspc->req.usp.socket;
 	}
 	proc->op = -1;
 	proc->pending = 0;
 	proc->complete = 1;
 	proc->ret = *rock;
+	/* <marcio> remove conditional */
+	if (uspc->reqtype & (AFS_USPC_SOCKPROXY_START | AFS_USPC_SOCKPROXY_SEND)) {
+	    proc->ret = uspc->retval;
+	}
 
 	CV_BROADCAST(&proc->cv_op);
     }
@@ -331,22 +305,23 @@ rx_SockProxyReply(int *op, int *rock, int *npkts,
 
     /* request received */
     *rock = ch->socket;
+    /* <marcio> remove this op */
     *op = proc->op;
+    uspc->reqtype = proc->op;
 
     if (*op & (SOCKPROXY_SHUTDOWN)) {
 	/* send proc */
 	MUTEX_EXIT(&ch->lock);
 	return -2;
     }
-    if (*op & (SOCKPROXY_BIND | SOCKPROXY_SEND)) {
-	pkt->addr = *(struct sockaddr_in *)proc->addr;
+    if (uspc->reqtype & (AFS_USPC_SOCKPROXY_START)) {
+	struct sockaddr_in *ip4 = (struct sockaddr_in *)proc->addr;
+	uspc->req.usp.addr = ip4->sin_addr.s_addr;
+	uspc->req.usp.port = ip4->sin_port;
     }
-    if (*op & (SOCKPROXY_SEND)) {
-	pkt->nentries = proc->niov;
-	for (i = 0; i < proc->niov; i++) {
-	    pkt->len[i] = proc->iov[i].iov_len;
-	}
-	memcpy(pkt->data, proc->payload, proc->psize);
+    if (uspc->reqtype & (AFS_USPC_SOCKPROXY_SEND)) {
+	*pkts = proc->pkts;
+	*npkts = proc->npkts;
     }
 
     MUTEX_EXIT(&ch->lock);

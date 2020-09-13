@@ -124,31 +124,38 @@ int
 osi_NetSend(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
 	    int nvecs, afs_int32 alength, int istack)
 {
-    int i, code;
+    int iov_i, code;
     int haveGlock;
 
-    struct sockaddr *sa;
-    struct iovec iov[RX_MAXIOVECS];
+    struct afs_sockproxy_packet pkt;
+    int npkts = 1; /* for now, send one packet at a time */
+    char *payload;
 
     AFS_STATCNT(osi_NetSend);
 
-    sa = (struct sockaddr *)addr;
-    memset(&iov, 0, sizeof(iov));
-
+    memset(&pkt, 0, sizeof(pkt));
     haveGlock = ISAFS_GLOCK();
 
     if (nvecs > RX_MAXIOVECS) {
 	osi_Panic("osi_NetSend: %d: Too many iovecs.\n", nvecs);
     }
-
-    for (i = 0; i < nvecs; i++) {
-	iov[i] = dvec[i];
+    if (alength > SOCKPROXY_PAYLOAD_MAX) {
+	osi_Panic("osi_NetSend: %d: Payload is too big.\n", alength);
     }
-    addr->sin_len = sizeof(struct sockaddr_in);
-
     if ((afs_termState == AFSOP_STOP_RXK_LISTENER) ||
 	(afs_termState == AFSOP_STOP_COMPLETE)) {
 	return -1;
+    }
+    addr->sin_len = sizeof(struct sockaddr_in);
+
+    pkt.addr = *addr;
+    pkt.size = alength;
+    pkt.nentries = nvecs;
+    payload = pkt.data;
+    for (iov_i = 0; iov_i < nvecs; iov_i++) {
+	memcpy(payload, dvec[iov_i].iov_base, dvec[iov_i].iov_len);
+	payload += dvec[iov_i].iov_len;
+	pkt.len[iov_i] = dvec[iov_i].iov_len;
     }
 
     if (haveGlock) {
@@ -156,7 +163,7 @@ osi_NetSend(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
     }
 
     /* returns the number of bytes sent */
-    code = rx_SockProxyRequest(SOCKPROXY_SEND, sa, iov, nvecs);
+    code = rx_SockProxyRequest(AFS_USPC_SOCKPROXY_SEND, NULL, &pkt, npkts);
     if (code >= 0) {
 	/* success */
 	code = 0;
@@ -204,29 +211,17 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
     sa = (struct sockaddr *)&addr;
     memset(&addr, 0, sizeof(addr));
 
-    AFS_STATCNT(osi_NewSocket);
-    AFS_ASSERT_GLOCK();
-    AFS_GUNLOCK();
-    /* create socket */
-    code = rx_SockProxyRequest(SOCKPROXY_SOCKET, NULL, NULL, 0);
-    if (code < 0) {
-	goto done;
-    }
     addr.sin_family = AF_INET;
     addr.sin_port = aport;
     addr.sin_addr.s_addr = ahost;
-    /* set options */
-    code = rx_SockProxyRequest(SOCKPROXY_SETOPT, NULL, NULL, 0);
+
+    AFS_STATCNT(osi_NewSocket);
+    AFS_ASSERT_GLOCK();
+    AFS_GUNLOCK();
+
+    code = rx_SockProxyRequest(AFS_USPC_SOCKPROXY_START, sa, NULL, 0);
     if (code != 0) {
-	/* preserving original behavior */
-	osi_Panic("osi_NewSocket: last attempt to reserve 32K failed!\n");
-    }
-    /* assign addr to the socket */
-    code = rx_SockProxyRequest(SOCKPROXY_BIND, sa, NULL, 0);
-    if (code != 0) {
-	printf("sobind fails (%d)\n", code);
-	rx_SockProxyRequest(SOCKPROXY_CLOSE, NULL, NULL, 0);
-	goto done;
+	osi_Panic("rxk_NewSocketHost: Could not initialize rx socket.\n");
     }
     /*
      * success. notice that the rxk_NewSocketHost interface forces us to return
@@ -234,10 +229,10 @@ rxk_NewSocketHost(afs_uint32 ahost, short aport)
      * the socket returned by this function is not used. since the caller is
      * expecting an osi_socket, return one to represent success.
      */
-    rx_SockProxySocket = rxi_Alloc(sizeof(socket_t));
+    rx_SockProxySocket = rxi_Alloc(sizeof(socket_t)); /* <marcio> release this */
     ret = (osi_socket *)rx_SockProxySocket;
-  done:
     AFS_GLOCK();
+
     return ret;
 }
 

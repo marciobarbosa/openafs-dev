@@ -151,10 +151,19 @@ struct afs_umv_param {
     afs_int32 dUnique;
 };
 
+struct afs_usp_param {
+    afs_int32 socket;	/* file descriptor for the socket */
+    afs_int32 addr;	/* addr to be bound to the socket */
+    afs_int32 port;	/* port to be bound to the socket */
+};
+
 #ifdef AFS_DARWIN_ENV
 # define AFS_USPC_UMV 1
 #endif
 #define AFS_USPC_SHUTDOWN 2
+
+#define AFS_USPC_SOCKPROXY_START	4
+#define AFS_USPC_SOCKPROXY_SEND		8
 
 struct afs_uspc_param {
     afs_int32 retval;
@@ -163,6 +172,7 @@ struct afs_uspc_param {
     afs_int32 reqtype;
     union {
 	struct afs_umv_param umv;
+	struct afs_usp_param usp;
     } req;
 };
 

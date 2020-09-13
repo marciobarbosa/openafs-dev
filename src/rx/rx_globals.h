@@ -48,20 +48,22 @@ EXT osi_socket rx_socket;
 #define SOCKPROXY_SHUTDOWN	128
 
 struct rx_sockproxy_proc {
-    unsigned char op;		/* operation to be performed */
-    unsigned char pending;	/* waiting for a reply from userspace */
-    unsigned char complete;	/* response received from userspace */
-    unsigned char ready;	/* can receive requests */
-    int ret;			/* value returned by op executed on userspace */
-    struct sockaddr *addr;	/* ip passed to userspace */
-    size_t asize;		/* size of addr */
-    void *payload;		/* payload passed to / received from userspace */
-    size_t psize;		/* size of payload */
-    struct iovec *iov;		/* used to store the packets (sent / received) */
-    int niov;			/* number of iovs */
-    afs_kcondvar_t cv_ready;	/* ready to receive requests */
-    afs_kcondvar_t cv_op;	/* request / reply received */
-    afs_kcondvar_t cv_pend;	/* proc in use */
+    unsigned char op;			/* operation to be performed */
+    unsigned char pending;		/* waiting for a reply from userspace */
+    unsigned char complete;		/* response received from userspace */
+    unsigned char ready;		/* can receive requests */
+    int ret;				/* value returned by op executed on userspace */
+    struct sockaddr *addr;		/* ip passed to userspace */
+    size_t asize;			/* size of addr */
+    void *payload;			/* payload passed to / received from userspace */
+    size_t psize;			/* size of payload */
+    struct iovec *iov;			/* used to store the packets (sent / received) */
+    int niov;				/* number of iovs */
+    struct afs_sockproxy_packet *pkts;	/* packets to be sent */
+    int npkts;				/* number of packets to be sent */
+    afs_kcondvar_t cv_ready;		/* ready to receive requests */
+    afs_kcondvar_t cv_op;		/* request / reply received */
+    afs_kcondvar_t cv_pend;		/* proc in use */
 };
 
 struct rx_sockproxy_channel {

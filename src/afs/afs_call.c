@@ -1361,27 +1361,34 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	//int psize;
 	//struct afs_sockproxy_packet *pkts;
 	int npkts;
+	struct afs_sockproxy_packet *p = pkts;
+
+	/* <marcio> version 2 */
+	struct afs_uspc_param uspc;
+	memset(&uspc, 0, sizeof(uspc));
+	/* end */
 
 	op = rock = -1;
 	//psize = 0;
 	//pkts = NULL;
 
 	/* get response from userspace */
-	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&op, sizeof(op), code);
-	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&rock, sizeof(rock), code);
-	AFS_COPYIN(AFSKPTR(parm4), (caddr_t)&npkts, sizeof(npkts), code);
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&uspc, sizeof(uspc), code);
+	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&op, sizeof(op), code);
+	AFS_COPYIN(AFSKPTR(parm4), (caddr_t)&rock, sizeof(rock), code);
+	AFS_COPYIN(AFSKPTR(parm5), (caddr_t)&npkts, sizeof(npkts), code);
 
 	//psize = SOCKPROXY_PKT_MAX * sizeof(*pkts);
 	//pkts = afs_osi_Alloc(psize);
 	if ((op & 32))
-	    AFS_COPYIN(AFSKPTR(parm5), (caddr_t)pkts, npkts * sizeof(*pkts), code);
+	    AFS_COPYIN(AFSKPTR(parm6), (caddr_t)pkts, npkts * sizeof(*pkts), code);
 
 	/*
 	 * send response from userspace (if any) to the rx layer and wait for a
 	 * new request.
 	 */
 	AFS_GUNLOCK();
-	code = rx_SockProxyReply(&op, &rock, &npkts, pkts);
+	code = rx_SockProxyReply(&uspc, &op, &rock, &npkts, &p);
 	AFS_GLOCK();
 
 	/* shutting down */
@@ -1396,13 +1403,14 @@ afs_syscall_call(long parm, long parm2, long parm3,
 
 	/* send request to userspace process */
 	if (code != -1) {
-	    AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm2), sizeof(op), code);
-	    AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm3), sizeof(rock), code);
-	    AFS_COPYOUT((caddr_t)&npkts, AFSKPTR(parm4), sizeof(npkts), code);
+	    AFS_COPYOUT((caddr_t)&uspc, AFSKPTR(parm2), sizeof(uspc), code);
+	    AFS_COPYOUT((caddr_t)&op, AFSKPTR(parm3), sizeof(op), code);
+	    AFS_COPYOUT((caddr_t)&rock, AFSKPTR(parm4), sizeof(rock), code);
+	    AFS_COPYOUT((caddr_t)&npkts, AFSKPTR(parm5), sizeof(npkts), code);
 	    if (!(op & 32)) {
 		/* assume 1 for now */
 		npkts = 1;
-		AFS_COPYOUT((caddr_t)pkts, AFSKPTR(parm5), npkts * sizeof(*pkts), code);
+		AFS_COPYOUT((caddr_t)p, AFSKPTR(parm6), npkts * sizeof(*pkts), code);
 	    }
 	}
 	/*

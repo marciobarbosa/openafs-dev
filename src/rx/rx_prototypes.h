@@ -284,9 +284,9 @@ extern void osi_StopListener(void);
 # ifdef AFS_SOCKPROXY
 extern int rx_SockProxyRequest(int op,
 			       struct sockaddr *addr,
-			       struct iovec *iov, int niov);
-extern int rx_SockProxyReply(int *op, int *rock, int *npkts,
-			     struct afs_sockproxy_packet *pkts);
+			       struct afs_sockproxy_packet *pkts, int npkts);
+extern int rx_SockProxyReply(struct afs_uspc_param *uspc, int *op, int *rock,
+			     int *npkts, struct afs_sockproxy_packet **pkts);
 # endif
 
 /* ARCH/rx_kmutex.c */
