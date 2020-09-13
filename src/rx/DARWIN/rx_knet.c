@@ -47,8 +47,8 @@ rx_SockProxyUpCall(int npkts, struct afs_sockproxy_packet *pkts)
     struct sockaddr_in saddr;
     int host, port;
 
-    int tlen, i;
-    int pkt_i;
+    int tlen, psize, csize; 
+    int pkt_i, iov_i;
 
     char *payloadp;
 
@@ -87,12 +87,15 @@ rx_SockProxyUpCall(int npkts, struct afs_sockproxy_packet *pkts)
 	}
 
 	payloadp = (char *)pkt->data;
-	for (i = 0; i < pkt->nentries && p->niovecs; i++) {
-	    /* assume that iov_base is big enough for now */
-	    memcpy(p->wirevec[i].iov_base, payloadp, pkt->len[i]);
-	    payloadp += pkt->len[i];
+	psize = pkt->size;
+	for (iov_i = 0; (iov_i < p->niovecs) && (psize > 0); iov_i++) {
+	    csize = (psize < p->wirevec[iov_i].iov_len) ? psize : p->wirevec[iov_i].iov_len;
+	    memcpy(p->wirevec[iov_i].iov_base, payloadp, csize);
+	    payloadp += csize;
+	    psize -= csize;
 	}
 
+	/* <marcio> subtract psize */
 	p->length = pkt->size - RX_HEADER_SIZE;
 	/* extract packet header. */
 	rxi_DecodePacketHeader(p);

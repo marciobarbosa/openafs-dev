@@ -1380,7 +1380,7 @@ afs_syscall_call(long parm, long parm2, long parm3,
 
 	//psize = SOCKPROXY_PKT_MAX * sizeof(*pkts);
 	//pkts = afs_osi_Alloc(psize);
-	if ((op & 32))
+	if ((uspc.reqtype & 16))
 	    AFS_COPYIN(AFSKPTR(parm6), (caddr_t)pkts, npkts * sizeof(*pkts), code);
 
 	/*

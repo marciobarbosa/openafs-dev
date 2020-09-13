@@ -164,6 +164,7 @@ struct afs_usp_param {
 
 #define AFS_USPC_SOCKPROXY_START	4
 #define AFS_USPC_SOCKPROXY_SEND		8
+#define AFS_USPC_SOCKPROXY_RECV		16
 
 struct afs_uspc_param {
     afs_int32 retval;

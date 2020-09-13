@@ -150,7 +150,7 @@ rxi_SockProxyGetProc(int op)
 	case AFS_USPC_SOCKPROXY_SEND:
 	    proc = &rx_sockproxy_ch.proc[0];
 	    break;
-	case SOCKPROXY_RECV:
+	case AFS_USPC_SOCKPROXY_RECV:
 	    proc = &rx_sockproxy_ch.proc[1];
 	    break;
     }
@@ -270,8 +270,8 @@ rx_SockProxyReply(struct afs_uspc_param *uspc, int *op, int *rock, int *npkts,
 	MUTEX_EXIT(&ch->lock);
 	return -1;
     }
-    if (*op & (SOCKPROXY_RECV)) {
-	*rock = ch->socket;
+    if (uspc->reqtype & (AFS_USPC_SOCKPROXY_RECV)) {
+	uspc->req.usp.socket = ch->socket;
 	MUTEX_EXIT(&ch->lock);
 	rx_SockProxyUpCall(*npkts, *pkts);
 	return 0;

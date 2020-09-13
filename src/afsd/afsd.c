@@ -1670,17 +1670,9 @@ static void *sockproxy_thread(void *rock);
 static void
 SockProxyHandler(int role)
 {
-    int code, i;
-    int flags;
+    int code;
 
     int op, rock;
-    char *payloadp;
-
-    struct msghdr msg;
-    struct iovec iov[SOCKPROXY_LEN_MAX];
-
-    struct afs_sockproxy_packet *pkt;
-    int nbytes, cbytes;
 
     int shutdown;
     int npkts = 1;
@@ -1764,7 +1756,7 @@ SockProxyHandler(int role)
 		    recvpid = fork();
 		    if (recvpid == 0) {
 			/* <marcio> change this role to AFS_USPC_SOCKPROXY_RECV */
-			SockProxyHandler(SOCKPROXY_RECVPKTS);
+			SockProxyHandler(AFS_USPC_SOCKPROXY_RECV);
 			exit(1);
 		    }
 		}
@@ -1806,6 +1798,40 @@ SockProxyHandler(int role)
 		    tbytes += code;
 		}
 		uspc.retval = (code < 0) ? code : tbytes;
+		continue; /* <marcio> remove this */
+		break;
+	    }
+	    case AFS_USPC_SOCKPROXY_RECV: {
+		int i_pkts, flags;
+		struct iovec iov;
+		struct msghdr msg;
+		struct afs_sockproxy_packet *pkt;
+
+		flags = 0;
+		memset(pkts, 0, sizeof(pkts));
+
+		for (i_pkts = 0; i_pkts < SOCKPROXY_PKT_MAX; i_pkts++) {
+		    pkt = &pkts[i_pkts];
+
+		    memset(&iov, 0, sizeof(iov));
+		    iov.iov_base = pkt->data;
+		    iov.iov_len = sizeof(pkt->data);
+		    pkt->nentries = 1; /* <marcio> remove this entry */
+
+		    memset(&msg, 0, sizeof(msg));
+		    msg.msg_name = &pkt->addr;
+		    msg.msg_namelen = sizeof(pkt->addr);
+		    msg.msg_iov = &iov;
+		    msg.msg_iovlen = 1;
+
+		    code = recvmsg(uspc.req.usp.socket, &msg, flags);
+		    if (code < 0) {
+			break;
+		    }
+		    pkt->size = code;
+		    flags = MSG_DONTWAIT;
+		}
+		npkts = i_pkts;
 		continue; /* <marcio> remove this */
 		break;
 	    }
@@ -1891,7 +1917,6 @@ SockProxyHandler(int role)
 		    iov[i].iov_len = 0;
 		}
 		break;
-#endif
 	    case SOCKPROXY_RECV:
 		/**
 		 * param[in]  rock  socket
@@ -1926,6 +1951,7 @@ SockProxyHandler(int role)
 		}
 		npkts = i;
 		break;
+#endif
 	    case SOCKPROXY_CLOSE:
 		/**
 		 * param[in]  rock  socket
