@@ -1652,56 +1652,31 @@ BkgHandler(void)
 #endif
 
 #ifdef AFS_SOCKPROXY
-/* operations to be performed by us (also defined in rx_globals.h) */
-#define SOCKPROXY_SOCKET	2
-#define SOCKPROXY_SETOPT	4
-#define SOCKPROXY_BIND		8
-#define SOCKPROXY_SEND		16
-#define SOCKPROXY_RECV		32
-#define SOCKPROXY_CLOSE		64
-#define SOCKPROXY_SHUTDOWN	128
-
-/* role of each process */
-#define SOCKPROXY_SENDPKTS	16
-#define SOCKPROXY_RECVPKTS	32
-
 static void *sockproxy_thread(void *rock);
 
 static void
 SockProxyHandler(int role)
 {
     int code;
+    int shutdown, recvpid;
 
-    int op, rock;
-
-    int shutdown;
-    int npkts = 1;
-
-    struct afs_sockproxy_packet pkts[SOCKPROXY_PKT_MAX];
-
-    /* version 2 - args */
     struct afs_uspc_param uspc;
-    int recvpid;
-    /* end */
-
-    op = role;
-    rock = -1;
+    struct afs_sockproxy_packet pkts[SOCKPROXY_PKT_MAX];
+    int npkts;
 
     shutdown = 0;
-    memset(&pkts, 0, sizeof(pkts));
+    recvpid = -1;
 
-    /* version 2 - init */
     memset(&uspc, 0, sizeof(uspc));
+    memset(&pkts, 0, sizeof(pkts));
+    npkts = 1;
+
     uspc.reqtype = role;
     uspc.req.usp.socket = -1;
-    recvpid = -1;
-    /* end */
 
     while (!shutdown) {
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
 			    &uspc,
-			    &op,
-			    &rock,
 			    &npkts,
 			    &pkts);
 	if (code) {
@@ -1755,7 +1730,6 @@ SockProxyHandler(int role)
 		     */
 		    recvpid = fork();
 		    if (recvpid == 0) {
-			/* <marcio> change this role to AFS_USPC_SOCKPROXY_RECV */
 			SockProxyHandler(AFS_USPC_SOCKPROXY_RECV);
 			exit(1);
 		    }
@@ -1766,7 +1740,6 @@ SockProxyHandler(int role)
 		}
 		uspc.retval = code;
 		uspc.bufSz = 0;
-		continue; /* <marcio> remove later */
 		break;
 	    }
 	    case AFS_USPC_SOCKPROXY_SEND: {
@@ -1798,7 +1771,6 @@ SockProxyHandler(int role)
 		    tbytes += code;
 		}
 		uspc.retval = (code < 0) ? code : tbytes;
-		continue; /* <marcio> remove this */
 		break;
 	    }
 	    case AFS_USPC_SOCKPROXY_RECV: {
@@ -1832,135 +1804,13 @@ SockProxyHandler(int role)
 		    flags = MSG_DONTWAIT;
 		}
 		npkts = i_pkts;
-		continue; /* <marcio> remove this */
 		break;
 	    }
-	}
-
-	switch (op) {
-#if 0
-	    case SOCKPROXY_SOCKET:
-		/**
-		 * param[out] rock  socket
-		 */
-		rock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	    case AFS_USPC_SOCKPROXY_CLOSE:
+		uspc.retval = close(uspc.req.usp.socket);
 		break;
-	    case SOCKPROXY_SETOPT:
-		/**
-		 * param[in]  rock  socket
-		 * param[out] rock  code returned by setsockopt
-		 */
-		blen = 50000;
-		bsize = sizeof(blen);
-		for (i = 0; i < 2; i++) {
-		    code  = setsockopt(rock, SOL_SOCKET, SO_SNDBUF, &blen, bsize);
-		    code |= setsockopt(rock, SOL_SOCKET, SO_RCVBUF, &blen, bsize);
-		    if (code == 0) {
-			break;
-		    }
-		    /* setsockopt didn't succeed. try a smaller size. */
-		    blen = 32766;
-		}
-		rock = code;
-		break;
-	    case SOCKPROXY_BIND:
-		/**
-		 * param[in]  rock  socket
-		 * param[in]  addr  IPv4 to be bound to the socket
-		 * param[out] rock  code returned by bind
-		 */
-		pkt = &pkts[0];
-		addr = (struct sockaddr *)&pkt->addr;
-		code = bind(rock, addr, sizeof(pkt->addr));
-		if (role == SOCKPROXY_SENDPKTS && code == 0) {
-		    /* at this point, we can start receiving packets. notice
-		     * that this child inherits our socket. */
-		    recvpid = fork();
-		    if (recvpid == 0) {
-			SockProxyHandler(SOCKPROXY_RECVPKTS);
-			exit(1);
-		    }
-		}
-		rock = code;
-		break;
-	    case AFS_USPC_SOCKPROXY_SEND:
-		/**
-		 * param[in]  rock  socket
-		 * param[in]  addr  IPv4 of the target
-		 * param[in]  pkts  data to be sent
-		 * param[out] rock  number of bytes sent
-		 */
-
-		/* reconstruct iovecs from blob sent by kext */
-		pkt = &pkts[0];
-		addr = (struct sockaddr *)&pkt->addr;
-		payloadp = pkt->data;
-		for (i = 0; i < pkt->nentries; i++) {
-		    iov[i].iov_base = malloc(pkt->len[i]);
-		    iov[i].iov_len = pkt->len[i];
-		    memcpy(iov[i].iov_base, payloadp, iov[i].iov_len);
-		    payloadp += iov[i].iov_len;
-		}
-
-		memset(&msg, 0, sizeof(msg));
-		msg.msg_name = addr;
-		msg.msg_namelen = addr->sa_len;
-		msg.msg_iov = iov;
-		msg.msg_iovlen = pkt->nentries;
-
-		code = sendmsg(rock, &msg, 0);
-		rock = code;
-
-		for (i = 0; i < pkt->nentries; i++) {
-		    free(iov[i].iov_base);
-		    iov[i].iov_base = NULL;
-		    iov[i].iov_len = 0;
-		}
-		break;
-	    case SOCKPROXY_RECV:
-		/**
-		 * param[in]  rock  socket
-		 * param[out] addr  IPv4 of the source
-		 * param[out] pkt   data received
-		 * param[out] rock  number of bytes received
-		 */
-
-		flags = 0;
-		memset(pkts, 0, sizeof(pkts));
-		for (i = 0; i < SOCKPROXY_PKT_MAX; i++) {
-		    pkt = &pkts[i];
-
-		    pkt->nentries = 2;
-		    pkt->len[0] = iov[0].iov_len = 28;
-		    pkt->len[1] = iov[1].iov_len = 1416;
-		    iov[0].iov_base = pkt->data;
-		    iov[1].iov_base = pkt->data + pkt->len[0];
-
-		    memset(&msg, 0, sizeof(msg));
-		    msg.msg_name = &pkt->addr;
-		    msg.msg_namelen = sizeof(pkt->addr);
-		    msg.msg_iov = iov;
-		    msg.msg_iovlen = pkt->nentries;
-
-		    code = recvmsg(rock, &msg, flags);
-		    if (code < 0) {
-			break;
-		    }
-		    pkt->size = code;
-		    flags = MSG_DONTWAIT;
-		}
-		npkts = i;
-		break;
-#endif
-	    case SOCKPROXY_CLOSE:
-		/**
-		 * param[in]  rock  socket
-		 * param[out] rock  code returned by close
-		 */
-		code = close(rock);
-		rock = code;
-		break;
-	    case SOCKPROXY_SHUTDOWN:
+	    case AFS_USPC_SOCKPROXY_STOP:
+		uspc.retval = close(uspc.req.usp.socket);
 		/*
 		 * receiver has to be killed since it can be blocked in recvmsg
 		 * waiting for packets.
@@ -1972,7 +1822,7 @@ SockProxyHandler(int role)
 		break;
 	    default:
 		/* operation not found */
-		rock = -1;
+		uspc.retval = -1;
 		sleep(1);
 	}
     }
@@ -3103,6 +2953,9 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
 	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, int)));
 	break;
     case AFSOP_BKG_HANDLER:
+#ifdef AFS_SOCKPROXY
+    case AFSOP_SOCKPROXY_HANDLER:
+#endif
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
@@ -3140,15 +2993,6 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, afs_uint32)));
 	break;
-#ifdef AFS_SOCKPROXY
-    case AFSOP_SOCKPROXY_HANDLER:
-	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
-	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
-	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
-	params[3] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
-	params[4] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
-	break;
-#endif
     default:
 	printf("Unknown syscall enountered: %d\n", syscall);
 	opr_Assert(0);

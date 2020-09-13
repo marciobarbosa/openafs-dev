@@ -38,15 +38,6 @@
 EXT osi_socket rx_socket;
 
 #ifdef AFS_SOCKPROXY
-/* operations to be performed by userspace process */
-#define SOCKPROXY_SOCKET	2
-#define SOCKPROXY_SETOPT	4
-#define SOCKPROXY_BIND		8
-#define SOCKPROXY_SEND		16
-#define SOCKPROXY_RECV		32
-#define SOCKPROXY_CLOSE		64
-#define SOCKPROXY_SHUTDOWN	128
-
 struct rx_sockproxy_proc {
     unsigned char op;			/* operation to be performed */
     unsigned char pending;		/* waiting for a reply from userspace */

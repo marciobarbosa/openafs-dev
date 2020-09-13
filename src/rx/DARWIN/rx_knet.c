@@ -188,8 +188,7 @@ osi_StopNetIfPoller(void)
 {
     /* not working yet */
     AFS_GUNLOCK();
-    rx_SockProxyRequest(SOCKPROXY_CLOSE, NULL, NULL, 0);
-    rx_SockProxyRequest(SOCKPROXY_SHUTDOWN, NULL, NULL, 0);
+    rx_SockProxyRequest(AFS_USPC_SOCKPROXY_STOP, NULL, NULL, 0);
     AFS_GLOCK();
 }
 
@@ -265,7 +264,7 @@ rxk_FreeSocket(struct socket *asocket)
     int code;
 
     AFS_STATCNT(osi_FreeSocket);
-    code = rx_SockProxyRequest(SOCKPROXY_CLOSE, NULL, NULL, 0);
+    code = rx_SockProxyRequest(AFS_USPC_SOCKPROXY_CLOSE, NULL, NULL, 0);
 
     return code;
 }

@@ -144,10 +144,10 @@ rxi_SockProxyGetProc(int op)
     struct rx_sockproxy_proc *proc = NULL;
 
     switch (op) {
-	case SOCKPROXY_CLOSE:
-	case SOCKPROXY_SHUTDOWN:
 	case AFS_USPC_SOCKPROXY_START:
 	case AFS_USPC_SOCKPROXY_SEND:
+	case AFS_USPC_SOCKPROXY_CLOSE:
+	case AFS_USPC_SOCKPROXY_STOP:
 	    proc = &rx_sockproxy_ch.proc[0];
 	    break;
 	case AFS_USPC_SOCKPROXY_RECV:
@@ -170,10 +170,7 @@ rxi_SockProxyGetProc(int op)
 int
 rx_SockProxyRequest(int op, struct sockaddr *addr, struct afs_sockproxy_packet *pkts, int npkts)
 {
-    int ret, offset, i;
-    void *payload;
-    size_t psize;
-
+    int ret;
     struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
     struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(op);
     struct rx_sockproxy_proc *recvproc;
@@ -215,14 +212,14 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct afs_sockproxy_packet *
     CV_BROADCAST(&proc->cv_op);
     /* if shutting down, there is no need to wait for the response from the
      * userspace process since it will exit and never return. */
-    if (proc->op & (SOCKPROXY_SHUTDOWN)) {
+    if (proc->op & (AFS_USPC_SOCKPROXY_STOP)) {
 	ch->shutdown = 1;
 	ret = 0;
 
 	/* if the receiver is sleeping waiting for a request, wake it up so it
 	 * can finalize itself. notice that if the receiver is stuck on user
 	 * space waiting for packets, it will get killed by proc[0]. */
-	recvproc = rxi_SockProxyGetProc(SOCKPROXY_RECV);
+	recvproc = rxi_SockProxyGetProc(AFS_USPC_SOCKPROXY_RECV);
 	recvproc->ret = -1;
 	CV_BROADCAST(&recvproc->cv_op);
 	goto done;
@@ -243,24 +240,19 @@ rx_SockProxyRequest(int op, struct sockaddr *addr, struct afs_sockproxy_packet *
 /**
  * Receive response from user space process.
  *
- * @param[inout]  op       operation
- * @param[inout]  rock     generic argument sent to or received from user space
- * @param[inout]  addr     ip addr sent to or received from user space
- * @param[out]    asize    size of addr
- * @param[inout]  payload  data sent to or received from user space
+ * <marcio> update this
  *
  * @return 0 on success; -1 otherwise.
  */
 int
-rx_SockProxyReply(struct afs_uspc_param *uspc, int *op, int *rock, int *npkts,
+rx_SockProxyReply(struct afs_uspc_param *uspc, int *npkts,
 		  struct afs_sockproxy_packet **pkts)
 {
-    int i;
     struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
-    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(*op);
+    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(uspc->reqtype);
 
     if (proc == NULL) {
-	printf("rx_SockProxyReply: proc not found (op = %d).\n", *op);
+	printf("rx_SockProxyReply: proc not found (op = %d).\n", uspc->reqtype);
 	return -1;
     }
 
@@ -284,11 +276,7 @@ rx_SockProxyReply(struct afs_uspc_param *uspc, int *op, int *rock, int *npkts,
 	proc->op = -1;
 	proc->pending = 0;
 	proc->complete = 1;
-	proc->ret = *rock;
-	/* <marcio> remove conditional */
-	if (uspc->reqtype & (AFS_USPC_SOCKPROXY_START | AFS_USPC_SOCKPROXY_SEND)) {
-	    proc->ret = uspc->retval;
-	}
+	proc->ret = uspc->retval;
 
 	CV_BROADCAST(&proc->cv_op);
     }
@@ -302,14 +290,10 @@ rx_SockProxyReply(struct afs_uspc_param *uspc, int *op, int *rock, int *npkts,
 	/* wait for requests */
 	CV_WAIT(&proc->cv_op, &ch->lock);
     }
-
     /* request received */
-    *rock = ch->socket;
-    /* <marcio> remove this op */
-    *op = proc->op;
     uspc->reqtype = proc->op;
 
-    if (*op & (SOCKPROXY_SHUTDOWN)) {
+    if (uspc->reqtype & (AFS_USPC_SOCKPROXY_STOP)) {
 	/* send proc */
 	MUTEX_EXIT(&ch->lock);
 	return -2;
