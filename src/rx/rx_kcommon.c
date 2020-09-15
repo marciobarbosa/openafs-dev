@@ -259,8 +259,10 @@ rx_SockProxyReply(struct afs_uspc_param *uspc, int *npkts,
     MUTEX_ENTER(&ch->lock);
 
     if (ch->shutdown) {
+	uspc->req.usp.socket = ch->socket;
+	uspc->reqtype = AFS_USPC_SOCKPROXY_STOP;
 	MUTEX_EXIT(&ch->lock);
-	return -1;
+	return 0;
     }
     if (uspc->reqtype & (AFS_USPC_SOCKPROXY_RECV)) {
 	uspc->req.usp.socket = ch->socket;
@@ -293,11 +295,6 @@ rx_SockProxyReply(struct afs_uspc_param *uspc, int *npkts,
     /* request received */
     uspc->reqtype = proc->op;
 
-    if (uspc->reqtype & (AFS_USPC_SOCKPROXY_STOP)) {
-	/* send proc */
-	MUTEX_EXIT(&ch->lock);
-	return -2;
-    }
     if (uspc->reqtype & (AFS_USPC_SOCKPROXY_START)) {
 	struct sockaddr_in *ip4 = (struct sockaddr_in *)proc->addr;
 	uspc->req.usp.addr = ip4->sin_addr.s_addr;
@@ -1268,6 +1265,8 @@ afs_rxevent_daemon(void)
 	if (afs_termState == AFSOP_STOP_RXEVENT) {
 #ifdef RXK_LISTENER_ENV
 	    afs_termState = AFSOP_STOP_RXK_LISTENER;
+#elif AFS_SOCKPROXY
+	    afs_termState = AFSOP_STOP_SOCKPROXY;
 #elif defined(AFS_SUN510_ENV) || defined(RXK_UPCALL_ENV)
 	    afs_termState = AFSOP_STOP_NETIF;
 #else

@@ -179,17 +179,24 @@ osi_NetSend(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
 }
 
 /**
- * Cancel rx listener and socket proxy.
+ * Cancel socket proxy.
  *
  * @return none.
  */
 void
 osi_StopNetIfPoller(void)
 {
-    /* not working yet */
     AFS_GUNLOCK();
     rx_SockProxyRequest(AFS_USPC_SOCKPROXY_STOP, NULL, NULL, 0);
     AFS_GLOCK();
+
+    while (afs_termState == AFSOP_STOP_SOCKPROXY) {
+	afs_osi_Sleep(&afs_termState);
+    }
+    if (afs_termState == AFSOP_STOP_NETIF) {
+	afs_termState = AFSOP_STOP_COMPLETE;
+	osi_rxWakeup(&afs_termState);
+    }
 }
 
 /**

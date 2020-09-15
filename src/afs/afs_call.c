@@ -91,6 +91,10 @@ afs_int32 afs_rx_idledead_rep = AFS_IDLEDEADTIME_REP;
 
 static int afscall_set_rxpck_received = 0;
 
+#ifdef AFS_SOCKPROXY
+static int afs_sockproxy_procs = SOCKPROXY_NPROCS;
+#endif
+
 extern afs_int32 afs_volume_ttl;
 
 /* From afs_util.c */
@@ -1377,13 +1381,13 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	AFS_GLOCK();
 
 	/* shutting down */
-	if (code == -2) {
-	    while (afs_termState != AFSOP_STOP_SOCKPROXY) {
-		afs_osi_Sleep(&afs_termState);
+	if ((uspc.reqtype & AFS_USPC_SOCKPROXY_STOP)) {
+	    afs_sockproxy_procs--;
+
+	    if (afs_sockproxy_procs == 0) {
+		afs_termState = AFSOP_STOP_NETIF;
+		afs_osi_Wakeup(&afs_termState);
 	    }
-	    afs_termState = AFSOP_STOP_COMPLETE;
-	    afs_osi_Wakeup(&afs_termState);
-	    code = 0;
 	}
 
 	/* send request to userspace process */

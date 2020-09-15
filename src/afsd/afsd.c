@@ -1811,13 +1811,6 @@ SockProxyHandler(int role)
 		break;
 	    case AFS_USPC_SOCKPROXY_STOP:
 		uspc.retval = close(uspc.req.usp.socket);
-		/*
-		 * receiver has to be killed since it can be blocked in recvmsg
-		 * waiting for packets.
-		 */
-		if (recvpid > 0) {
-		    kill(recvpid, SIGTERM);
-		}
 		shutdown = 1;
 		break;
 	    default:

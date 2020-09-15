@@ -341,6 +341,7 @@ struct afssysargs32 {
 #endif
 
 #ifdef AFS_SOCKPROXY
+#define SOCKPROXY_NPROCS	2	/* Number of processes */
 #define SOCKPROXY_PAYLOAD_MAX	1444	/* 2 * (RX_JUMBOBUFFERSIZE + RX_JUMBOHEADERSIZE) */
 #define SOCKPROXY_LEN_MAX	16	/* RX_MAXIOVECS */
 #define SOCKPROXY_PKT_MAX	32	/* Max number of packets */
