@@ -1652,7 +1652,16 @@ BkgHandler(void)
 #endif
 
 #ifdef AFS_SOCKPROXY
-static void *sockproxy_thread(void *rock);
+void
+SockProxyShutdownRecv(int asig)
+{
+    /*
+     * This function is a no-op. It is used as a handler for SIGUSR1 so we can
+     * unblock the recv process (if this process is blocked in recvmsg() waiting
+     * for packets) during shutdown.
+     */
+    return;
+}
 
 static void
 SockProxyHandler(int role)
@@ -1673,6 +1682,16 @@ SockProxyHandler(int role)
 
     uspc.reqtype = role;
     uspc.req.usp.socket = -1;
+
+    if (role == AFS_USPC_SOCKPROXY_RECV) {
+	struct sigaction recvsig;
+
+	sigemptyset(&recvsig.sa_mask);
+	recvsig.sa_handler = SockProxyShutdownRecv;
+	/* make sure that SA_RESTART is not set */
+	recvsig.sa_flags = 0;
+	sigaction(SIGUSR1, &recvsig, NULL);
+    }
 
     while (!shutdown) {
 	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
@@ -1810,6 +1829,9 @@ SockProxyHandler(int role)
 		uspc.retval = close(uspc.req.usp.socket);
 		break;
 	    case AFS_USPC_SOCKPROXY_STOP:
+		if (recvpid > 0) {
+		    kill(recvpid, SIGUSR1);
+		}
 		uspc.retval = close(uspc.req.usp.socket);
 		shutdown = 1;
 		break;
