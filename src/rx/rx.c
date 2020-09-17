@@ -515,6 +515,29 @@ rx_InitHost(u_int host, u_int port)
     rxi_InitializeThreadSupport();
 #endif
 
+#ifdef AFS_SOCKPROXY
+    /*
+     * Initialize communication channel used by rx_SockProxyRequest and
+     * rx_SockProxyReply.
+     */
+
+    /* <marcio> support several processes */
+    memset(&rx_sockproxy_ch, 0, sizeof(rx_sockproxy_ch));
+
+    rx_sockproxy_ch.socket = -1;
+    MUTEX_INIT(&rx_sockproxy_ch.lock, "rx_sockproxy_mutex", MUTEX_DEFAULT, 0);
+
+    rx_sockproxy_ch.proc[0].op = -1;
+    rx_sockproxy_ch.proc[1].op = -1;
+
+    CV_INIT(&rx_sockproxy_ch.proc[0].cv_ready, "rx_sockproxy_cv_ready", CV_DEFAULT, 0);
+    CV_INIT(&rx_sockproxy_ch.proc[1].cv_ready, "rx_sockproxy_cv_ready", CV_DEFAULT, 0);
+    CV_INIT(&rx_sockproxy_ch.proc[0].cv_op, "rx_sockproxy_cv_op", CV_DEFAULT, 0);
+    CV_INIT(&rx_sockproxy_ch.proc[1].cv_op, "rx_sockproxy_cv_op", CV_DEFAULT, 0);
+    CV_INIT(&rx_sockproxy_ch.proc[0].cv_pend, "rx_sockproxy_cv_pend", CV_DEFAULT, 0);
+    CV_INIT(&rx_sockproxy_ch.proc[1].cv_pend, "rx_sockproxy_cv_pend", CV_DEFAULT, 0);
+#endif
+
     /* Allocate and initialize a socket for client and perhaps server
      * connections. */
 

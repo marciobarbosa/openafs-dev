@@ -14,6 +14,9 @@
 #include <afsconfig.h>
 #include <afs/param.h>
 
+#ifdef AFS_SOCKPROXY
+#include <afs/afs_args.h>
+#endif
 
 #include "rx/rx_kcommon.h"
 #include "rx_atomic.h"
@@ -126,6 +129,181 @@ rxi_GetUDPSocket(u_short port)
 {
     return rxi_GetHostUDPSocket(htonl(INADDR_ANY), port);
 }
+
+#ifdef AFS_SOCKPROXY
+/**
+ * Return process that provides the given operation.
+ *
+ * @param[in]  op  operation
+ *
+ * @return process on success; NULL otherwise.
+ */
+static struct rx_sockproxy_proc *
+rxi_SockProxyGetProc(int op)
+{
+    struct rx_sockproxy_proc *proc = NULL;
+
+    switch (op) {
+	case AFS_USPC_SOCKPROXY_START:
+	case AFS_USPC_SOCKPROXY_SEND:
+	case AFS_USPC_SOCKPROXY_CLOSE:
+	case AFS_USPC_SOCKPROXY_STOP:
+	    proc = &rx_sockproxy_ch.proc[0];
+	    break;
+	case AFS_USPC_SOCKPROXY_RECV:
+	    proc = &rx_sockproxy_ch.proc[1];
+	    break;
+    }
+    return proc;
+}
+
+/**
+ * Delegate given operation to user space process.
+ *
+ * @param[in]  op    operation
+ * @param[in]  addr  address assigned to socket
+ * @param[in]  pkts  packets to be sent by process
+ * @param[in]  npkts number of pkts
+ *
+ * @return value returned by the requested operation.
+ */
+int
+rx_SockProxyRequest(int op, struct sockaddr *addr,
+		    struct afs_sockproxy_packet *pkts, int npkts)
+{
+    int ret;
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(op);
+    struct rx_sockproxy_proc *recvproc;
+
+    if (proc == NULL) {
+	printf("rx_SockProxyRequest: proc not found.\n");
+	return -1;
+    }
+
+    MUTEX_ENTER(&ch->lock);
+
+    while (!ch->shutdown && !proc->ready) {
+	/* userspace process is not ready for requests yet */
+	CV_WAIT(&proc->cv_ready, &ch->lock);
+    }
+    while (!ch->shutdown && proc->pending) {
+	/* userspace process is being used */
+	CV_WAIT(&proc->cv_pend, &ch->lock);
+    }
+    if (ch->shutdown) {
+	ret = -1;
+	goto done;
+    }
+
+    proc->op = op;
+    proc->pending = 1;
+    proc->complete = 0;
+
+    if (op & (AFS_USPC_SOCKPROXY_START)) {
+	proc->addr = addr;
+    }
+    if (op & (AFS_USPC_SOCKPROXY_SEND)) {
+	proc->pkts = pkts;
+	proc->npkts = npkts;
+    }
+
+    CV_BROADCAST(&proc->cv_op);
+    /* if shutting down, there is no need to wait for the response from the
+     * userspace process since it will exit and never return. */
+    if (proc->op & (AFS_USPC_SOCKPROXY_STOP)) {
+	/* <marcio> wake up other processes */
+	ch->shutdown = 1;
+	ret = 0;
+	goto done;
+    }
+    /* wait for response from userspace process */
+    while (!proc->complete && !ch->shutdown) {
+	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
+    }
+    ret = proc->ret;
+
+  done:
+    CV_BROADCAST(&proc->cv_pend);
+    MUTEX_EXIT(&ch->lock);
+
+    return ret;
+}
+
+/**
+ * Receive response from user space process.
+ *
+ * @param[in]     uspc   control information exchanged between rx and process
+ * @param[inout]  npkts  number of packets to be sent or received
+ * @param[inout]  pkts   packets to be sent or received
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+rx_SockProxyReply(struct afs_uspc_param *uspc, int *npkts,
+		  struct afs_sockproxy_packet **pkts)
+{
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+    struct rx_sockproxy_proc *proc = rxi_SockProxyGetProc(uspc->reqtype);
+
+    if (proc == NULL) {
+	printf("rx_SockProxyReply: proc not found (op = %d).\n", uspc->reqtype);
+	return -1;
+    }
+
+    MUTEX_ENTER(&ch->lock);
+
+    if (ch->shutdown) {
+	uspc->req.usp.socket = ch->socket;
+	uspc->reqtype = AFS_USPC_SOCKPROXY_STOP;
+	MUTEX_EXIT(&ch->lock);
+	return 0;
+    }
+    if (uspc->reqtype & (AFS_USPC_SOCKPROXY_RECV)) {
+	uspc->req.usp.socket = ch->socket;
+	MUTEX_EXIT(&ch->lock);
+	rx_SockProxyUpCall(*npkts, *pkts);
+	return 0;
+    }
+    /* response received from userspace process */
+    if (proc->pending) {
+	if (uspc->reqtype == AFS_USPC_SOCKPROXY_START) {
+	    ch->socket = uspc->req.usp.socket;
+	}
+	proc->op = -1;
+	proc->pending = 0;
+	proc->complete = 1;
+	proc->ret = uspc->retval;
+
+	CV_BROADCAST(&proc->cv_op);
+    }
+
+    if (!proc->ready) {
+	/* ready to receive requests */
+	proc->ready = 1;
+	CV_BROADCAST(&proc->cv_ready);
+    }
+    if (!proc->pending && !ch->shutdown) {
+	/* wait for requests */
+	CV_WAIT(&proc->cv_op, &ch->lock);
+    }
+    /* request received */
+    uspc->reqtype = proc->op;
+
+    if (uspc->reqtype & (AFS_USPC_SOCKPROXY_START)) {
+	struct sockaddr_in *ip4 = (struct sockaddr_in *)proc->addr;
+	uspc->req.usp.addr = ip4->sin_addr.s_addr;
+	uspc->req.usp.port = ip4->sin_port;
+    }
+    if (uspc->reqtype & (AFS_USPC_SOCKPROXY_SEND)) {
+	*pkts = proc->pkts;
+	*npkts = proc->npkts;
+    }
+
+    MUTEX_EXIT(&ch->lock);
+    return 0;
+}
+#endif
 
 /*
  * osi_utoa() - write the NUL-terminated ASCII decimal form of the given
@@ -809,7 +987,7 @@ rxi_FindIfnet(afs_uint32 addr, afs_uint32 * maskp)
  * most of it is simple to follow common code.
  */
 #if !defined(UKERNEL)
-#if !defined(AFS_SUN5_ENV) && !defined(AFS_LINUX20_ENV)
+#if !defined(AFS_SUN5_ENV) && !defined(AFS_LINUX20_ENV) && !defined(AFS_SOCKPROXY)
 /* rxk_NewSocket creates a new socket on the specified port. The port is
  * in network byte order.
  */
@@ -1029,7 +1207,7 @@ rxk_FreeSocket(struct socket *asocket)
 #endif
     return 0;
 }
-#endif /* !SUN5 && !LINUX20 */
+#endif /* !SUN5 && !LINUX20 && !AFS_SOCKPROXY */
 
 #if defined(RXK_LISTENER_ENV) || defined(AFS_SUN5_ENV) || defined(RXK_UPCALL_ENV)
 #ifdef RXK_TIMEDSLEEP_ENV
@@ -1082,6 +1260,8 @@ afs_rxevent_daemon(void)
 	if (afs_termState == AFSOP_STOP_RXEVENT) {
 #ifdef RXK_LISTENER_ENV
 	    afs_termState = AFSOP_STOP_RXK_LISTENER;
+#elif AFS_SOCKPROXY
+	    afs_termState = AFSOP_STOP_SOCKPROXY;
 #elif defined(AFS_SUN510_ENV) || defined(RXK_UPCALL_ENV)
 	    afs_termState = AFSOP_STOP_NETIF;
 #else

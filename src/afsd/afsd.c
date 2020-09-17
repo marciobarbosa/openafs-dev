@@ -183,6 +183,10 @@ static int event_pid;
 #undef	VIRTUE
 #undef	VICE
 
+#ifdef AFS_SOCKPROXY
+#include <sys/types.h>
+#include <sys/socket.h>
+#endif
 
 #define CACHEINFOFILE   "cacheinfo"
 #define	DCACHEFILE	"CacheItems"
@@ -1647,6 +1651,215 @@ BkgHandler(void)
 }
 #endif
 
+#ifdef AFS_SOCKPROXY
+void
+SockProxyShutdownRecv(int asig)
+{
+    /*
+     * This function is a no-op. It is used as a handler for SIGUSR1 so we can
+     * unblock the recv process (if this process is blocked in recvmsg() waiting
+     * for packets) during shutdown.
+     */
+    return;
+}
+
+static void
+SockProxyHandler(int role)
+{
+    int code;
+    int shutdown, recvpid;
+
+    struct afs_uspc_param uspc;
+    struct afs_sockproxy_packet pkts[SOCKPROXY_PKT_MAX];
+    int npkts;
+
+    shutdown = 0;
+    recvpid = -1;
+
+    memset(&uspc, 0, sizeof(uspc));
+    memset(&pkts, 0, sizeof(pkts));
+    npkts = 0;
+
+    uspc.reqtype = role;
+    uspc.req.usp.socket = -1;
+
+    if (role == AFS_USPC_SOCKPROXY_RECV) {
+	struct sigaction recvsig;
+
+	sigemptyset(&recvsig.sa_mask);
+	recvsig.sa_handler = SockProxyShutdownRecv;
+	/* make sure that SA_RESTART is not set */
+	recvsig.sa_flags = 0;
+	sigaction(SIGUSR1, &recvsig, NULL);
+    }
+
+    while (!shutdown) {
+	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER,
+			    &uspc,
+			    &npkts,
+			    &pkts);
+	if (code) {
+	    /* on failure, try again */
+	    uspc.retval = -1;
+	    sleep(1);
+	    continue;
+	}
+
+	switch (uspc.reqtype) {
+	    case AFS_USPC_SOCKPROXY_START: {
+		int sock, attempt_i;
+		int blen, bsize;
+		struct sockaddr_in ip4;
+
+		/* create an endpoint for communication */
+		uspc.retval = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		if (uspc.retval < 0) {
+		    continue;
+		}
+		uspc.req.usp.socket = sock = uspc.retval;
+
+		/* set options on socket */
+		blen = 50000;
+		bsize = sizeof(blen);
+		for (attempt_i = 0; attempt_i < 2; attempt_i++) {
+		    code  = setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &blen, bsize);
+		    code |= setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &blen, bsize);
+		    if (code == 0) {
+			break;
+		    }
+		    /* setsockopt didn't succeed. try a smaller size. */
+		    blen = 32766;
+		}
+		uspc.retval = code;
+		if (uspc.retval != 0) {
+		    close(uspc.req.usp.socket);
+		    uspc.req.usp.socket = -1;
+		    continue;
+		}
+		/* assign addr to the socket */
+		ip4.sin_family = AF_INET;
+		ip4.sin_port = uspc.req.usp.port;
+		ip4.sin_addr.s_addr = uspc.req.usp.addr;
+
+		code = bind(sock, (struct sockaddr *)&ip4, sizeof(ip4));
+		if (role == AFS_USPC_SOCKPROXY_SEND && code == 0) {
+		    /*
+		     * at this point, we can start receiving packets. notice
+		     * that this child inherits our socket.
+		     */
+		    recvpid = fork();
+		    if (recvpid == 0) {
+			SockProxyHandler(AFS_USPC_SOCKPROXY_RECV);
+			exit(1);
+		    }
+		}
+		if (code != 0) {
+		    close(uspc.req.usp.socket);
+		    uspc.req.usp.socket = -1;
+		}
+		uspc.retval = code;
+		uspc.bufSz = 0;
+		break;
+	    }
+	    case AFS_USPC_SOCKPROXY_SEND: {
+		int pkts_i, tbytes;
+		struct iovec iov;
+		struct sockaddr *addr;
+		struct afs_sockproxy_packet *pkt;
+		struct msghdr msg;
+
+		for (pkts_i = 0, tbytes = 0; pkts_i < npkts; pkts_i++) {
+		    pkt = &pkts[pkts_i];
+		    addr = (struct sockaddr *)&pkt->addr;
+
+		    memset(&iov, 0, sizeof(iov));
+		    memset(&msg, 0, sizeof(msg));
+
+		    iov.iov_base = pkt->data;
+		    iov.iov_len = pkt->size;
+
+		    msg.msg_name = addr;
+		    msg.msg_namelen = addr->sa_len;
+		    msg.msg_iov = &iov;
+		    msg.msg_iovlen = 1;
+
+		    code = sendmsg(uspc.req.usp.socket, &msg, 0);
+		    if (code < 0) {
+			break;
+		    }
+		    tbytes += code;
+		}
+		uspc.retval = (code < 0) ? code : tbytes;
+		break;
+	    }
+	    case AFS_USPC_SOCKPROXY_RECV: {
+		int i_pkts, flags;
+		struct iovec iov;
+		struct msghdr msg;
+		struct afs_sockproxy_packet *pkt;
+
+		flags = 0;
+		memset(pkts, 0, sizeof(pkts));
+
+		for (i_pkts = 0; i_pkts < SOCKPROXY_PKT_MAX; i_pkts++) {
+		    pkt = &pkts[i_pkts];
+
+		    memset(&iov, 0, sizeof(iov));
+		    iov.iov_base = pkt->data;
+		    iov.iov_len = sizeof(pkt->data);
+
+		    memset(&msg, 0, sizeof(msg));
+		    msg.msg_name = &pkt->addr;
+		    msg.msg_namelen = sizeof(pkt->addr);
+		    msg.msg_iov = &iov;
+		    msg.msg_iovlen = 1;
+
+		    code = recvmsg(uspc.req.usp.socket, &msg, flags);
+		    if (code < 0) {
+			break;
+		    }
+		    pkt->size = code;
+		    flags = MSG_DONTWAIT;
+		}
+		npkts = i_pkts;
+		break;
+	    }
+	    case AFS_USPC_SOCKPROXY_CLOSE:
+		uspc.retval = close(uspc.req.usp.socket);
+		break;
+	    case AFS_USPC_SOCKPROXY_STOP:
+		if (recvpid > 0) {
+		    kill(recvpid, SIGUSR1);
+		}
+		uspc.retval = close(uspc.req.usp.socket);
+		shutdown = 1;
+		break;
+	    default:
+		/* operation not found */
+		uspc.retval = -1;
+		sleep(1);
+	}
+    }
+    exit(0);
+}
+
+static void *
+sockproxy_thread(void *rock)
+{
+    int *role = (int *)rock;
+    /* Since the socket proxy handler runs as a user process,
+     * need to drop the controlling TTY, etc.
+     */
+    if (afsd_daemon(0, 0) == -1) {
+	printf("Error starting socket proxy handler: %s\n",
+	       strerror(errno));
+	exit(1);
+    }
+    SockProxyHandler(*role);
+    return NULL;
+}
+#endif
+
 static void *
 afsdb_thread(void *rock)
 {
@@ -2210,6 +2423,14 @@ afsd_run(void)
     fork_rx_syscall(rn, AFSOP_RXEVENT_DAEMON);
 #endif
 
+#ifdef AFS_SOCKPROXY
+    if (afsd_verbose) {
+	printf("%s: Forking socket proxy handlers.\n", rn);
+    }
+    code = AFS_USPC_SOCKPROXY_SEND;	/* role to be performed */
+    afsd_fork(0, sockproxy_thread, &code);
+#endif
+
     if (enable_afsdb) {
 	if (afsd_verbose)
 	    printf("%s: Forking AFSDB lookup handler.\n", rn);
@@ -2746,6 +2967,9 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
 	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, int)));
 	break;
     case AFSOP_BKG_HANDLER:
+#ifdef AFS_SOCKPROXY
+    case AFSOP_SOCKPROXY_HANDLER:
+#endif
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[2] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
