@@ -284,6 +284,13 @@ extern void afs_rxevent_daemon(void);
 # endif
 extern rx_ifnet_t rxi_FindIfnet(afs_uint32 addr, afs_uint32 * maskp);
 extern void osi_StopListener(void);
+# ifdef AFS_SOCKPROXY
+extern int rx_SockProxyRequest(int op,
+			       struct sockaddr *addr,
+			       struct afs_sockproxy_packet *pkts, int npkts);
+extern int rx_SockProxyReply(struct afs_uspc_param *uspc, int *npkts,
+			     struct afs_sockproxy_packet **pkts);
+# endif
 
 /* ARCH/rx_kmutex.c */
 # if defined(AFS_LINUX20_ENV)
@@ -305,6 +312,7 @@ extern int osi_NetSend(osi_socket asocket, struct sockaddr_in *addr,
 		       int istack);
 # endif
 # ifdef RXK_UPCALL_ENV
+extern void rx_SockProxyUpCall(int npkts, struct afs_sockproxy_packet *pkts);
 extern void rx_upcall(socket_t so, void *arg, __unused int waitflag);
 extern void osi_StopNetIfPoller(void);
 # else
