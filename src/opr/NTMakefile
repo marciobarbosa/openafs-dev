@@ -40,6 +40,7 @@ LIBOBJS = \
 	$(OUT)\casestrcpy.obj \
 	$(OUT)\dict.obj \
 	$(OUT)\fmt.obj \
+	$(OUT)\prname.obj \
 	$(OUT)\proc.obj \
 	$(OUT)\rbtree.obj \
 	$(OUT)\uuid.obj \

@@ -11,6 +11,7 @@ opr/cache
 opr/dict
 opr/fmt
 opr/jhash
+opr/prname
 opr/queues
 opr/rbtree
 opr/softsig

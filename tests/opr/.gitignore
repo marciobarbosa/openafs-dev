@@ -5,6 +5,7 @@
 /fmt-t
 /dict-t
 /jhash-t
+/prname-t
 /queues-t
 /rbtree-t
 /time-t

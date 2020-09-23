@@ -18,3 +18,4 @@ opr_threadname_set
 opr_ucstring
 opr_softsig_Init
 opr_softsig_Register
+opr_prname_isblank

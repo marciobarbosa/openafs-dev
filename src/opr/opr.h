@@ -104,4 +104,7 @@ extern int opr_cache_get(struct opr_cache *cache, void *key_buf,
 extern void opr_cache_put(struct opr_cache *cache, void *key_buf,
 			  size_t key_len, void *val_buf, size_t val_len);
 
+/* prname.c */
+extern int opr_prname_isblank(char *aname, int asize);
+
 #endif
