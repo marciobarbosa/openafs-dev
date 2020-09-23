@@ -25,6 +25,7 @@
 #include <afs/stds.h>
 
 #include <roken.h>
+#include <afs/opr.h>
 
 #include <lock.h>
 #include <ubik.h>
@@ -175,12 +176,14 @@ pt_hook_write(void)
  *   bogus. */
 
 static int
-CorrectUserName(char *name)
+CorrectUserName(char name[PR_MAXNAMELEN], int notblank)
 {
     /* We accept foreign names, so we will deal with '@' later */
     if (strchr(name, ':') || strchr(name, '\n'))
 	return 0;
     if (strlen(name) >= PR_MAXNAMELEN)
+	return 0;
+    if (notblank && opr_prname_isblank(name, PR_MAXNAMELEN))
 	return 0;
     return 1;
 }
@@ -195,7 +198,8 @@ CorrectGroupName(struct ubik_trans *ut, char aname[PR_MAXNAMELEN],	/* name for g
 		 afs_int32 cid,		/* caller id */
 		 afs_int32 oid,		/* owner of group */
 		 afs_int32 admin,	/* non-zero if admin */
-		 char cname[PR_MAXNAMELEN])	/* correct name for group */
+		 char cname[PR_MAXNAMELEN],	/* correct name for group */
+		 int notblank)		/* do not allow blank names */
 {
     afs_int32 code;
     char *prefix;		/* ptr to group owner part */
@@ -265,8 +269,11 @@ CorrectGroupName(struct ubik_trans *ut, char aname[PR_MAXNAMELEN],	/* name for g
 	if (strchr(cname, '\n') ||	/* restrict so recreate can work */
 	    strchr(suffix + 1, ':'))	/* avoid multiple colons */
 	    return PRBADNAM;
+	if (notblank && opr_prname_isblank(cname, PR_MAXNAMELEN)) {
+	    return PRBADNAM;
+	}
     } else {
-	if (!CorrectUserName(cname))
+	if (!CorrectUserName(cname, notblank))
 	    return PRBADNAM;
     }
     return 0;
@@ -354,13 +361,13 @@ CreateEntry(struct ubik_trans *at, char aname[PR_MAXNAMELEN], afs_int32 *aid, af
     }
 
     if (flag & PRGRP) {
-	code = CorrectGroupName(at, aname, creator, oid, admin, tentry.name);
+	code = CorrectGroupName(at, aname, creator, oid, admin, tentry.name, 1);
 	if (code)
 	    return code;
 	if (strcmp(aname, tentry.name) != 0)
 	    return PRBADNAM;
     } else {			/* non-group must not have colon */
-	if (!CorrectUserName(aname))
+	if (!CorrectUserName(aname, 1))
 	    return PRBADNAM;
 	strcpy(tentry.name, aname);
     }
@@ -2112,7 +2119,8 @@ ChangeEntry(struct ubik_trans *at, afs_int32 aid, afs_int32 cid, char *name, afs
 	    if (tentry.owner == 0 || tentry.owner == ANONYMOUSID)
 		tentry.owner = cid;
 
-	    code = CorrectGroupName(at, name, cid, tentry.owner, admin, tentry.name);
+	    code = CorrectGroupName(at, name, cid, tentry.owner, admin,
+				    tentry.name, 0);
 	    if (code)
 		return code;
 
@@ -2136,7 +2144,7 @@ ChangeEntry(struct ubik_trans *at, afs_int32 aid, afs_int32 cid, char *name, afs
 		    || strcmp(atsign, newatsign))
 		    return PRPERM;
 	    }
-	    if (!CorrectUserName(name))
+	    if (!CorrectUserName(name, 0))
 		return PRBADNAM;
 	}
 
