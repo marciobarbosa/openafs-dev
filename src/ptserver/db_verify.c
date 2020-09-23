@@ -40,6 +40,7 @@
 
 #include <afs/cellconfig.h>
 #include <afs/afsutil.h>
+#include <afs/opr.h>
 #include <ubik.h>
 #include <afs/cmd.h>
 #include <afs/com_err.h>
@@ -827,6 +828,10 @@ WalkChains(char map[],		/* one byte per db entry */
 	    type = ntohl(e.flags) & PRTYPE;
 	    switch (type) {
 	    case PRGRP:
+		if (opr_prname_isblank(e.name, PR_MAXNAMELEN)) {
+		    fprintf(stderr,
+			    "warning: group name \"%s\" is blank\n", e.name);
+		}
 		if (id >= 0) {
 		    fprintf(stderr, "Group id not negative\n");
 		    goto abort;
@@ -848,6 +853,10 @@ WalkChains(char map[],		/* one byte per db entry */
 		misc->ngroups++;
 		break;
 	    case PRUSER:
+		if (opr_prname_isblank(e.name, PR_MAXNAMELEN)) {
+		    fprintf(stderr,
+			    "warning: user name \"%s\" is blank\n", e.name);
+		}
 		if (id <= 0) {
 #if defined(SUPERGROUPS)
 		    fprintf(stderr, "User id not positive\n");
