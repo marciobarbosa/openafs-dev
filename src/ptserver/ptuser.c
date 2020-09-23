@@ -376,7 +376,12 @@ pr_End(void)
  */
 static_inline int check_length(prname arg)
 {
-    if (strnlen(arg, PR_MAXNAMELEN) >= PR_MAXNAMELEN)
+    int len = strnlen(arg, PR_MAXNAMELEN);
+
+    if (opr_prname_isblank(arg, len)) {
+	fprintf(stderr, "warning: name \"%s\" is blank\n", arg);
+    }
+    if (len >= PR_MAXNAMELEN)
 	return PRNAMETOOLONG;
     return 0;
 }
