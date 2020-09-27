@@ -694,6 +694,7 @@ extern int afs_syscall_iincdec(int, int, int, int);
 
 /* ARCH/osi_file.c */
 extern int afs_osicred_initialized;
+extern void afs_InitDualFSCacheOps(struct vnode *vp);
 extern void *osi_UFSOpen(afs_dcache_id_t *ainode);
 #if defined(AFS_LINUX22_ENV)
 extern void osi_get_fh(struct dentry *dp, afs_ufs_dcache_id_t *ainode);
@@ -738,6 +739,10 @@ extern int setpag(afs_proc_t *proc, struct ucred **cred, afs_uint32 pagvalue,
 extern afs_int32 osi_get_group_pag(afs_ucred_t *cred);
 #endif
 
+#if defined(AFS_DARWIN_ENV)
+extern int setpag(struct proc *proc, struct ucred **cred, afs_uint32 pagvalue,
+		  afs_uint32 * newpag, afs_uint32 change_parent);
+#endif
 
 
 /* ARCH/osi_vm.c */

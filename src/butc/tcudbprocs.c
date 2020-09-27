@@ -42,6 +42,8 @@
 #include "butc_internal.h"
 #include "error_macros.h"
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 /* GLOBAL CONFIGURATION PARAMETERS */
 #define BIGCHUNK 102400
 

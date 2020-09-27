@@ -14,6 +14,8 @@
 
 #include <afs/cmd.h>
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 #if !defined(AFS_DARWIN_ENV) && !defined(AFS_FBSD_ENV)
 /* Here be hacks. */
 #ifdef AFS_LINUX24_ENV

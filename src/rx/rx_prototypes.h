@@ -306,6 +306,7 @@ extern int osi_NetSend(osi_socket asocket, struct sockaddr_in *addr,
 # endif
 # ifdef RXK_UPCALL_ENV
 extern void rx_upcall(socket_t so, void *arg, __unused int waitflag);
+extern void osi_StopNetIfPoller(void);
 # else
 extern int osi_NetReceive(osi_socket so, struct sockaddr_in *addr,
 			  struct iovec *dvec, int nvecs, int *lengthp);

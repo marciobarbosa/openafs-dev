@@ -8,6 +8,7 @@
  */
 
 #include <afsconfig.h>
+#include <mach/thread_act.h>
 #include "afs/param.h"
 
 #if defined(HAVE_LINUX_KTHREAD_RUN) && !defined(UKERNEL)

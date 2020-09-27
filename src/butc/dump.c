@@ -35,6 +35,8 @@
 #include "butc_xbsa.h"
 #include "afs/butx.h"
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 /* GLOBAL CONFIGURATION PARAMETERS */
 extern int dump_namecheck;
 extern int queryoperator;
