@@ -105,7 +105,7 @@ rxk_shutdownPorts(void)
     for (i = 0; i < MAXRXPORTS; i++) {
 	if (rxk_ports[i]) {
 	    rxk_ports[i] = 0;
-#if ! defined(AFS_SUN5_ENV) && ! defined(UKERNEL) && ! defined(RXK_LISTENER_ENV)
+#if ! defined(AFS_SUN5_ENV) && ! defined(UKERNEL) && ! defined(RXK_LISTENER_ENV) && ! defined(AFS_SOCKPROXY)
 	    soclose((struct socket *)rxk_portRocks[i]);
 #endif
 	    rxk_portRocks[i] = NULL;
