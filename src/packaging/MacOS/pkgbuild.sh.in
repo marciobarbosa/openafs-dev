@@ -164,8 +164,8 @@ elif [ x"$majorvers" = x19 ]; then
     THISREL=15
 
 elif [ x"$majorvers" = x20 ]; then
-    RELNAME="Big Sur"
-    THISREL=16
+    RELNAME="BigSur"
+    THISREL=0
 
 elif [ x"$majorvers" = x ] ; then
     echo "Error running uname" >&2
