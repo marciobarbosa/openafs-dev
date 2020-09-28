@@ -347,6 +347,8 @@ if [ x"$PASS1" = x1 ]; then
 	# To be notarized by Apple, all files must be signed.
 	find "$PKGROOT" -type f -exec codesign --verbose --force \
 	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
+	find "$PLUGINS" -type f -exec codesign --verbose --force \
+	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
 
 	# Sign each 'thing' that we have (commands, kexts, etc)
 	for obj in "$DPKGROOT"/Library/OpenAFS/Debug/afs.kext \
