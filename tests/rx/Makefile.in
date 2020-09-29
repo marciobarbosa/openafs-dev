@@ -5,12 +5,12 @@ abs_top_builddir=@abs_top_builddir@
 include @TOP_OBJDIR@/src/config/Makefile.config
 include @TOP_OBJDIR@/src/config/Makefile.pthread
 
-MODULE_CFLAGS = -I$(TOP_OBJDIR)
+MODULE_CFLAGS = -I$(TOP_OBJDIR) -I$(srcdir)/../common/
 
 LIBS = $(abs_top_builddir)/tests/common/libafstest_common.la \
        $(abs_top_builddir)/src/rx/liboafs_rx.la
 
-BINS = atomic-t event-t
+BINS = atomic-t event-t opaque-t
 
 all: $(BINS)
 
@@ -19,6 +19,8 @@ atomic-t: atomic-t.o $(LIBS)
 
 event-t: event-t.o $(LIBS)
 	$(LT_LDRULE_static) event-t.o $(LIBS) $(LIB_roken) $(XLIBS)
+opaque-t: opaque-t.o $(LIBS)
+	$(LT_LDRULE_static) opaque-t.o $(LIBS) $(LIB_roken) $(XLIBS)
 install:
 
 clean distclean:

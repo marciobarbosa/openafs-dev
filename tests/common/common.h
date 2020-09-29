@@ -22,6 +22,21 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef OPENAFS_TEST_COMMON_H
+#define OPENAFS_TEST_COMMON_H
+
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+
+#include <roken.h>
+
+#include <afs/opr.h>
+#include <afs/com_err.h>
+#include <rx/rx_opaque.h>
+
+#include <tests/tap/basic.h>
+
 /* config.c */
 
 struct afstest_configinfo {
@@ -95,3 +110,12 @@ extern char *afstest_GetProgname(char **argv);
 extern char *afstest_vasprintf(const char *fmt, va_list ap);
 extern char *afstest_asprintf(const char *fmt, ...)
 	AFS_ATTRIBUTE_FORMAT(__printf__, 1, 2);
+extern int is_pointer(void *left, void *right, const char *fmt, ...)
+	AFS_ATTRIBUTE_FORMAT(__printf__, 3, 4);
+
+/* opaque.c */
+extern int is_opaque(struct rx_opaque *left, struct rx_opaque *right,
+		     const char *format, ...)
+	AFS_ATTRIBUTE_FORMAT(__printf__, 3, 4);
+
+#endif /* OPENAFS_TEST_COMMON_H */
