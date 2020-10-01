@@ -38,6 +38,7 @@ typedef unsigned short etap_event_t;
 #include <kern/thread.h>
 
 #ifdef AFS_DARWIN80_ENV
+#define strcpy(s1, s2) strncpy(s1, s2, sizeof(s1))
 #define vop_proc vfs_context_proc(ap->a_context)
 #define vop_cred vfs_context_ucred(ap->a_context)
 #define cn_proc(cnp) vfs_context_proc(ap->a_context)

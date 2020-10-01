@@ -23,7 +23,7 @@ TOP_SRC_OPR = $(TOP_SRCDIR)/opr
 TOP_SRC_VNOPS = ${TOP_SRCDIR}/afs/VNOPS
 TOP_SRC_RXKAD = ${TOP_SRCDIR}/rxkad
 
-COMMON_INCLUDE = -I. -I.. -I../nfs \
+COMMON_INCLUDE = -I. -I.. -I../nfs ${KINCLUDES} \
 	-I$(TOP_SRCDIR)/crypto/hcrypto/kernel \
 	-I${TOP_SRCDIR} \
 	-I${TOP_SRCDIR}/afs \
