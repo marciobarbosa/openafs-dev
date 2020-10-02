@@ -348,6 +348,8 @@ if [ x"$PASS1" = x1 ]; then
 	# To be notarized by Apple, all files must be signed.
 	find "$PKGROOT" -type f -exec codesign --verbose --force \
 	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
+	find "$PLUGINS" -type f -exec codesign --verbose --force \
+	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
 
 	# Sign each 'thing' that we have (commands, kexts, etc)
 	for obj in "$DPKGROOT"/Library/OpenAFS/Debug/afs.kext \
@@ -364,12 +366,6 @@ if [ x"$PASS1" = x1 ]; then
 	do
 	    codesign --verbose --force --timestamp --sign "$APP_KEY" $CODESIGN_OPTS "$obj"
 	done
-
-	# To be notarized by Apple, all files must be signed.
-	find "$PKGROOT" -type f -exec codesign --verbose --force \
-	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
-	find "$PLUGINS" -type f -exec codesign --verbose --force \
-	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
 
 	# Check if our signatures for our kexts are valid. 'kextutil' will exit
 	# with an error and print out a message if something is wrong with the
