@@ -163,6 +163,11 @@ elif [ x"$majorvers" = x19 ]; then
     RELNAME="Catalina"
     THISREL=15
 
+elif [ x"$majorvers" = x20 ]; then
+    RELNAME="BigSur"
+    THISREL=16
+    OSXMAJOR=0
+
 elif [ x"$majorvers" = x ] ; then
     echo "Error running uname" >&2
     exit 1
@@ -357,6 +362,8 @@ if [ x"$PASS1" = x1 ]; then
 	# To be notarized by Apple, all files must be signed.
 	find "$PKGROOT" -type f -exec codesign --verbose --force \
 	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
+	find "$PLUGINS" -type f -exec codesign --verbose --force \
+	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
 
 	# Check if our signatures for our kexts are valid. 'kextutil' will exit
 	# with an error and print out a message if something is wrong with the
@@ -496,11 +503,21 @@ if [ x"$PASS2" = x1 ]; then
     fi
 
     # generate Distribution.xml from Distribution.xml.in -- nonstandard substs
-    sed -e "s/%%OSX_MAJOR_CUR%%/$THISREL/g" \
-	-e "s/%%OSX_MAJOR_NEXT%%/$(( $THISREL + 1 ))/g" \
-	-e "s,%%PRES_EXTRA%%,$PRES_EXTRA,g" \
-	-e "s/%%OPENAFS_VERSION%%/@PACKAGE_VERSION@/g" \
-	< Distribution.xml.in > Distribution.xml
+    if [ $majorvers -ge 20 ] ; then
+	sed -e "s/%%OSX_MAJOR_CUR%%/$OSXMAJOR/g" \
+	    -e "s/%%OSX_MAJOR_NEXT%%/$(( $OSXMAJOR + 1 ))/g" \
+	    -e "s/%%OSVER%%/11/g" \
+	    -e "s,%%PRES_EXTRA%%,$PRES_EXTRA,g" \
+	    -e "s/%%OPENAFS_VERSION%%/@PACKAGE_VERSION@/g" \
+	    < Distribution.xml.in > Distribution.xml
+    else
+	sed -e "s/%%OSX_MAJOR_CUR%%/$THISREL/g" \
+	    -e "s/%%OSX_MAJOR_NEXT%%/$(( $THISREL + 1 ))/g" \
+	    -e "s/%%OSVER%%/10/g" \
+	    -e "s,%%PRES_EXTRA%%,$PRES_EXTRA,g" \
+	    -e "s/%%OPENAFS_VERSION%%/@PACKAGE_VERSION@/g" \
+	    < Distribution.xml.in > Distribution.xml
+    fi
 
     rm -rf "$CURDIR/prod"
     mkdir "$CURDIR/prod"
