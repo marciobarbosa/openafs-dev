@@ -89,6 +89,11 @@ afs_int32 afs_rx_idledead_rep = AFS_IDLEDEADTIME_REP;
 
 static int afscall_set_rxpck_received = 0;
 
+#ifdef AFS_SOCKPROXY
+/* protected by AFS_GLOCK */
+static int afs_sockproxy_procs = SOCKPROXY_NPROCS;
+#endif
+
 extern afs_int32 afs_volume_ttl;
 
 /* From afs_util.c */
@@ -1328,6 +1333,60 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	    afs_volume_ttl = parm2;
 	    code = 0;
 	}
+    } else if (parm == AFSOP_SOCKPROXY_HANDLER) {
+#ifdef AFS_SOCKPROXY
+	struct afs_uspc_param uspc;
+	struct afs_sockproxy_packet *pkts, *pktsp;
+	int npkts, allocsize;
+
+	memset(&uspc, 0, sizeof(uspc));
+	pkts = pktsp = NULL;
+	allocsize = 0;
+
+	/* get response from userspace */
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&uspc, sizeof(uspc), code);
+	AFS_COPYIN(AFSKPTR(parm3), (caddr_t)&npkts, sizeof(npkts), code);
+
+	if ((uspc.reqtype & AFS_USPC_SOCKPROXY_RECV) && (npkts > 0)) {
+	    allocsize = npkts * sizeof(*pkts);
+	    pkts = afs_osi_Alloc(allocsize);
+	    AFS_COPYIN(AFSKPTR(parm4), (caddr_t)pkts, allocsize, code);
+	    pktsp = pkts;
+	}
+
+	/*
+	 * send response from userspace (if any) to the rx layer and wait for a
+	 * new request.
+	 */
+	AFS_GUNLOCK();
+	code = rx_SockProxyReply(&uspc, &npkts, &pktsp);
+	AFS_GLOCK();
+
+	/* shutting down */
+	if ((uspc.reqtype & AFS_USPC_SOCKPROXY_STOP)) {
+	    afs_sockproxy_procs--;
+
+	    if (afs_sockproxy_procs == 0) {
+		afs_termState = AFSOP_STOP_NETIF;
+		afs_osi_Wakeup(&afs_termState);
+	    }
+	}
+
+	/* send request to userspace process */
+	if (code != -1) {
+	    AFS_COPYOUT((caddr_t)&uspc, AFSKPTR(parm2), sizeof(uspc), code);
+	    AFS_COPYOUT((caddr_t)&npkts, AFSKPTR(parm3), sizeof(npkts), code);
+
+	    if ((uspc.reqtype & AFS_USPC_SOCKPROXY_SEND)) {
+		AFS_COPYOUT((caddr_t)pktsp, AFSKPTR(parm4), npkts * sizeof(*pkts), code);
+	    }
+	}
+	/* destructors */
+	if (pkts) {
+	    afs_osi_Free(pkts, allocsize);
+	    pkts = NULL;
+	}
+#endif
     } else {
 	code = EINVAL;
     }
