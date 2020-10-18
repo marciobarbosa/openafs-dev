@@ -10,6 +10,9 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#ifdef AFS_SOCKPROXY_ENV
+# include <afs/afs_args.h>
+#endif
 
 #include "rx/rx_kcommon.h"
 #include "rx/rx_atomic.h"
@@ -22,6 +25,476 @@
 #endif
 
 #ifdef RXK_UPCALL_ENV
+
+# ifdef AFS_SOCKPROXY_ENV
+
+/* osi_socket returned by rxk_NewSocketHost on success */
+static socket_t rx_SockProxySocket;
+
+/**
+ * Receive packets.
+ *
+ * @param[in]  npkts  number of pkts
+ * @param[in]  pkts   packets to be received
+ *
+ * @return none.
+ */
+void
+rx_SockProxyUpCall(int npkts, struct afs_pkt_hdr *pkts)
+{
+    struct rx_packet *p;
+    struct afs_pkt_hdr *pkt;
+    struct sockaddr_in *saddr;
+    int host, port;
+
+    char *payloadp;
+    int tlen, psize, csize;
+    int pkt_i, iov_i;
+
+    /*
+     * receiver process calls this function immediately after being forked. the
+     * first call does not have any packet.
+     */
+    if (npkts == 0) {
+	return;
+    }
+    pkt = &pkts[0];
+    p = NULL;
+
+    for (pkt_i = 0; pkt_i < npkts; pkt_i++) {
+	pkt = &pkts[pkt_i];
+	/* see if a check for additional packets was issued */
+	rx_CheckPackets();
+
+	if (p == NULL) {
+	    /* alloc and init packet */
+	    p = rxi_AllocPacket(RX_PACKET_CLASS_RECEIVE);
+	    rx_computelen(p, tlen);
+	    rx_SetDataSize(p, tlen);
+
+	    tlen += RX_HEADER_SIZE;
+	    tlen = rx_maxJumboRecvSize - tlen;
+	    /*
+	     * check if our packet is as big as the maximum size of a jumbo
+	     * datagram we can receive. if not, try to increase the size of the
+	     * packet in question.
+	     */
+	    if (tlen > 0) {
+		(void)rxi_AllocDataBuf(p, tlen, RX_PACKET_CLASS_RECV_CBUF);
+	    }
+	} else {
+	    rxi_RestoreDataBufs(p);
+	}
+
+	payloadp = (char *)pkt->payload;
+	psize = pkt->size;
+	for (iov_i = 0; (iov_i < p->niovecs) && (psize > 0); iov_i++) {
+	    int iovlen = p->wirevec[iov_i].iov_len;
+
+	    csize = (psize < iovlen) ? psize : iovlen;
+	    memcpy(p->wirevec[iov_i].iov_base, payloadp, csize);
+	    payloadp += csize;
+	    psize -= csize;
+	}
+
+	p->length = (pkt->size - RX_HEADER_SIZE) - (psize /* left over */);
+	/* extract packet header. */
+	rxi_DecodePacketHeader(p);
+
+	saddr = (struct sockaddr_in *)&pkt->addr;
+	host = saddr->sin_addr.s_addr;
+	port = saddr->sin_port;
+	/* receive packet */
+	p = rxi_ReceivePacket(p, rx_SockProxySocket, host, port, 0, 0);
+    }
+    if (p) {
+	rxi_FreePacket(p);
+    }
+}
+
+/**
+ * Send packets to the given address.
+ *
+ * @param[in]  so       not used
+ * @param[in]  addr     destination address
+ * @param[in]  dvec     vector holding data to be sent
+ * @param[in]  nvecs    number of dvec entries
+ * @param[in]  alength  packet size
+ * @param[in]  istack   not used
+ *
+ * @return 0 on success.
+ */
+int
+osi_NetSend(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
+	    int nvecs, afs_int32 alength, int istack)
+{
+    int iov_i, code;
+    int haveGlock;
+
+    struct afs_pkt_hdr pkt;
+    int npkts = 1; /* for now, send one packet at a time */
+    char *payloadp;
+
+    AFS_STATCNT(osi_NetSend);
+
+    memset(&pkt, 0, sizeof(pkt));
+    haveGlock = ISAFS_GLOCK();
+
+    if (nvecs > RX_MAXIOVECS) {
+	osi_Panic("osi_NetSend: %d: Too many iovecs.\n", nvecs);
+    }
+    if (alength > AFS_SOCKPROXY_PAYLOAD_MAX) {
+	osi_Panic("osi_NetSend: %d: Payload is too big.\n", alength);
+    }
+    if ((afs_termState == AFSOP_STOP_RXK_LISTENER) ||
+	(afs_termState == AFSOP_STOP_COMPLETE)) {
+	return -1;
+    }
+    addr->sin_len = sizeof(struct sockaddr_in);
+
+    memset(&pkt.addr, 0, sizeof(pkt.addr));
+    memcpy(&pkt.addr, addr, sizeof(*addr));
+    pkt.size = alength;
+    pkt.payload = rxi_Alloc(alength);
+    payloadp = pkt.payload;
+    for (iov_i = 0; iov_i < nvecs; iov_i++) {
+	memcpy(payloadp, dvec[iov_i].iov_base, dvec[iov_i].iov_len);
+	payloadp += dvec[iov_i].iov_len;
+    }
+
+    if (haveGlock) {
+	AFS_GUNLOCK();
+    }
+
+    /* returns the number of bytes sent */
+    code = rx_SockProxyRequest(AFS_USPC_SOCKPROXY_SEND, NULL, &pkt, npkts);
+    if (code >= 0) {
+	/* success */
+	code = 0;
+    }
+
+    rxi_Free(pkt.payload, alength);
+    if (haveGlock) {
+	AFS_GLOCK();
+    }
+    return code;
+}
+
+/**
+ * Return process that provides the given operation.
+ *
+ * @param[in]  op  operation
+ *
+ * @return process on success; NULL otherwise.
+ *
+ * @pre rx_sockproxy_ch.lock held
+ */
+static struct rx_sockproxy_proc *
+rxi_SockProxyGetProc(int op)
+{
+    struct rx_sockproxy_proc *proc = NULL;
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+
+    switch (op) {
+	case AFS_USPC_SOCKPROXY_START:
+	case AFS_USPC_SOCKPROXY_SEND:
+	case AFS_USPC_SOCKPROXY_CLOSE:
+	case AFS_USPC_SOCKPROXY_STOP:
+	    while (!ch->shutdown && opr_queue_IsEmpty(&ch->procq)) {
+		/* no process available */
+		CV_WAIT(&ch->cv_procq, &ch->lock);
+	    }
+	    proc = opr_queue_First(&ch->procq, struct rx_sockproxy_proc, entry);
+	    opr_queue_Remove(&proc->entry);
+	    break;
+    }
+    return proc;
+}
+
+/**
+ * Check if index is valid for a given op.
+ *
+ * @param[in]  op   operation
+ * @param[in]  idx  index
+ *
+ * @return 1 if valid; 0 otherwise.
+ */
+static int
+rxi_IsIndexValid(int op, int idx)
+{
+    int code = 0;
+
+    switch (op) {
+	case AFS_USPC_SOCKPROXY_RECV:
+	    if (idx == 0)
+		code = 1;
+	    break;
+	case AFS_USPC_SOCKPROXY_START:
+	case AFS_USPC_SOCKPROXY_SEND:
+	case AFS_USPC_SOCKPROXY_CLOSE:
+	case AFS_USPC_SOCKPROXY_STOP:
+	    if (idx > 0 && idx < AFS_SOCKPROXY_NPROCS)
+		code = 1;
+	    break;
+    }
+    return code;
+}
+
+/**
+ * Delegate given operation to user space process.
+ *
+ * @param[in]  op    operation
+ * @param[in]  addr  address assigned to socket
+ * @param[in]  pkts  packets to be sent by process
+ * @param[in]  npkts number of pkts
+ *
+ * @return value returned by the requested operation.
+ */
+int
+rx_SockProxyRequest(int op, struct sockaddr *addr,
+		    struct afs_pkt_hdr *pkts, int npkts)
+{
+    int ret;
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+    struct rx_sockproxy_proc *proc;
+
+    MUTEX_ENTER(&ch->lock);
+
+    proc = rxi_SockProxyGetProc(op);
+    if (proc == NULL) {
+	printf("rx_SockProxyRequest: proc not found.\n");
+	MUTEX_EXIT(&ch->lock);
+	return -1;
+    }
+    if (ch->shutdown) {
+	ret = -1;
+	goto done;
+    }
+
+    proc->op = op;
+    proc->pending = 1;
+    proc->complete = 0;
+
+    if (op == AFS_USPC_SOCKPROXY_START) {
+	proc->addr = addr;
+    }
+    if (op == AFS_USPC_SOCKPROXY_SEND) {
+	proc->pkts = pkts;
+	proc->npkts = npkts;
+    }
+
+    CV_BROADCAST(&proc->cv_op);
+    /* if shutting down, there is no need to wait for the response from the
+     * userspace process since it will exit and never return. */
+    if (proc->op == AFS_USPC_SOCKPROXY_STOP) {
+	int proc_i;
+
+	for (proc_i = 1; proc_i < AFS_SOCKPROXY_NPROCS; proc_i++) {
+	    struct rx_sockproxy_proc *p = &ch->proc[proc_i];
+
+	    p->op = AFS_USPC_SOCKPROXY_STOP;
+	    p->ret = -1;
+	    CV_BROADCAST(&p->cv_op);
+	}
+	ret = 0;
+	ch->shutdown = 1;
+
+	goto done;
+    }
+    /* wait for response from userspace process */
+    while (!proc->complete && !ch->shutdown) {
+	CV_WAIT(&proc->cv_op, &rx_sockproxy_ch.lock);
+    }
+    ret = proc->ret;
+
+  done:
+    /* add proc to the queue of procs available for use */
+    opr_queue_Append(&ch->procq, &proc->entry);
+    CV_BROADCAST(&ch->cv_procq);
+    MUTEX_EXIT(&ch->lock);
+
+    return ret;
+}
+
+/**
+ * Receive response from user space process.
+ *
+ * @param[in]     uspc   control information exchanged between rx and process
+ * @param[inout]  pkts   packets to be sent or received
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+rx_SockProxyReply(struct afs_uspc_param *uspc, struct afs_pkt_hdr **pkts)
+{
+    struct rx_sockproxy_channel *ch = &rx_sockproxy_ch;
+    struct rx_sockproxy_proc *proc;
+    int procidx = uspc->req.usp.idx;
+
+    if (procidx < 0 || procidx > AFS_SOCKPROXY_NPROCS) {
+	printf("rx_SockProxyReply: proc not found (idx = %d).\n", procidx);
+	return -1;
+    }
+    MUTEX_ENTER(&ch->lock);
+    proc = &rx_sockproxy_ch.proc[procidx];
+
+    if (ch->shutdown) {
+	uspc->reqtype = AFS_USPC_SOCKPROXY_STOP;
+	MUTEX_EXIT(&ch->lock);
+	return 0;
+    }
+    if (uspc->reqtype == AFS_USPC_SOCKPROXY_RECV) {
+	MUTEX_EXIT(&ch->lock);
+	rx_SockProxyUpCall(uspc->req.usp.npkts, *pkts);
+	return 0;
+    }
+    /* response received from userspace process */
+    if (proc->pending) {
+	proc->op = -1;
+	proc->pending = 0;
+	proc->complete = 1;
+	proc->ret = uspc->retval;
+
+	CV_BROADCAST(&proc->cv_op);
+    }
+
+    if (!proc->ready) {
+	/* ready to receive requests */
+	proc->ready = 1;
+	/* add proc to the queue of procs available for use */
+	opr_queue_Append(&ch->procq, &proc->entry);
+	CV_BROADCAST(&ch->cv_procq);
+    }
+    if (!proc->pending && !ch->shutdown) {
+	/* wait for requests */
+	CV_WAIT(&proc->cv_op, &ch->lock);
+    }
+    if (!rxi_IsIndexValid(proc->op, procidx)) {
+	printf("rx_SockProxyReply: bad idx %d for op %d\n", procidx, proc->op);
+	MUTEX_EXIT(&ch->lock);
+	return -1;
+    }
+    /* request received */
+    uspc->reqtype = proc->op;
+
+    if (uspc->reqtype == AFS_USPC_SOCKPROXY_START) {
+	struct sockaddr_in *ip4 = (struct sockaddr_in *)proc->addr;
+	uspc->req.usp.addr = ip4->sin_addr.s_addr;
+	uspc->req.usp.port = ip4->sin_port;
+    }
+    if (uspc->reqtype == AFS_USPC_SOCKPROXY_SEND) {
+	*pkts = proc->pkts;
+	uspc->req.usp.npkts = proc->npkts;
+    }
+
+    MUTEX_EXIT(&ch->lock);
+    return 0;
+}
+
+/**
+ * Cancel socket proxy.
+ *
+ * @return none.
+ */
+void
+osi_StopNetIfPoller(void)
+{
+    AFS_GUNLOCK();
+    rx_SockProxyRequest(AFS_USPC_SOCKPROXY_STOP, NULL, NULL, 0);
+    AFS_GLOCK();
+
+    while (afs_termState == AFSOP_STOP_SOCKPROXY) {
+	afs_osi_Sleep(&afs_termState);
+    }
+    if (rx_SockProxySocket != NULL) {
+	rxi_Free(rx_SockProxySocket, sizeof(socket_t));
+    }
+
+    if (afs_termState == AFSOP_STOP_NETIF) {
+	afs_termState = AFSOP_STOP_COMPLETE;
+	osi_rxWakeup(&afs_termState);
+    }
+}
+
+/**
+ * Open and bind RX socket.
+ *
+ * @param[in]  ahost  ip address
+ * @param[in]  aport  port number
+ *
+ * @return non-NULL on success; NULL otherwise.
+ */
+osi_socket *
+rxk_NewSocketHost(afs_uint32 ahost, short aport)
+{
+    int code;
+    osi_socket *ret;
+
+    struct sockaddr *sa;
+    struct sockaddr_in addr;
+
+    ret = NULL;
+    sa = (struct sockaddr *)&addr;
+    memset(&addr, 0, sizeof(addr));
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = aport;
+    addr.sin_addr.s_addr = ahost;
+
+    AFS_STATCNT(osi_NewSocket);
+    AFS_ASSERT_GLOCK();
+    AFS_GUNLOCK();
+
+    code = rx_SockProxyRequest(AFS_USPC_SOCKPROXY_START, sa, NULL, 0);
+    if (code != 0) {
+	osi_Panic("rxk_NewSocketHost: Could not initialize rx socket.\n");
+    }
+    /*
+     * success. notice that the rxk_NewSocketHost interface forces us to return
+     * an osi_socket address on success. however, if AFS_SOCKPROXY_ENV is
+     * defined, the socket returned by this function is not used. since the
+     * caller is expecting an osi_socket, return one to represent success.
+     */
+    rx_SockProxySocket = rxi_Alloc(sizeof(socket_t));
+    ret = (osi_socket *)rx_SockProxySocket;
+    AFS_GLOCK();
+
+    return ret;
+}
+
+/**
+ * Open and bind RX socket to all local interfaces.
+ *
+ * @param[in]  aport  port number
+ *
+ * @return non-NULL on success; NULL otherwise.
+ */
+osi_socket *
+rxk_NewSocket(short aport)
+{
+    return rxk_NewSocketHost(0, aport);
+}
+
+/**
+ * Close socket opened by rxk_NewSocket.
+ *
+ * @param[in]  asocket  not used
+ *
+ * @return 0 on success.
+ */
+int
+rxk_FreeSocket(struct socket *asocket)
+{
+    int code;
+
+    AFS_STATCNT(osi_FreeSocket);
+    code = rx_SockProxyRequest(AFS_USPC_SOCKPROXY_CLOSE, NULL, NULL, 0);
+
+    return code;
+}
+
+# else
+
 void
 rx_upcall(socket_t so, void *arg, __unused int waitflag)
 {
@@ -158,6 +631,9 @@ osi_StopNetIfPoller(void)
 	osi_rxWakeup(&afs_termState);
     }
 }
+
+# endif	/* AFS_SOCKPROXY_ENV */
+
 #elif defined(RXK_LISTENER_ENV)
 int
 osi_NetReceive(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
@@ -274,9 +750,6 @@ osi_StopListener(void)
 	psignal(p, SIGUSR1);
 #endif
 }
-#else
-#error need upcall or listener
-#endif
 
 int
 osi_NetSend(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
@@ -341,3 +814,7 @@ osi_NetSend(osi_socket so, struct sockaddr_in *addr, struct iovec *dvec,
 	AFS_GLOCK();
     return code;
 }
+
+#else
+#error need upcall or listener
+#endif

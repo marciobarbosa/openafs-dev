@@ -87,6 +87,11 @@ afs_int32 afs_rx_idledead_rep = AFS_IDLEDEADTIME_REP;
 
 static int afscall_set_rxpck_received = 0;
 
+#ifdef AFS_SOCKPROXY_ENV
+/* protected by AFS_GLOCK */
+static int afs_sockproxy_procs;
+#endif
+
 extern afs_int32 afs_volume_ttl;
 
 /* From afs_util.c */
@@ -1343,7 +1348,138 @@ afs_syscall_call(long parm, long parm2, long parm3,
 	    afs_volume_ttl = parm2;
 	    code = 0;
 	}
-    } else {
+    }
+#ifdef AFS_SOCKPROXY_ENV
+    else if (parm == AFSOP_SOCKPROXY_HANDLER) {
+	struct afs_uspc_param uspc;
+	int npkts, pkt_i;
+
+	struct afs_pkt_hdr *pkts, *pktsp;
+	afs_uint32 allocsize;
+
+	char *payload, *payloadp;
+	afs_uint32 plsize;
+
+	memset(&uspc, 0, sizeof(uspc));
+	pkts = pktsp = NULL;
+	payload = payloadp = NULL;
+	allocsize = plsize = npkts = 0;
+
+	/* get response from userspace */
+	AFS_COPYIN(AFSKPTR(parm2), (caddr_t)&uspc, sizeof(uspc), code);
+	if (code) {
+	    afs_warn("afs: AFSOP_SOCKPROXY_HANDLER can't read parm2\n");
+	    goto sockproxy_out;
+	}
+
+	/* process successfully initialized */
+	if (uspc.req.usp.init == 0) {
+	    afs_sockproxy_procs++;
+	    uspc.req.usp.init = 1;
+	}
+
+	npkts = uspc.req.usp.npkts;
+	if ((uspc.reqtype == AFS_USPC_SOCKPROXY_RECV) && (npkts > 0)) {
+	    allocsize = npkts * sizeof(*pkts);
+	    pkts = afs_osi_Alloc(allocsize);
+	    osi_Assert(pkts != NULL);
+
+	    AFS_COPYIN(AFSKPTR(parm3), (caddr_t)pkts, allocsize, code);
+	    if (code) {
+		afs_warn("afs: AFSOP_SOCKPROXY_HANDLER can't read parm3\n");
+		goto sockproxy_out;
+	    }
+	    plsize = uspc.req.usp.recvsize;
+	    payload = afs_osi_Alloc(plsize);
+	    osi_Assert(payload != NULL);
+	    payloadp = payload;
+
+	    for (pkt_i = 0; pkt_i < npkts; pkt_i++) {
+		struct afs_pkt_hdr *pkt = &pkts[pkt_i];
+		AFS_COPYIN(pkt->payload, (caddr_t)payloadp, pkt->size, code);
+		if (code) {
+		    afs_warn("afs: AFSOP_SOCKPROXY_HANDLER can't read pkts\n");
+		    goto sockproxy_out;
+		}
+		pkt->payload = payloadp;
+		payloadp += pkt->size;
+	    }
+	    pktsp = pkts;
+	}
+
+	/*
+	 * send response from userspace (if any) to the rx layer and wait for a
+	 * new request.
+	 */
+	AFS_GUNLOCK();
+	code = rx_SockProxyReply(&uspc, &pktsp);
+	AFS_GLOCK();
+	if (code) {
+	    afs_warn("afs: AFSOP_SOCKPROXY_HANDLER rx_SockProxyReply failed\n");
+	    goto sockproxy_out;
+	}
+
+	/* shutting down */
+	if (uspc.reqtype == AFS_USPC_SOCKPROXY_STOP) {
+	    afs_sockproxy_procs--;
+
+	    if (afs_sockproxy_procs == 0) {
+		afs_termState = AFSOP_STOP_NETIF;
+		afs_osi_Wakeup(&afs_termState);
+	    }
+	}
+
+	/* send request to userspace process */
+	AFS_COPYOUT((caddr_t)&uspc, AFSKPTR(parm2), sizeof(uspc), code);
+	if (code) {
+	    afs_warn("afs: AFSOP_SOCKPROXY_HANDLER can't write parm2\n");
+	    goto sockproxy_out;
+	}
+
+	npkts = uspc.req.usp.npkts;
+	if ((uspc.reqtype == AFS_USPC_SOCKPROXY_SEND) && (npkts > 0)) {
+	    allocsize = npkts * sizeof(*pkts);
+	    pkts = afs_osi_Alloc(allocsize);
+	    osi_Assert(pkts != NULL);
+
+	    AFS_COPYIN(AFSKPTR(parm3), (caddr_t)pkts, allocsize, code);
+	    if (code) {
+		afs_warn("afs: AFSOP_SOCKPROXY_HANDLER can't read parm3\n");
+		goto sockproxy_out;
+	    }
+
+	    for (pkt_i = 0; pkt_i < npkts; pkt_i++) {
+		struct afs_pkt_hdr *kpkt = &pktsp[pkt_i];
+		struct afs_pkt_hdr *upkt = &pkts[pkt_i];
+
+		upkt->addr = kpkt->addr;
+		upkt->size = kpkt->size;
+
+		AFS_COPYOUT((caddr_t)kpkt->payload,
+			    upkt->payload,
+			    kpkt->size,
+			    code);
+
+		if (code) {
+		    afs_warn("afs: AFSOP_SOCKPROXY_HANDLER can't write pkts\n");
+		    goto sockproxy_out;
+		}
+	    }
+	    AFS_COPYOUT((caddr_t)pkts, AFSKPTR(parm3), allocsize, code);
+	}
+  sockproxy_out:
+	/* destructors */
+	if (payload) {
+	    afs_osi_Free(payload, plsize);
+	    payload = NULL;
+	}
+	if (pkts) {
+	    afs_osi_Free(pkts, allocsize);
+	    pkts = NULL;
+	}
+    }
+#endif	/* AFS_SOCKPROXY_ENV */
+    else {
 	code = EINVAL;
     }
 

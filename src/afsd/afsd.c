@@ -183,6 +183,10 @@ static int event_pid;
 #undef	VIRTUE
 #undef	VICE
 
+#ifdef AFS_SOCKPROXY_ENV
+# include <sys/types.h>
+# include <sys/socket.h>
+#endif
 
 #define CACHEINFOFILE   "cacheinfo"
 #define	DCACHEFILE	"CacheItems"
@@ -1653,6 +1657,259 @@ BkgHandler(void)
 }
 #endif
 
+#ifdef AFS_SOCKPROXY_ENV
+static int
+SockProxyStart(afs_int32 addr, afs_int32 port, afs_int32 *sock)
+{
+    int code;
+    int attempt_i;
+    int blen, bsize;
+    struct sockaddr_in ip4;
+
+    /* create an endpoint for communication */
+    *sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (*sock < 0) {
+	code = *sock;
+	goto done;
+    }
+
+    /* set options on socket */
+    blen = 50000;
+    bsize = sizeof(blen);
+    for (attempt_i = 0; attempt_i < 2; attempt_i++) {
+	code  = setsockopt(*sock, SOL_SOCKET, SO_SNDBUF, &blen, bsize);
+	code |= setsockopt(*sock, SOL_SOCKET, SO_RCVBUF, &blen, bsize);
+	if (code == 0) {
+	    break;
+	}
+	/* setsockopt didn't succeed. try a smaller size. */
+	blen = 32766;
+    }
+    if (code != 0) {
+	close(*sock);
+	*sock = -1;
+	goto done;
+    }
+    /* assign addr to the socket */
+    ip4.sin_family = AF_INET;
+    ip4.sin_port = port;
+    ip4.sin_addr.s_addr = addr;
+
+    code = bind(*sock, (struct sockaddr *)&ip4, sizeof(ip4));
+    if (code != 0) {
+	close(*sock);
+	*sock = -1;
+    }
+  done:
+    return code;
+}
+
+static int
+SockProxySend(int sock, struct afs_pkt_hdr *pkts, int npkts)
+{
+    int code;
+    int pkt_i, tbytes;
+    struct iovec iov;
+    struct sockaddr *addr;
+    struct afs_pkt_hdr *pkt;
+    struct msghdr msg;
+
+    tbytes = 0;
+    for (pkt_i = 0; pkt_i < npkts; pkt_i++) {
+	pkt = &pkts[pkt_i];
+	addr = (struct sockaddr *)&pkt->addr;
+
+	memset(&iov, 0, sizeof(iov));
+	memset(&msg, 0, sizeof(msg));
+
+	iov.iov_base = pkt->payload;
+	iov.iov_len = pkt->size;
+
+	msg.msg_name = addr;
+	msg.msg_namelen = addr->sa_len;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
+	code = sendmsg(sock, &msg, 0);
+	if (code < 0) {
+	    break;
+	}
+	tbytes += code;
+    }
+    return (code < 0) ? code : tbytes;
+}
+
+static int
+SockProxyRecv(int sock, struct afs_pkt_hdr *pkts, int *recvsize)
+{
+    int code;
+    int pkt_i, flags;
+    struct iovec iov;
+    struct msghdr msg;
+    struct afs_pkt_hdr *pkt;
+
+    *recvsize = 0;
+    flags = 0;
+
+    for (pkt_i = 0; pkt_i < AFS_SOCKPROXY_PKT_MAX; pkt_i++) {
+	pkt = &pkts[pkt_i];
+	pkt->size = AFS_SOCKPROXY_PAYLOAD_MAX;
+	memset(pkt->payload, 0, pkt->size);
+
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = pkt->payload;
+	iov.iov_len = pkt->size;
+
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_name = &pkt->addr;
+	msg.msg_namelen = sizeof(pkt->addr);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
+	code = recvmsg(sock, &msg, flags);
+	if (code < 0) {
+	    break;
+	}
+	pkt->size = code;
+	*recvsize += pkt->size;
+	flags = MSG_DONTWAIT;
+    }
+    return pkt_i;
+}
+
+void
+SockProxyShutdownRecv(int asig)
+{
+    /*
+     * This function is a no-op. It is used as a handler for SIGUSR1 so we can
+     * unblock the recv process (if this process is blocked in recvmsg() waiting
+     * for packets) during shutdown.
+     */
+    return;
+}
+
+static void
+SockProxyHandler(int idx, int role, int sock)
+{
+    int code;
+    int shutdown, recvpid;
+
+    struct afs_uspc_param uspc;
+    int pkt_i, proc_i;
+
+    struct afs_pkt_hdr *pkts;
+    char *buff;
+
+    shutdown = 0;
+    recvpid = -1;
+
+    memset(&uspc, 0, sizeof(uspc));
+    uspc.reqtype = role;
+    uspc.req.usp.idx = idx;
+
+    pkts = calloc(AFS_SOCKPROXY_PKT_MAX, sizeof(*pkts));
+    buff = calloc(AFS_SOCKPROXY_PKT_MAX, AFS_SOCKPROXY_PAYLOAD_MAX);
+    if (pkts == NULL || buff == NULL) {
+	exit(1);
+    }
+
+    for (pkt_i = 0; pkt_i < AFS_SOCKPROXY_PKT_MAX; pkt_i++) {
+	struct afs_pkt_hdr *pkt = &pkts[pkt_i];
+	pkt->payload = buff + (pkt_i * AFS_SOCKPROXY_PAYLOAD_MAX);
+	pkt->size = AFS_SOCKPROXY_PAYLOAD_MAX;
+    }
+
+    if (role == AFS_USPC_SOCKPROXY_RECV) {
+	/* use SIGUSR1 to unblock recvmsg() during shutdown */
+	struct sigaction recvsig;
+
+	sigemptyset(&recvsig.sa_mask);
+	recvsig.sa_handler = SockProxyShutdownRecv;
+	/* make sure that SA_RESTART is not set */
+	recvsig.sa_flags = 0;
+	sigaction(SIGUSR1, &recvsig, NULL);
+    }
+
+    while (!shutdown) {
+	code = afsd_syscall(AFSOP_SOCKPROXY_HANDLER, &uspc, pkts);
+	/* on failure, try again */
+	if (code) {
+	    uspc.retval = -1;
+	    sleep(1);
+	    continue;
+	}
+
+	switch (uspc.reqtype) {
+	    case AFS_USPC_SOCKPROXY_START:
+		uspc.retval =
+		    SockProxyStart(uspc.req.usp.addr, uspc.req.usp.port, &sock);
+		if (uspc.retval != 0 || role != AFS_USPC_SOCKPROXY_SEND) {
+		    continue;
+		}
+		/*
+		 * at this point, we can start receiving packets. notice
+		 * that this child inherits our socket.
+		 */
+		recvpid = fork();
+		if (recvpid == 0) {
+		    free(pkts);
+		    free(buff);
+		    SockProxyHandler(0, AFS_USPC_SOCKPROXY_RECV, sock);
+		    exit(1);
+		}
+		/* fork extra senders */
+		for (proc_i = 2; proc_i < AFS_SOCKPROXY_NPROCS; proc_i++) {
+		    if (fork() == 0) {
+			/* child */
+			free(pkts);
+			free(buff);
+			SockProxyHandler(proc_i, AFS_USPC_SOCKPROXY_SEND, sock);
+			exit(1);
+		    }
+		}
+		break;
+	    case AFS_USPC_SOCKPROXY_SEND:
+		uspc.retval = SockProxySend(sock, pkts, uspc.req.usp.npkts);
+		break;
+	    case AFS_USPC_SOCKPROXY_RECV:
+		uspc.req.usp.npkts =
+		    SockProxyRecv(sock, pkts, &uspc.req.usp.recvsize);
+		break;
+	    case AFS_USPC_SOCKPROXY_CLOSE:
+		uspc.retval = close(sock);
+		break;
+	    case AFS_USPC_SOCKPROXY_STOP:
+		if (recvpid > 0) {
+		    kill(recvpid, SIGUSR1);
+		}
+		uspc.retval = close(sock);
+		shutdown = 1;
+		break;
+	    default:
+		/* operation not found */
+		uspc.retval = -1;
+		sleep(1);
+	}
+    }
+    exit(0);
+}
+
+static void *
+sockproxy_thread(void *rock)
+{
+    /*
+     * Since the socket proxy handler runs as a user process,
+     * need to drop the controlling TTY, etc.
+     */
+    if (afsd_daemon(0, 0) == -1) {
+	printf("Error starting socket proxy handler: %s\n", strerror(errno));
+	exit(1);
+    }
+    SockProxyHandler(1, AFS_USPC_SOCKPROXY_SEND, -1);
+    return NULL;
+}
+#endif
+
 static void *
 afsdb_thread(void *rock)
 {
@@ -2216,6 +2473,13 @@ afsd_run(void)
     fork_rx_syscall(rn, AFSOP_RXEVENT_DAEMON);
 #endif
 
+#ifdef AFS_SOCKPROXY_ENV
+    if (afsd_verbose) {
+	printf("%s: Forking socket proxy handlers.\n", rn);
+    }
+    afsd_fork(0, sockproxy_thread, NULL);
+#endif
+
     if (enable_afsdb) {
 	if (afsd_verbose)
 	    printf("%s: Forking AFSDB lookup handler.\n", rn);
@@ -2743,6 +3007,9 @@ afsd_syscall_populate(struct afsd_syscall_args *args, int syscall, va_list ap)
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	break;
     case AFSOP_ADDCELLALIAS:
+#ifdef AFS_SOCKPROXY_ENV
+    case AFSOP_SOCKPROXY_HANDLER:
+#endif
 	params[0] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	params[1] = CAST_SYSCALL_PARAM((va_arg(ap, void *)));
 	break;

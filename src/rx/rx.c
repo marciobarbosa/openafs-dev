@@ -490,6 +490,9 @@ rx_InitHost(u_int host, u_int port)
     struct timeval tv;
 #endif /* KERNEL */
     char *htable, *ptable;
+#ifdef AFS_SOCKPROXY_ENV
+    int proc_i;
+#endif
 
     SPLVAR;
 
@@ -513,6 +516,24 @@ rx_InitHost(u_int host, u_int port)
      * environment.
      */
     rxi_InitializeThreadSupport();
+#endif
+
+#ifdef AFS_SOCKPROXY_ENV
+    /*
+     * Initialize communication channel used by rx_SockProxyRequest and
+     * rx_SockProxyReply.
+     */
+    memset(&rx_sockproxy_ch, 0, sizeof(rx_sockproxy_ch));
+    opr_queue_Init(&rx_sockproxy_ch.procq);
+    CV_INIT(&rx_sockproxy_ch.cv_procq, "rx_sockproxy_cv_procq", CV_DEFAULT, 0);
+    MUTEX_INIT(&rx_sockproxy_ch.lock, "rx_sockproxy_mutex", MUTEX_DEFAULT, 0);
+
+    for (proc_i = 0; proc_i < AFS_SOCKPROXY_NPROCS; proc_i++) {
+	struct rx_sockproxy_proc *proc = &rx_sockproxy_ch.proc[proc_i];
+
+	proc->op = -1;
+	CV_INIT(&proc->cv_op, "rx_sockproxy_cv_op", CV_DEFAULT, 0);
+    }
 #endif
 
     /* Allocate and initialize a socket for client and perhaps server
