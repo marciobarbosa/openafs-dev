@@ -334,6 +334,13 @@ case $AFS_SYSNAME in
 		;;
 
 	*_darwin_190)
+		dnl For x86, default to building for amd64, since darwin
+		dnl doesn't support 32-bit x86 anymore
+		AS_CASE(["$AFS_SYSNAME"],
+			[x86_*],
+			  [AS_IF([test x"$ARCHFLAGS" = x],
+				 [ARCHFLAGS='-arch x86_64'])])
+
 		AFSD_LDFLAGS="-F/System/Library/PrivateFrameworks -framework DiskArbitration -framework SystemConfiguration -framework IOKit -framework CoreFoundation"
 		MT_CFLAGS="-D_REENTRANT"
 		MT_LIBS='${XLIBS}'
