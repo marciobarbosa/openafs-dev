@@ -16,6 +16,14 @@ extern void opr_NTAbort(void);
 # define opr_abort() abort()
 #endif
 
+#ifdef KERNEL
+# define opr_Alloc(size)	afs_osi_Alloc(size)
+# define opr_Free(ptr, size)	afs_osi_Free(ptr, size)
+#else
+# define opr_Alloc(size)	malloc(size)
+# define opr_Free(ptr, size)	free(ptr)
+#endif
+
 extern void opr_AssertionFailed(const char *, int) AFS_NORETURN;
 
 /* opr_Assert is designed to work in a similar way to the operating
