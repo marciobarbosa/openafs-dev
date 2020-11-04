@@ -19,9 +19,11 @@ extern void opr_NTAbort(void);
 #ifdef KERNEL
 # define opr_Alloc(size)	afs_osi_Alloc(size)
 # define opr_Free(ptr, size)	afs_osi_Free(ptr, size)
+# define opr_Rand(num, size)	RAND_bytes(num, size)
 #else
 # define opr_Alloc(size)	malloc(size)
 # define opr_Free(ptr, size)	free(ptr)
+# define opr_Rand(num, size)	do { *num = rand(); } while (0)
 #endif
 
 extern void opr_AssertionFailed(const char *, int) AFS_NORETURN;
@@ -31,8 +33,12 @@ extern void opr_AssertionFailed(const char *, int) AFS_NORETURN;
  * to a no-op if NDEBUG is defined
  */
 
-#define __opr_Assert(ex) \
+#if defined(KERNEL) && !defined(UKERNEL)
+# define __opr_Assert(ex)	osi_Assert(ex)
+#else
+# define __opr_Assert(ex) \
     do {if (!(ex)) opr_AssertionFailed(__FILE__, __LINE__);} while(0)
+#endif
 
 #if defined(HAVE__PRAGMA_TAUTOLOGICAL_POINTER_COMPARE) && defined(__clang__)
 # define opr_Assert(ex) \
