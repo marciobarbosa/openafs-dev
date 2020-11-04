@@ -24,7 +24,14 @@
 #include <afsconfig.h>
 #include <afs/param.h>
 
-#include <roken.h>
+#include <afs/opr.h>
+
+#ifdef KERNEL
+# include <afs/sysincludes.h>
+# include <afsincludes.h>
+#else
+# include <roken.h>
+#endif
 
 #include "dict.h"
 
@@ -43,10 +50,11 @@ opr_dict_Init(unsigned int size)
     if (!isPowerOf2(size))
 	return NULL;
 
-    dict = calloc(1, sizeof(struct opr_dict));
+    dict = opr_Alloc(sizeof(struct opr_dict));
+    memset(dict, 0, sizeof(*dict));
     dict->size = size;
 
-    dict->table = malloc(dict->size * sizeof(struct opr_queue));
+    dict->table = opr_Alloc(dict->size * sizeof(struct opr_queue));
     for (i = 0; i < dict->size; i++) {
 	opr_queue_Init(&dict->table[i]);
     }
@@ -57,7 +65,7 @@ opr_dict_Init(unsigned int size)
 void
 opr_dict_Free(struct opr_dict **dict)
 {
-    free((*dict)->table);
-    free(*dict);
+    opr_Free((*dict)->table, (*dict)->size * sizeof(struct opr_queue));
+    opr_Free(*dict, sizeof(struct opr_dict));
     *dict = NULL;
 }
