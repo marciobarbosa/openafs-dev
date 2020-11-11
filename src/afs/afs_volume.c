@@ -732,7 +732,7 @@ afs_SetupVolume(afs_int32 volid, char *aname, void *ve, struct cell *tcell,
 	if (!tv->name) {
 	    tv->name = afs_osi_Alloc(strlen(aname) + 1);
 	    osi_Assert(tv->name != NULL);
-	    strcpy(tv->name, aname);
+	    strncpy(tv->name, aname, strlen(aname) + 1);
 	}
     }
     for (i = 0; i < NMAXNSERVERS; i++) {
@@ -805,7 +805,7 @@ afs_NewDynrootVolume(struct VenusFid *fid)
 
     bp = afs_cv2string(&tbuf[CVBS], fid->Fid.Volume);
     memset(tve, 0, sizeof(*tve));
-    strcpy(tve->name, "local-dynroot");
+    strncpy(tve->name, "local-dynroot", sizeof(tve->name));
     tve->volumeId[ROVOL] = fid->Fid.Volume;
     tve->flags = VLF_ROEXISTS;
 

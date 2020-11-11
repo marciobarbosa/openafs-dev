@@ -497,7 +497,7 @@ afs_ENameOK(char *aname)
 
 static int
 afs_getsysname(struct vrequest *areq, struct vcache *adp,
-	       char *bufp, int *num, char **sysnamelist[])
+	       char *bufp, size_t buflen, int *num, char **sysnamelist[])
 {
     struct unixuser *au;
     afs_int32 error;
@@ -507,20 +507,20 @@ afs_getsysname(struct vrequest *areq, struct vcache *adp,
     *sysnamelist = afs_sysnamelist;
 
     if (!afs_nfsexporter)
-	strcpy(bufp, (*sysnamelist)[0]);
+	strncpy(bufp, (*sysnamelist)[0], buflen);
     else {
 	au = afs_GetUser(areq->uid, adp->f.fid.Cell, READ_LOCK);
 	if (au->exporter) {
 	    error = EXP_SYSNAME(au->exporter, (char *)0, sysnamelist, num, 0);
 	    if (error) {
-		strcpy(bufp, "@sys");
+		strncpy(bufp, "@sys", buflen);
 		afs_PutUser(au, READ_LOCK);
 		return -1;
 	    } else {
-		strcpy(bufp, (*sysnamelist)[0]);
+		strncpy(bufp, (*sysnamelist)[0], buflen);
 	    }
 	} else
-	    strcpy(bufp, afs_sysname);
+	    strncpy(bufp, afs_sysname, buflen);
 	afs_PutUser(au, READ_LOCK);
     }
     return 0;
@@ -536,14 +536,17 @@ Check_AtSys(struct vcache *avc, const char *aname,
     if (AFS_EQ_ATSYS(aname)) {
 	state->offset = 0;
 	state->name = osi_AllocLargeSpace(MAXSYSNAME);
+	state->namelen = MAXSYSNAME;
 	state->allocked = 1;
 	state->index =
-	    afs_getsysname(areq, avc, state->name, &num, sysnamelist);
+	    afs_getsysname(areq, avc, state->name, state->namelen, &num,
+			   sysnamelist);
     } else {
 	state->offset = -1;
 	state->allocked = 0;
 	state->index = 0;
 	state->name = (char *)aname;
+	state->namelen = strlen(aname) + 1;
     }
 }
 
@@ -570,11 +573,12 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	    tname = osi_AllocLargeSpace(AFS_LRALLOCSIZ);
 	    strncpy(tname, state->name, state->offset);
 	    state->name = tname;
+	    state->namelen = AFS_LRALLOCSIZ;
 	    state->allocked = 1;
 	    num = 0;
 	    state->index =
-		afs_getsysname(areq, avc, state->name + state->offset, &num,
-			       sysnamelist);
+		afs_getsysname(areq, avc, state->name + state->offset,
+			       state->namelen, &num, sysnamelist);
 	    return 1;
 	} else
 	    return 0;		/* .*@sys doesn't match either */
@@ -599,7 +603,9 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	if (++(state->index) >= num || !(*sysnamelist)[(unsigned int)state->index])
 	    return 0;		/* end of list */
     }
-    strcpy(state->name + state->offset, (*sysnamelist)[(unsigned int)state->index]);
+    strncpy(state->name + state->offset,
+	    (*sysnamelist)[(unsigned int)state->index],
+	    state->namelen);
     return 1;
 }
 

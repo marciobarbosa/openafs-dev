@@ -80,6 +80,7 @@ afs_MarinerLog(char *astring, struct vcache *avc)
     struct sockaddr_in taddr;
     char *tp, *tp1, *buf;
     struct iovec dvec;
+    size_t tsize;
 
     AFS_STATCNT(afs_MarinerLog);
     taddr.sin_family = AF_INET;
@@ -89,14 +90,17 @@ afs_MarinerLog(char *astring, struct vcache *avc)
     taddr.sin_len = sizeof(taddr);
 #endif
     tp = buf = osi_AllocSmallSpace(AFS_SMALLOCSIZ);
+    tsize = AFS_SMALLOCSIZ;
 
-    strcpy(tp, astring);
+    strncpy(tp, astring, AFS_SMALLOCSIZ);
     tp += strlen(astring);
+    tsize -= strlen(astring);
     if (avc) {
 	*tp++ = ' ';
 	tp1 = afs_GetMariner(avc);
-	strcpy(tp, tp1);
+	strncpy(tp, tp1, tsize);
 	tp += strlen(tp1);
+	tsize -= strlen(tp1);
     }
     *tp++ = '\n';
     /* note, console doesn't want a terminating null */
