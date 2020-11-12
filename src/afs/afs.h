@@ -119,6 +119,7 @@ extern afs_int32 afs_rx_idledead_rep;
 
 struct sysname_info {
     char *name;
+    size_t namelen;
     short offset;
     signed char index, allocked;
 };

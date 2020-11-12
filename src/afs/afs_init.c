@@ -16,6 +16,7 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
 
 #include "afs/stds.h"
 #include "afs/sysincludes.h"	/* Standard vendor system headers */
@@ -556,7 +557,7 @@ afs_ResourceInit(int preallocs)
 	    osi_Assert(afs_sysnamelist[i] != NULL);
 	}
 	afs_sysname = afs_sysnamelist[0];
-	strcpy(afs_sysname, SYS_NAME);
+	strncpy(afs_sysname, SYS_NAME, MAXSYSNAME);
 	afs_sysnamecount = 1;
 	afs_sysnamegen++;
     }
