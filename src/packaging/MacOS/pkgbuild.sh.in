@@ -163,6 +163,13 @@ elif [ x"$majorvers" = x19 ]; then
     RELNAME="Catalina"
     THISREL=15
 
+elif [ x"$majorvers" = x20 ]; then
+    RELNAME="BigSur"
+    # Big Sur version number is 11.0 (not 10.16). Still, set THISREL to 16 so we
+    # know that this version came after the ones listed above.
+    THISREL=16
+    OSXMAJOR=0
+
 elif [ x"$majorvers" = x ] ; then
     echo "Error running uname" >&2
     exit 1
@@ -505,11 +512,21 @@ if [ x"$PASS2" = x1 ]; then
     fi
 
     # generate Distribution.xml from Distribution.xml.in -- nonstandard substs
-    sed -e "s/%%OSX_MAJOR_CUR%%/$THISREL/g" \
-	-e "s/%%OSX_MAJOR_NEXT%%/$(( $THISREL + 1 ))/g" \
-	-e "s,%%PRES_EXTRA%%,$PRES_EXTRA,g" \
-	-e "s/%%OPENAFS_VERSION%%/@PACKAGE_VERSION@/g" \
-	< Distribution.xml.in > Distribution.xml
+    if [ $majorvers -ge 20 ] ; then
+	sed -e "s/%%OSX_MAJOR_CUR%%/$OSXMAJOR/g" \
+	    -e "s/%%OSX_MAJOR_NEXT%%/$(( $OSXMAJOR + 1 ))/g" \
+	    -e "s/%%OSVER%%/11/g" \
+	    -e "s,%%PRES_EXTRA%%,$PRES_EXTRA,g" \
+	    -e "s/%%OPENAFS_VERSION%%/@PACKAGE_VERSION@/g" \
+	    < Distribution.xml.in > Distribution.xml
+    else
+	sed -e "s/%%OSX_MAJOR_CUR%%/$THISREL/g" \
+	    -e "s/%%OSX_MAJOR_NEXT%%/$(( $THISREL + 1 ))/g" \
+	    -e "s/%%OSVER%%/10/g" \
+	    -e "s,%%PRES_EXTRA%%,$PRES_EXTRA,g" \
+	    -e "s/%%OPENAFS_VERSION%%/@PACKAGE_VERSION@/g" \
+	    < Distribution.xml.in > Distribution.xml
+    fi
 
     rm -rf "$CURDIR/prod"
     mkdir "$CURDIR/prod"
