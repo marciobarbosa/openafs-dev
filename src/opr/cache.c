@@ -512,16 +512,18 @@ opr_cache_drop(struct opr_cache *cache, void *key_buf, size_t key_len)
  * @param[in] key_buf The key of the entry to be updated.
  * @param[in] key_len The size of 'key_buf'.
  * @param[in] update  Function responsible for updating the entry in question.
+ *
+ * @return code returned by "update" on success; errno otherwise.
  */
-void
+int
 opr_cache_update(struct opr_cache *cache, void *key_buf, size_t key_len,
-		 void (*update)(void *))
+		 int (*update)(void *))
 {
     struct cache_entry *entry;
-    int code;
+    int code = -1;
 
     if (cache == NULL || key_buf == NULL || key_len < 1) {
-	return;
+	return -1;
     }
 
     opr_mutex_enter(&cache->lock);
@@ -536,7 +538,8 @@ opr_cache_update(struct opr_cache *cache, void *key_buf, size_t key_len,
     }
 
     /* Update members of val_buf. */
-    (*update)(entry->val_buf);
+    code = (*update)(entry->val_buf);
  done:
     opr_mutex_exit(&cache->lock);
+    return code;
 }

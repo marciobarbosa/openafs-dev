@@ -121,7 +121,7 @@ extern void opr_cache_put(struct opr_cache *cache, void *key_buf,
 			  size_t key_len, void *val_buf, size_t val_len);
 extern void opr_cache_drop(struct opr_cache *cache, void *key_buf,
 			   size_t key_len);
-extern void opr_cache_update(struct opr_cache *cache, void *key_buf,
-			     size_t key_len, void (*upddate)(void *));
+extern int opr_cache_update(struct opr_cache *cache, void *key_buf,
+			    size_t key_len, int (*upddate)(void *));
 
 #endif

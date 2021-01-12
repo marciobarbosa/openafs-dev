@@ -295,6 +295,7 @@ afs_FlushVCache(struct vcache *avc, int *slept)
 	    osi_Panic("flush vc refcnt < 1");
     }
 #endif /* AFS_LINUX22_ENV */
+    afs_VolNameCacheDecRef(avc->f.fid.Fid.Volume);
     return 0;
 
   bad:
@@ -1118,6 +1119,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
     if (tvc->f.states & CVInit)
 #endif
     afs_PostPopulateVCache(tvc, afid, seq);
+    afs_VolNameCacheIncRef(afid->Fid.Volume);
 
     return tvc;
 }				/*afs_NewVCache */
