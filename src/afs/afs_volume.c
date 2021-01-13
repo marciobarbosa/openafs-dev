@@ -1380,6 +1380,8 @@ afs_VolNameCacheInsert(int a_volid, char *a_volname)
     entry.volname_len = strlen(a_volname);
     entry.refcount = 1;
 
+    afs_warn("<marcio> add (%d => %s) into the cache.\n", a_volid, a_volname);
+
     opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
     code = 0;
  done:
@@ -1387,14 +1389,22 @@ afs_VolNameCacheInsert(int a_volid, char *a_volname)
 }
 
 static int
-afs_VolNameCacheInc(void *a_entry)
+afs_VolNameCacheInc(void *a_entry, int a_volid)
 {
     struct afs_volnamecache_entry *entry = a_entry;
 
     if (entry == NULL || entry->refcount == 0) {
+	if (entry == NULL) {
+	    afs_warn("<marcio> Inc: entry is NULL\n");
+	} else {
+	    afs_warn("<marcio> Inc: ref count is 0\n");
+	}
 	return -1;
     }
     entry->refcount++;
+
+    afs_warn("<marcio> increased refcount of (%d => %s) to %d.\n",
+	     a_volid, entry->volname, entry->refcount);
 
     return 0;
 }
@@ -1412,14 +1422,25 @@ afs_VolNameCacheIncRef(int a_volid)
 }
 
 static int
-afs_VolNameCacheDec(void *a_entry)
+afs_VolNameCacheDec(void *a_entry, int a_volid)
 {
     struct afs_volnamecache_entry *entry = a_entry;
 
     if (entry == NULL || entry->refcount == 0) {
+	if (entry == NULL) {
+	    afs_warn("<marcio> Dec: entry is NULL\n");
+	} else {
+	    afs_warn("<marcio> Dec: ref count is 0\n");
+	}
 	return -1;
     }
     entry->refcount--;
+
+    afs_warn("<marcio> decreased refcount of (%d => %s) to %d.\n",
+	     a_volid, entry->volname, entry->refcount);
+    if (entry->refcount == 0) {
+	afs_warn("-----\n");
+    }
 
     return entry->refcount;
 }
@@ -1439,9 +1460,12 @@ afs_VolNameCacheDecRef(int a_volid)
 	opr_cache_update(afs_volnamecache, &a_volid, ilen, afs_VolNameCacheDec);
 
     if (refcount < 0) {
+	afs_warn("<marcio> DecRef: refcount < 0\n");
 	return;
     }
     if (refcount == 0) {
+	afs_warn("<marcio> removing %d (refcount == 0)\n", a_volid);
+	afs_warn("-----\n");
 	opr_cache_drop(afs_volnamecache, &a_volid, ilen);
     }
 }
@@ -1471,6 +1495,7 @@ afs_VolNameCacheGet(int a_volid)
 
     code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
     if (code != 0 || entry.refcount == 0) {
+	afs_warn("<marcio> code: %d ; refcount: %d\n", code, entry.refcount);
 	goto done;
     }
 

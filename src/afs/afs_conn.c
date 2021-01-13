@@ -283,6 +283,15 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     int i;
     struct srvAddr *sa1p;
     afs_int32 replicated = -1; /* a single RO will increment to 0 */
+    char *volname;
+
+    volname = afs_VolNameCacheGet(afid->Fid.Volume);
+    if (volname != NULL) {
+	afs_warn("<marcio> volume (%d => %s) found.\n", afid->Fid.Volume, volname);
+	afs_osi_Free(volname, strlen(volname));
+    } else {
+	afs_warn("<marcio> volume %d not found.\n", afid->Fid.Volume);
+    }
 
     *rxconn = NULL;
 
