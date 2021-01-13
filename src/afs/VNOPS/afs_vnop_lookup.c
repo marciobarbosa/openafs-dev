@@ -1876,7 +1876,7 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 			       &tvc->f.fid);
 		    uvc = tvc;	/* remember for later */
 
-		    afs_VolNameCacheInsert(tvolp->volume, tvolp->name);
+		    code = afs_VolNameCacheInsert(tvolp->volume, tvolp->name);
 
 		    if (tvolp && (tvolp->states & VForeign)) {
 			/* XXXX tvolp has ref cnt on but not locked! XXX */
@@ -1887,7 +1887,9 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 		    }
 		    afs_PutVCache(uvc);	/* we're done with it */
 
-		    afs_VolNameCacheDecRef(tvolp->volume);
+		    if (code == 0) {
+			afs_VolNameCacheDecRef(tvolp->volume);
+		    }
 
 		    if (!tvc) {
 			code = EIO;
