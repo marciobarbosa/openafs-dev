@@ -283,21 +283,39 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     int i;
     struct srvAddr *sa1p;
     afs_int32 replicated = -1; /* a single RO will increment to 0 */
-    char *volname;
+    char *volname = NULL;
+    afs_int32 n_cell = afid->Cell;
 
-    volname = afs_VolNameCacheGet(afid->Fid.Volume);
-    if (volname != NULL) {
-	afs_warn("<marcio> volume (%d => %s) found.\n", afid->Fid.Volume, volname);
-	afs_osi_Free(volname, strlen(volname));
-    } else {
-	afs_warn("<marcio> volume %d not found.\n", afid->Fid.Volume);
+    struct cell *tcell = NULL;
+
+    tcell = afs_GetPrimaryCell(READ_LOCK);
+
+    if ((tcell->states & CFallbackCell) && areq->networkError) {
+	volname = afs_VolNameCacheGet(afid->Fid.Volume);
+	if (volname != NULL) {
+	    afs_warn("<marcio> volume (%d => %s) found.\n", afid->Fid.Volume, volname);
+	    areq->initd = 0;
+	    afs_FinalizeReq(areq);
+	    areq->flags |= O_NOFOLLOW;
+	    n_cell = tcell->lcellp->cellNum;
+	} else {
+	    afs_warn("<marcio> volume %d not found.\n", afid->Fid.Volume);
+	}
     }
+
+    afs_PutCell(tcell, READ_LOCK);
+
 
     *rxconn = NULL;
 
     AFS_STATCNT(afs_Conn);
     /* Get fid's volume. */
-    tv = afs_GetVolume(afid, areq, READ_LOCK);
+    if (volname) {
+	tv = afs_GetVolumeByName(volname, n_cell, 1, areq, READ_LOCK);
+	afs_osi_Free(volname, strlen(volname));
+    } else {
+	tv = afs_GetVolume(afid, areq, READ_LOCK);
+    }
     if (!tv) {
 	if (areq) {
 	    afs_FinalizeReq(areq);
@@ -363,8 +381,8 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     afs_PutVolume(tv, READ_LOCK);
 
     if (lowp) {
-	tu = afs_GetUser(areq->uid, afid->Cell, SHARED_LOCK);
-	tconn = afs_ConnBySA(lowp, fsport, afid->Cell, tu, 0 /*!force */ ,
+	tu = afs_GetUser(areq->uid, n_cell, SHARED_LOCK);
+	tconn = afs_ConnBySA(lowp, fsport, n_cell, tu, 0 /*!force */ ,
 			     1 /*create */ , locktype, replicated, rxconn);
 
 	afs_PutUser(tu, SHARED_LOCK);

@@ -1370,6 +1370,10 @@ afs_VolNameCacheInsert(int a_volid, char *a_volname)
     ilen = sizeof(a_volid);
     elen = sizeof(entry);
 
+    if (a_volname == NULL) {
+	goto done;
+    }
+
     code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
     if (code == 0) {
 	goto done;

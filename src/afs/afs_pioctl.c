@@ -3127,9 +3127,12 @@ DECL_PIOCTL(PNewCell)
     if (afs_pd_getStringPtr(ain, &newcell) != 0)
 	return EINVAL;
 
-    if (ls & 1) {
+    if (ls) {
 	if (afs_pd_getStringPtr(ain, &linkedcell) != 0)
 	    return EINVAL;
+	if (ls == 2) {
+	    linkedstate |= CFallbackCell;
+	}
 	linkedstate |= CLinkedCell;
     }
 

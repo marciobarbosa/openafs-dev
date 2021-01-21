@@ -2573,7 +2573,12 @@ NewCellCmd(struct cmd_syndesc *as, void *arock)
 	 * cell.
 	 */
 	cellname = as->parms[2].items->data;
-	linkedstate = 1;
+	if (as->parms[3].items) {
+	    /* -fallback */
+	    linkedstate = 2;
+	} else {
+	    linkedstate = 1;
+	}
     }
 #ifdef FS_ENABLE_SERVER_DEBUG_PORTS
     if (as->parms[3].items) {
@@ -3833,6 +3838,7 @@ defect 3069
     cmd_AddParm(ts, "-servers", CMD_LIST, CMD_REQUIRED, "primary servers");
     cmd_AddParm(ts, "-linkedcell", CMD_SINGLE, CMD_OPTIONAL,
 		"linked cell name");
+    cmd_AddParm(ts, "-fallback", CMD_FLAG, CMD_OPTIONAL, "enable fallback cell");
 
     ts = cmd_CreateSyntax("newalias", NewAliasCmd, NULL, 0,
 			  "configure new cell alias");

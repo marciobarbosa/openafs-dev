@@ -304,6 +304,7 @@ struct afs_cbr {
 #define CHasVolRef		0x10	/* volumes were referenced */
 #define CLinkedCell		0x20	/* has a linked cell in lcellp */
 #define CHush                   0x40    /* don't display until referenced */
+#define CFallbackCell           0x80    /* use linked cell as a fallback cell */
 
 struct cell {
     struct afs_q lruq;		/* lru q next and prev */

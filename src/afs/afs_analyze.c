@@ -568,6 +568,14 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 		}
 	    } /* if (hm_retry_int ... */
 	    else {
+		int tretry = 0;
+		struct cell *tcell = afs_GetPrimaryCell(READ_LOCK);
+
+		if ((tcell->states & CFallbackCell) && !(areq->flags & O_NOFOLLOW)) {
+		    tretry = 1;
+		}
+		afs_PutCell(tcell, READ_LOCK);
+
 		if (acode == RX_MSGSIZE)
 		    shouldRetry = 1;
 		else {
@@ -575,11 +583,16 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 		    /* do not promote to shouldRetry if not already */
 		    if (afs_ClearStatus(afid, op, NULL) == 0)
 			shouldRetry = 0;
+		    if (tretry) {
+			afs_warn("<marcio> try again!\n");
+			shouldRetry = 1;
+		    }
 		}
 	    }
 	}
 	if (aconn) /* simply lacking aconn->server doesn't absolve this */
 	    afs_PutConn(aconn, rxconn, locktype);
+	afs_warn("<marcio> returning shouldRetry: %d\n", shouldRetry);
 	return shouldRetry;
     }
 
