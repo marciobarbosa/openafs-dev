@@ -3590,6 +3590,7 @@ FlushVolumeData(struct VenusFid *afid, afs_ucred_t * acred)
     /* probably, a user is doing this, probably, because things are screwed up.
      * maybe it's the dnlc's fault? */
     osi_dnlc_purge();
+    afs_FlushAllVCaches();
     return code;
 }
 

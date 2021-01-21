@@ -39,6 +39,7 @@
 #include "afsincludes.h"	/* Afs-based standard headers */
 #include "afs/afs_stats.h"	/* afs statistics */
 #include "afs/afs_dynroot.h"
+#include "afs/opr.h"
 
 #if	defined(AFS_SUN5_ENV)
 #include <inet/led.h>
@@ -61,6 +62,14 @@ struct volume *afs_freeVolList;
 struct volume *afs_volumes[NVOLS];
 afs_int32 afs_volCounter = 1;	/** for allocating volume indices */
 afs_int32 fvTable[NFENTRIES];
+
+/* volume name cache */
+struct afs_volnamecache_entry {
+    char *volname;
+    afs_uint32 volname_len;
+    afs_uint32 refcount;
+};
+struct opr_cache *afs_volnamecache;
 
 /* Forward declarations */
 static struct volume *afs_NewVolumeByName(char *aname, afs_int32 acell,
@@ -1294,4 +1303,205 @@ afs_ResetVolumeInfo(struct volume *tv)
 	tv->name = NULL;
     }
     ReleaseWriteLock(&tv->lock);
+}
+
+/* volume name cache */
+
+/**
+ * Release volume name associated with a given entry.
+ *
+ * @param[in]  a_entry  entry from the cache
+ */
+static void
+afs_VolNameCacheDestroy(void *a_entry)
+{
+    struct afs_volnamecache_entry *entry = a_entry;
+
+    if (entry == NULL) {
+	return;
+    }
+    afs_osi_Free(entry->volname, entry->volname_len);
+    memset(entry, 0, sizeof(*entry));
+}
+
+/**
+ * Initialize volume name cache.
+ *
+ * @param[in]  a_nbuckets  number of buckets
+ * @param[in]  a_nentries  maximum number of entries
+ *
+ * @return errno status codes.
+ */
+int
+afs_VolNameCacheInit(int a_nbuckets, int a_nentries)
+{
+    int code = -1;
+    struct opr_cache_opts opts;
+
+    if (a_nbuckets <= 0 || a_nentries <= 0) {
+	goto done;
+    }
+
+    memset(&opts, 0, sizeof(opts));
+    opts.n_buckets = a_nbuckets;
+    opts.max_entries = a_nentries;
+    opts.destructor = afs_VolNameCacheDestroy;
+
+    code = opr_cache_init(&opts, &afs_volnamecache);
+ done:
+    return code;
+}
+
+/**
+ * Add entry into the volume name cache.
+ *
+ * @param[in]  a_volid        volume id
+ * @param[in]  a_volname      volume name
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+afs_VolNameCacheInsert(int a_volid, char *a_volname)
+{
+    int code = -1;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code == 0) {
+	goto done;
+    }
+
+    memset(&entry, 0, sizeof(entry));
+    entry.volname = afs_strdup(a_volname);
+    entry.volname_len = strlen(a_volname);
+    entry.refcount = 1;
+
+    afs_warn("<marcio> add (%d => %s) into the cache.\n", a_volid, a_volname);
+
+    opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
+    code = 0;
+ done:
+    return code;
+}
+
+static int
+afs_VolNameCacheInc(void *a_entry, int a_volid)
+{
+    struct afs_volnamecache_entry *entry = a_entry;
+
+    if (entry == NULL || entry->refcount == 0) {
+	if (entry == NULL) {
+	    afs_warn("<marcio> Inc: entry is NULL\n");
+	} else {
+	    afs_warn("<marcio> Inc: ref count is 0\n");
+	}
+	return -1;
+    }
+    entry->refcount++;
+
+    afs_warn("<marcio> increased refcount of (%d => %s) to %d.\n",
+	     a_volid, entry->volname, entry->refcount);
+
+    return 0;
+}
+
+/**
+ * Increment refcount of entry associated with given id.
+ *
+ * @param[in]  a_volid  volume id
+ */
+void
+afs_VolNameCacheIncRef(int a_volid)
+{
+    size_t ilen = sizeof(a_volid);
+    opr_cache_update(afs_volnamecache, &a_volid, ilen, afs_VolNameCacheInc);
+}
+
+static int
+afs_VolNameCacheDec(void *a_entry, int a_volid)
+{
+    struct afs_volnamecache_entry *entry = a_entry;
+
+    if (entry == NULL || entry->refcount == 0) {
+	if (entry == NULL) {
+	    afs_warn("<marcio> Dec: entry is NULL\n");
+	} else {
+	    afs_warn("<marcio> Dec: ref count is 0\n");
+	}
+	return -1;
+    }
+    entry->refcount--;
+
+    afs_warn("<marcio> decreased refcount of (%d => %s) to %d.\n",
+	     a_volid, entry->volname, entry->refcount);
+    if (entry->refcount == 0) {
+	afs_warn("-----\n");
+    }
+
+    return entry->refcount;
+}
+
+/**
+ * Decrement refcount of entry associated with given id.
+ *
+ * @param[in]  a_volid  volume id
+ */
+void
+afs_VolNameCacheDecRef(int a_volid)
+{
+    int refcount;
+    size_t ilen = sizeof(a_volid);
+
+    refcount =
+	opr_cache_update(afs_volnamecache, &a_volid, ilen, afs_VolNameCacheDec);
+
+    if (refcount < 0) {
+	afs_warn("<marcio> DecRef: refcount < 0\n");
+	return;
+    }
+    if (refcount == 0) {
+	afs_warn("<marcio> removing %d (refcount == 0)\n", a_volid);
+	afs_warn("-----\n");
+	opr_cache_drop(afs_volnamecache, &a_volid, ilen);
+    }
+}
+
+/**
+ * Get entry from the volume name cache.
+ *
+ * @param[in]  a_volid  volume id
+ *
+ * @return Volume name on success; NULL otherwise.
+ *
+ * @note The returned string must be freed by the caller.
+ */
+char *
+afs_VolNameCacheGet(int a_volid)
+{
+    int code = -1;
+    char *volname = NULL;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+    memset(&entry, 0, sizeof(entry));
+
+    afs_VolNameCacheIncRef(a_volid);
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code != 0 || entry.refcount == 0) {
+	afs_warn("<marcio> code: %d ; refcount: %d\n", code, entry.refcount);
+	goto done;
+    }
+
+    volname = afs_strdup(entry.volname);
+
+    afs_VolNameCacheDecRef(a_volid);
+ done:
+    return volname;
 }
