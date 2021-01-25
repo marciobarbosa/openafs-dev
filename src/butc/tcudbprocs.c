@@ -10,6 +10,8 @@
 #include <afsconfig.h>
 #include <afs/param.h>
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 #include <afs/procmgmt.h>
 #include <roken.h>
 

@@ -4,6 +4,8 @@
 #include "afs/sysincludes.h"
 #include "afsincludes.h"
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 #define MYBUNDLEID "org.openafs.filesystems.afs"
 extern struct vfsops afs_vfsops;
 

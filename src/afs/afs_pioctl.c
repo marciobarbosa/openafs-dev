@@ -10,6 +10,7 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
 
 #include "afs/sysincludes.h"	/* Standard vendor system headers */
 #ifdef AFS_OBSD_ENV

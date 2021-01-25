@@ -12,6 +12,8 @@
 
 #include <roken.h>
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 #include <afs/cmd.h>
 
 #if !defined(AFS_DARWIN_ENV) && !defined(AFS_FBSD_ENV)

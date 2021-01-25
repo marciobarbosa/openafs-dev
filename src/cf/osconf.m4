@@ -376,6 +376,7 @@ case $AFS_SYSNAME in
 		MT_LIBS='${XLIBS}'
 		KROOT='/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk'
 		KINCLUDES='-I$(KROOT)/System/Library/Frameworks/Kernel.framework/Headers'
+		CC="cc -D_FORTIFY_SOURCE=0"
 		LD="cc"
 		KERN_OPTMZ="-Os"
 		LWP_OPTMZ="-Os"

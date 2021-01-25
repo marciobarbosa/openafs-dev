@@ -17,6 +17,8 @@
 #include <regex.h>
 #endif
 
+#  pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
 #include <afs/cmd.h>
 #include <afs/com_err.h>
 #include <afs/afsutil.h>
