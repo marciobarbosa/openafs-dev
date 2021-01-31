@@ -73,6 +73,11 @@ struct opr_cache {
     afs_uint32 max_entries;
 
     /*
+     * Copy dynamically allocated memory pointed by each member of a given cache
+     * entry.
+     */
+    int (*fillentry)(void *, void *);
+    /*
      * Release dynamically allocated memory pointed by the members of each cache
      * entry.
      */
@@ -293,6 +298,10 @@ opr_cache_get(struct opr_cache *cache, void *key_buf, size_t key_len,
     memcpy(val_buf, entry->val_buf, entry->val_len);
     *a_val_len = entry->val_len;
 
+    if (cache->fillentry != NULL) {
+	/* Copy dynamically allocated members. */
+	code = (*cache->fillentry)(entry->val_buf, val_buf);
+    }
  done:
     opr_mutex_exit(&cache->lock);
     return code;
@@ -422,7 +431,9 @@ opr_cache_init(struct opr_cache_opts *opts, struct opr_cache **a_cache)
 
     opr_mutex_init(&cache->lock);
     cache->max_entries = opts->max_entries;
+
     cache->destructor = opts->destructor;
+    cache->fillentry = opts->fillentry;
 
     cache->dict = opr_dict_Init(n_buckets);
     if (cache->dict == NULL) {

@@ -106,6 +106,7 @@ struct opr_cache_opts {
     afs_uint32 max_entries;
     afs_uint32 n_buckets;
 
+    int (*fillentry)(void *, void*);
     void (*destructor)(void *);
 };
 struct opr_cache;
