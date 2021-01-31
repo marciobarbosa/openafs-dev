@@ -513,17 +513,17 @@ opr_cache_drop(struct opr_cache *cache, void *key_buf, size_t key_len)
  * @param[in] key_len The size of 'key_buf'.
  * @param[in] update  Function responsible for updating the entry in question.
  *
- * @return code returned by "update" on success; errno otherwise.
+ * @return errno status codes
  */
 int
 opr_cache_update(struct opr_cache *cache, void *key_buf, size_t key_len,
-		 int (*update)(void *, int))
+		 void *val_buf, size_t *a_val_len, int (*update)(void *, int))
 {
     struct cache_entry *entry;
     int code = -1;
 
     if (cache == NULL || key_buf == NULL || key_len < 1) {
-	return -1;
+	return ENOENT;
     }
 
     opr_mutex_enter(&cache->lock);
@@ -537,8 +537,21 @@ opr_cache_update(struct opr_cache *cache, void *key_buf, size_t key_len,
 	goto done;
     }
 
+    if (entry->val_len > *a_val_len) {
+	code = ENOSPC;
+	goto done;
+    }
+
+    memcpy(val_buf, entry->val_buf, entry->val_len);
+    *a_val_len = entry->val_len;
+
     /* Update members of val_buf. */
     code = (*update)(entry->val_buf, *((int *)key_buf));
+    if (code) {
+	/* This entry can be corrupted. Remove it. */
+	opr_cache_drop(cache, key_buf, key_len);
+    }
+
  done:
     opr_mutex_exit(&cache->lock);
     return code;

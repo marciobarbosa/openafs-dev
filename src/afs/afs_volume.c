@@ -1358,6 +1358,8 @@ afs_VolNameCacheInit(int a_nbuckets, int a_nentries)
  * @param[in]  a_volid        volume id
  * @param[in]  a_volname      volume name
  *
+ * @note afs_xvcache write lock must be held.
+ *
  * @return 0 on success; -1 otherwise.
  */
 int
@@ -1378,7 +1380,6 @@ afs_VolNameCacheInsert(int a_volid, char *a_volname)
     memset(&entry, 0, sizeof(entry));
     entry.volname = afs_strdup(a_volname);
     entry.volname_len = strlen(a_volname);
-    entry.refcount = 1;
 
     afs_warn("<marcio> add (%d => %s) into the cache.\n", a_volid, a_volname);
 
@@ -1439,10 +1440,10 @@ afs_VolNameCacheDec(void *a_entry, int a_volid)
     afs_warn("<marcio> decreased refcount of (%d => %s) to %d.\n",
 	     a_volid, entry->volname, entry->refcount);
     if (entry->refcount == 0) {
-	afs_warn("-----\n");
+	/* return not-zero so this entry can be removed */
+	return -1;
     }
-
-    return entry->refcount;
+    return 0;
 }
 
 /**
@@ -1453,21 +1454,8 @@ afs_VolNameCacheDec(void *a_entry, int a_volid)
 void
 afs_VolNameCacheDecRef(int a_volid)
 {
-    int refcount;
     size_t ilen = sizeof(a_volid);
-
-    refcount =
-	opr_cache_update(afs_volnamecache, &a_volid, ilen, afs_VolNameCacheDec);
-
-    if (refcount < 0) {
-	afs_warn("<marcio> DecRef: refcount < 0\n");
-	return;
-    }
-    if (refcount == 0) {
-	afs_warn("<marcio> removing %d (refcount == 0)\n", a_volid);
-	afs_warn("-----\n");
-	opr_cache_drop(afs_volnamecache, &a_volid, ilen);
-    }
+    opr_cache_update(afs_volnamecache, &a_volid, ilen, afs_VolNameCacheDec);
 }
 
 /**
@@ -1476,8 +1464,6 @@ afs_VolNameCacheDecRef(int a_volid)
  * @param[in]  a_volid  volume id
  *
  * @return Volume name on success; NULL otherwise.
- *
- * @note The returned string must be freed by the caller.
  */
 char *
 afs_VolNameCacheGet(int a_volid)
