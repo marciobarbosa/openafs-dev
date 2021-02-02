@@ -283,6 +283,7 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     int i;
     struct srvAddr *sa1p;
     afs_int32 replicated = -1; /* a single RO will increment to 0 */
+    char *volname;
 
     *rxconn = NULL;
 
@@ -295,6 +296,15 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
 	    areq->volumeError = 1;
 	}
 	return NULL;
+    }
+
+    if (afid) {
+	volname = afs_VolNameCacheGet(afid->Fid.Volume);
+	if (volname) {
+	    afs_warn("<marcio> volume %d found: %s\n", afid->Fid.Volume, volname);
+	} else {
+	    afs_warn("<marcio> volume %d not found\n", afid->Fid.Volume);
+	}
     }
 
     if (tv->serverHost[0] && tv->serverHost[0]->cell) {

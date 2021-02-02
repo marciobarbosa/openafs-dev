@@ -1308,6 +1308,31 @@ afs_ResetVolumeInfo(struct volume *tv)
 /* volume name cache */
 
 /**
+ * Copy volume name associated with a given entry.
+ *
+ * @param[in]   a_src_entry  entry from the cache
+ * @param[out]  a_dst_entry  entry provided by the caller
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+static int
+afs_VolNameCacheFillEntry(void *a_src_entry, void *a_dst_entry)
+{
+    struct afs_volnamecache_entry *s_entry = a_src_entry;
+    struct afs_volnamecache_entry *d_entry = a_dst_entry;
+
+    if (s_entry == NULL || d_entry == NULL) {
+	return -1;
+    }
+
+    d_entry->volname = afs_strdup(s_entry->volname);
+    if (d_entry->volname == NULL) {
+	return -1;
+    }
+    return 0;
+}
+
+/**
  * Release volume name associated with a given entry.
  *
  * @param[in]  a_entry  entry from the cache
@@ -1345,46 +1370,10 @@ afs_VolNameCacheInit(int a_nbuckets, int a_nentries)
     memset(&opts, 0, sizeof(opts));
     opts.n_buckets = a_nbuckets;
     opts.max_entries = a_nentries;
+    opts.fillentry = afs_VolNameCacheFillEntry;
     opts.destructor = afs_VolNameCacheDestroy;
 
     code = opr_cache_init(&opts, &afs_volnamecache);
- done:
-    return code;
-}
-
-/**
- * Add entry into the volume name cache.
- *
- * @param[in]  a_volid        volume id
- * @param[in]  a_volname      volume name
- *
- * @note afs_xvcache write lock must be held.
- *
- * @return 0 on success; -1 otherwise.
- */
-int
-afs_VolNameCacheInsert(int a_volid, char *a_volname)
-{
-    int code = -1;
-    size_t ilen, elen;
-    struct afs_volnamecache_entry entry;
-
-    ilen = sizeof(a_volid);
-    elen = sizeof(entry);
-
-    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
-    if (code == 0) {
-	goto done;
-    }
-
-    memset(&entry, 0, sizeof(entry));
-    entry.volname = afs_strdup(a_volname);
-    entry.volname_len = strlen(a_volname);
-
-    afs_warn("<marcio> add (%d => %s) into the cache.\n", a_volid, a_volname);
-
-    opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
-    code = 0;
  done:
     return code;
 }
@@ -1422,6 +1411,50 @@ afs_VolNameCacheIncRef(int a_volid)
     opr_cache_update(afs_volnamecache, &a_volid, ilen, afs_VolNameCacheInc);
 }
 
+/**
+ * Add entry into the volume name cache.
+ *
+ * @param[in]  a_volid        volume id
+ * @param[in]  a_volname      volume name
+ *
+ * @note afs_xvcache write lock must be held.
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+afs_VolNameCacheInsert(int a_volid, char *a_volname)
+{
+    int code = -1;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+
+    if (a_volname == NULL) {
+	afs_warn("<marcio> skipping %d because name is null\n", a_volid);
+	goto done;
+    }
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code == 0) {
+	afs_VolNameCacheIncRef(a_volid);
+	goto done;
+    }
+
+    memset(&entry, 0, sizeof(entry));
+    entry.volname = afs_strdup(a_volname);
+    entry.volname_len = strlen(a_volname);
+    entry.refcount = 1;
+
+    afs_warn("<marcio> add (%d => %s) into the cache.\n", a_volid, a_volname);
+
+    opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
+    code = 0;
+ done:
+    return code;
+}
+
 static int
 afs_VolNameCacheDec(void *a_entry, int a_volid)
 {
@@ -1441,6 +1474,7 @@ afs_VolNameCacheDec(void *a_entry, int a_volid)
 	     a_volid, entry->volname, entry->refcount);
     if (entry->refcount == 0) {
 	/* return not-zero so this entry can be removed */
+	afs_warn("<marcio> removing %s\n", entry->volname);
 	return -1;
     }
     return 0;
@@ -1477,17 +1511,13 @@ afs_VolNameCacheGet(int a_volid)
     elen = sizeof(entry);
     memset(&entry, 0, sizeof(entry));
 
-    afs_VolNameCacheIncRef(a_volid);
-
     code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
     if (code != 0 || entry.refcount == 0) {
 	afs_warn("<marcio> code: %d ; refcount: %d\n", code, entry.refcount);
 	goto done;
     }
 
-    volname = afs_strdup(entry.volname);
-
-    afs_VolNameCacheDecRef(a_volid);
+    volname = entry.volname;
  done:
     return volname;
 }

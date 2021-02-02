@@ -528,7 +528,7 @@ opr_cache_drop(struct opr_cache *cache, void *key_buf, size_t key_len)
  */
 int
 opr_cache_update(struct opr_cache *cache, void *key_buf, size_t key_len,
-		 void *val_buf, size_t *a_val_len, int (*update)(void *, int))
+		 int (*update)(void *, int))
 {
     struct cache_entry *entry;
     int code = -1;
@@ -547,14 +547,6 @@ opr_cache_update(struct opr_cache *cache, void *key_buf, size_t key_len,
     if (code != 0) {
 	goto done;
     }
-
-    if (entry->val_len > *a_val_len) {
-	code = ENOSPC;
-	goto done;
-    }
-
-    memcpy(val_buf, entry->val_buf, entry->val_len);
-    *a_val_len = entry->val_len;
 
     /* Update members of val_buf. */
     code = (*update)(entry->val_buf, *((int *)key_buf));

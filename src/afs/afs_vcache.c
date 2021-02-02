@@ -199,6 +199,7 @@ afs_FlushVCache(struct vcache *avc, int *slept)
 	}
     }
 
+    afs_VolNameCacheDecRef(avc->f.fid.Fid.Volume);
     /* remove entry from the volume hash table */
     QRemove(&avc->vhashq);
 
@@ -1127,6 +1128,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
     if (tvc->f.states & CVInit)
 #endif
     afs_PostPopulateVCache(tvc, afid, seq);
+    afs_VolNameCacheInsert(afid->Fid.Volume, afid->volname);
 
     return tvc;
 }				/*afs_NewVCache */
