@@ -72,6 +72,17 @@ struct opr_cache {
     /* The max number of items we can hold in the cache. */
     afs_uint32 max_entries;
 
+    /*
+     * Copy dynamically allocated memory pointed by each member of a given cache
+     * entry.
+     */
+    int (*fillentry)(void *, void *);
+    /*
+     * Release dynamically allocated memory pointed by the members of each cache
+     * entry.
+     */
+    void (*destructor)(void *);
+
     /* Our dictionary holding the cached items. Contains cache_entry structs,
      * linked together via 'link'. */
     struct opr_dict *dict;
@@ -287,6 +298,10 @@ opr_cache_get(struct opr_cache *cache, void *key_buf, size_t key_len,
     memcpy(val_buf, entry->val_buf, entry->val_len);
     *a_val_len = entry->val_len;
 
+    if (cache->fillentry != NULL) {
+	/* Copy dynamically allocated members. */
+	code = (*cache->fillentry)(entry->val_buf, val_buf);
+    }
  done:
     opr_mutex_exit(&cache->lock);
     return code;
@@ -417,6 +432,9 @@ opr_cache_init(struct opr_cache_opts *opts, struct opr_cache **a_cache)
     opr_mutex_init(&cache->lock);
     cache->max_entries = opts->max_entries;
 
+    cache->destructor = opts->destructor;
+    cache->fillentry = opts->fillentry;
+
     cache->dict = opr_dict_Init(n_buckets);
     if (cache->dict == NULL) {
 	opr_cache_free(&cache);
@@ -448,6 +466,10 @@ opr_cache_free(struct opr_cache **a_cache)
 	    for (opr_dict_ScanBucketSafe(cache->dict, bucket, cursor, tmp)) {
 		struct cache_entry *entry;
 		entry = opr_queue_Entry(cursor, struct cache_entry, link);
+		if (cache->destructor != NULL) {
+		    /* Release memory pointed by the members of val_buf. */
+		    (*cache->destructor)(entry->val_buf);
+		}
 		free_entry_contents(entry);
 		opr_Free(entry, sizeof(*entry));
 	    }
@@ -459,3 +481,38 @@ opr_cache_free(struct opr_cache **a_cache)
 
     opr_Free(cache, sizeof(*cache));
 }
+
+/**
+ * Remove an item from the cache.
+ *
+ * @param[in] cache   The opr_cache to use.
+ * @param[in] key_buf The key of the entry to be removed.
+ * @param[in] key_len The size of 'key_buf'.
+ */
+void
+opr_cache_drop(struct opr_cache *cache, void *key_buf, size_t key_len)
+{
+    struct cache_entry *entry;
+    int code;
+
+    if (cache == NULL || key_buf == NULL || key_len < 1) {
+	return;
+    }
+
+    opr_mutex_enter(&cache->lock);
+
+    code = find_entry(cache, key_buf, key_len, &entry);
+    if (code != 0) {
+	goto done;
+    }
+
+    if (cache->destructor != NULL) {
+	/* Release memory pointed by the members of val_buf. */
+	(*cache->destructor)(entry->val_buf);
+    }
+    free_entry_contents(entry);
+    opr_Free(entry, sizeof(*entry));
+ done:
+    opr_mutex_exit(&cache->lock);
+}
+

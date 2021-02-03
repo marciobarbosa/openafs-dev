@@ -105,6 +105,9 @@ opr_threadname_set(const char *threadname)
 struct opr_cache_opts {
     afs_uint32 max_entries;
     afs_uint32 n_buckets;
+
+    int (*fillentry)(void *, void*);
+    void (*destructor)(void *);
 };
 struct opr_cache;
 
@@ -117,5 +120,7 @@ extern int opr_cache_get(struct opr_cache *cache, void *key_buf,
 			 AFS_NONNULL((4,5));
 extern void opr_cache_put(struct opr_cache *cache, void *key_buf,
 			  size_t key_len, void *val_buf, size_t val_len);
+extern void opr_cache_drop(struct opr_cache *cache, void *key_buf,
+			   size_t key_len);
 
 #endif
