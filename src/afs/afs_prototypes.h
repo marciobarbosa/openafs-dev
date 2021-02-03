@@ -1425,6 +1425,10 @@ extern struct volume *afs_GetVolumeByName(char *aname,
 extern struct volume *afs_UFSGetVolSlot(afs_int32 volid, struct cell *cell);
 extern void afs_CheckVolumeNames(int flags);
 
+extern int afs_VolNameCacheInit(int a_nbuckets, int a_nentries);
+extern int afs_VolNameCacheIncRef(int a_volid, char *a_volname);
+extern int afs_VolNameCacheDecRef(int a_volid);
+
 /* Prototypes for generated files that aren't really in src/afs/ */
 
 /* afs_uuid.c */

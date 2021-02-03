@@ -39,6 +39,7 @@
 #include "afsincludes.h"	/* Afs-based standard headers */
 #include "afs/afs_stats.h"	/* afs statistics */
 #include "afs/afs_dynroot.h"
+#include "afs/opr.h"
 
 #if	defined(AFS_SUN5_ENV)
 #include <inet/led.h>
@@ -61,6 +62,14 @@ struct volume *afs_freeVolList;
 struct volume *afs_volumes[NVOLS];
 afs_int32 afs_volCounter = 1;	/** for allocating volume indices */
 afs_int32 fvTable[NFENTRIES];
+
+/* volume name cache */
+struct afs_volnamecache_entry {
+    char *name;
+    size_t len;
+    unsigned int refcount;
+};
+struct opr_cache *afs_volnamecache;
 
 /* Forward declarations */
 static struct volume *afs_NewVolumeByName(char *aname, afs_int32 acell,
@@ -1294,4 +1303,158 @@ afs_ResetVolumeInfo(struct volume *tv)
 	tv->name = NULL;
     }
     ReleaseWriteLock(&tv->lock);
+}
+
+/* volume name cache */
+
+/**
+ * Copy volume name associated with a given entry.
+ *
+ * @param[in]   a_src_entry  entry from the cache
+ * @param[out]  a_dst_entry  entry provided by the caller
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+static int
+afs_VolNameCacheFillEntry(void *a_src_entry, void *a_dst_entry)
+{
+    struct afs_volnamecache_entry *s_entry = a_src_entry;
+    struct afs_volnamecache_entry *d_entry = a_dst_entry;
+
+    if (s_entry == NULL || d_entry == NULL) {
+	return -1;
+    }
+
+    d_entry->name = afs_strdup(s_entry->name);
+    if (d_entry->name == NULL) {
+	return -1;
+    }
+    return 0;
+}
+
+/**
+ * Release volume name associated with a given entry.
+ *
+ * @param[in]  a_entry  entry from the cache
+ */
+static void
+afs_VolNameCacheDestroy(void *a_entry)
+{
+    struct afs_volnamecache_entry *entry = a_entry;
+
+    if (entry == NULL) {
+	return;
+    }
+    afs_osi_Free(entry->name, entry->len);
+    memset(entry, 0, sizeof(*entry));
+}
+
+/**
+ * Initialize volume name cache.
+ *
+ * @param[in]  a_nbuckets  number of buckets
+ * @param[in]  a_nentries  maximum number of entries
+ *
+ * @return errno status codes.
+ */
+int
+afs_VolNameCacheInit(int a_nbuckets, int a_nentries)
+{
+    int code = -1;
+    struct opr_cache_opts opts;
+
+    if (a_nbuckets <= 0 || a_nentries <= 0) {
+	goto done;
+    }
+    memset(&opts, 0, sizeof(opts));
+    opts.n_buckets = a_nbuckets;
+    opts.max_entries = a_nentries;
+    opts.fillentry = afs_VolNameCacheFillEntry;
+    opts.destructor = afs_VolNameCacheDestroy;
+
+    code = opr_cache_init(&opts, &afs_volnamecache);
+ done:
+    return code;
+}
+
+/**
+ * Increase reference count of a given entry.
+ *
+ * If the received entry exists in the cache, increase its reference count. If
+ * it does not, create one.
+ *
+ * @param[in]  a_volid    volume id
+ * @param[in]  a_volname  volume name
+ *
+ * @note afs_xvcache write lock must be held.
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+afs_VolNameCacheIncRef(int a_volid, char *a_volname)
+{
+    int code = -1;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    if (a_volid <= 0 || a_volname == NULL) {
+	goto done;
+    }
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code == 0) {
+	entry.refcount++;
+    } else if (code == ENOENT) {
+	memset(&entry, 0, sizeof(entry));
+	entry.name = afs_strdup(a_volname);
+	entry.len = strlen(a_volname);
+	entry.refcount = 1;
+    } else {
+	goto done;
+    }
+
+    opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
+    code = 0;
+ done:
+    return code;
+}
+
+/**
+ * Decrement refcount of entry associated with given id.
+ *
+ * @param[in]  a_volid  volume id
+ *
+ * @note afs_xvcache write lock must be held.
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+afs_VolNameCacheDecRef(int a_volid)
+{
+    int code = -1;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    if (a_volid <= 0) {
+	goto done;
+    }
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code != 0) {
+	goto done;
+    }
+
+    if (entry.refcount > 1) {
+	entry.refcount--;
+	opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
+    } else {
+	/* if refcount is 0, remove it. */
+	opr_cache_drop(afs_volnamecache, &a_volid, ilen);
+    }
+ done:
+    return code;
 }
