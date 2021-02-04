@@ -87,6 +87,8 @@ afs_int32 afs_rx_idledead_rep = AFS_IDLEDEADTIME_REP;
 
 static int afscall_set_rxpck_received = 0;
 
+int afs_fallbackcell = 0;
+
 extern afs_int32 afs_volume_ttl;
 
 /* From afs_util.c */
@@ -940,6 +942,20 @@ afs_syscall_call(long parm, long parm2, long parm3,
 		    if (!code) {
 			lcnamep = tbuffer;
 			cflags |= CLinkedCell;
+			if (parm4 & 0x80) {
+			    int nbuckets, nentries;
+
+			    nentries = cm_initParams.cmi_nVolumeCaches;
+			    nbuckets = nentries / 2;
+
+			    code = afs_VolNameCacheInit(nbuckets, nentries);
+			    if (code == 0) {
+				cflags |= CFallBackCell;
+				afs_fallbackcell = 1;
+			    }
+			    /* retore original code */
+			    code = 0;
+			}
 		    }
 		}
 		if (parm4 & 8) {

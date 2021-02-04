@@ -287,7 +287,7 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     *rxconn = NULL;
 
     AFS_STATCNT(afs_Conn);
-    if (afid) {
+    if (afid && afs_fallbackcell) {
 	int code;
 	char *volname;
 	size_t volname_len;

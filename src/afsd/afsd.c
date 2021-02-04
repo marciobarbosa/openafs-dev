@@ -286,6 +286,7 @@ static int afsd_CloseSynch = 0;	/*Are closes synchronous or not? */
 static int rxmaxmtu = 0;       /* Are we forcing a limit on the mtu? */
 static int rxmaxfrags = 0;      /* Are we forcing a limit on frags? */
 static int volume_ttl = 0;      /* enable vldb cache timeout support */
+static int enable_fallbackcell = 0;	/* enable fallback cell support */
 
 #ifdef AFS_SGI62_ENV
 #define AFSD_INO_T ino64_t
@@ -365,6 +366,7 @@ enum optionsList {
     OPT_rxmaxfrags,
     OPT_inumcalc,
     OPT_volume_ttl,
+    OPT_fallbackcell,
 };
 
 #ifdef MACOS_EVENT_HANDLING
@@ -1441,9 +1443,11 @@ ConfigCell(struct afsconf_cell *aci, void *arock, struct afsconf_dir *adir)
     for (i = 0; i < MAXHOSTSPERCELL; i++)
 	memcpy(&hosts[i], &aci->hostAddr[i].sin_addr, sizeof(afs_int32));
 
-    if (aci->linkedCell)
+    if (aci->linkedCell) {
 	cellFlags |= 4;		/* Flag that linkedCell arg exists,
 				 * for upwards compatibility */
+	cellFlags |= 0x80;
+    }
 
     /* configure one cell */
     code = afsd_syscall(AFSOP_ADDCELL2, hosts,	/* server addresses */
@@ -1918,6 +1922,10 @@ CheckOptions(struct cmd_syndesc *as)
 	cmd_OptionAsString(as, OPT_inumcalc, &inumcalc);
     }
     cmd_OptionAsInt(as, OPT_volume_ttl, &volume_ttl);
+
+    if (cmd_OptionPresent(as, OPT_fallbackcell)) {
+	enable_fallbackcell = 1;
+    }
 
     /* parse cacheinfo file if this is a diskcache */
     if (ParseCacheInfoFile()) {
@@ -2650,6 +2658,9 @@ afsd_init(void)
     cmd_AddParmAtOffset(ts, OPT_volume_ttl, "-volume-ttl", CMD_SINGLE,
 			CMD_OPTIONAL,
 			"Set the vldb cache timeout value in seconds.");
+    cmd_AddParmAtOffset(ts, OPT_fallbackcell, "-fallbackcell", CMD_FLAG,
+		        CMD_OPTIONAL,
+			"Use linked cell as a fallback cell.");
 }
 
 /**

@@ -135,12 +135,6 @@ afs_CacheInit(afs_int32 astatSize, afs_int32 afiles, afs_int32 ablocks,
     osi_dnlc_init();
 
     /*
-     * create volume name cache
-     */
-    code = afs_VolNameCacheInit(aVolumes / 2, aVolumes);
-    osi_Assert(code == 0);
-
-    /*
      * create volume list structure
      */
     if (aVolumes < 50)

@@ -199,11 +199,13 @@ afs_FlushVCache(struct vcache *avc, int *slept)
 	}
     }
 
-    code = afs_VolNameCacheDecRef(avc->f.fid.Fid.Volume);
-    if (code != 0) {
-	afs_warn("afs_FlushVCache: can't change ref of %d\n",
-		 avc->f.fid.Fid.Volume);
-	code = 0;
+    if (afs_fallbackcell) {
+	code = afs_VolNameCacheDecRef(avc->f.fid.Fid.Volume);
+	if (code != 0) {
+	    afs_warn("afs_FlushVCache: can't change ref of %d\n",
+		     avc->f.fid.Fid.Volume);
+	    code = 0;
+	}
     }
     /* remove entry from the volume hash table */
     QRemove(&avc->vhashq);
@@ -1135,9 +1137,11 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 #endif
     afs_PostPopulateVCache(tvc, afid, seq);
 
-    code = afs_VolNameCacheIncRef(afid->Fid.Volume, afid->VolumeName);
-    if (code != 0) {
-	afs_warn("afs_NewVCache: can't change ref of %d\n", afid->Fid.Volume);
+    if (afs_fallbackcell) {
+	code = afs_VolNameCacheIncRef(afid->Fid.Volume, afid->VolumeName);
+	if (code != 0) {
+	    afs_warn("afs_NewVCache: can't change ref of %d\n", afid->Fid.Volume);
+	}
     }
     return tvc;
 }				/*afs_NewVCache */

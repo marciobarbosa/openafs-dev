@@ -1870,16 +1870,16 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 		/* next, we want to continue using the target of the mt point */
 		if (tvc->mvid.target_root && (tvc->f.states & CMValid)) {
 		    struct vcache *uvc;
+		    struct VenusFid mfid = *tvc->mvid.target_root;
 
-		    struct VenusFid mfid;
-		    char *cpos;
+		    if (afs_fallbackcell) {
+			char *cpos;
 
-		    mfid = *tvc->mvid.target_root;
-		    mfid.VolumeName = tvc->linkData + 1;
-
-		    cpos = afs_strchr(mfid.VolumeName, ':');
-		    if (cpos) {
-			mfid.VolumeName = cpos + 1;
+			mfid.VolumeName = tvc->linkData + 1;
+			cpos = afs_strchr(mfid.VolumeName, ':');
+			if (cpos) {
+			    mfid.VolumeName = cpos + 1;
+			}
 		    }
 
 		    /* now lookup target, to set .. pointer */
