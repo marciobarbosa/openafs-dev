@@ -1870,6 +1870,18 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 		/* next, we want to continue using the target of the mt point */
 		if (tvc->mvid.target_root && (tvc->f.states & CMValid)) {
 		    struct vcache *uvc;
+
+		    struct VenusFid mfid;
+		    char *cpos;
+
+		    mfid = *tvc->mvid.target_root;
+		    mfid.VolumeName = tvc->linkData + 1;
+
+		    cpos = afs_strchr(mfid.VolumeName, ':');
+		    if (cpos) {
+			mfid.VolumeName = cpos + 1;
+		    }
+
 		    /* now lookup target, to set .. pointer */
 		    afs_Trace2(afs_iclSetp, CM_TRACE_LOOKUP1,
 			       ICL_TYPE_POINTER, tvc, ICL_TYPE_FID,
@@ -1879,9 +1891,9 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 		    if (tvolp && (tvolp->states & VForeign)) {
 			/* XXXX tvolp has ref cnt on but not locked! XXX */
 			tvc =
-			    afs_GetRootVCache(tvc->mvid.target_root, treq, tvolp);
+			    afs_GetRootVCache(&mfid, treq, tvolp);
 		    } else {
-			tvc = afs_GetVCache(tvc->mvid.target_root, treq);
+			tvc = afs_GetVCache(&mfid, treq);
 		    }
 		    afs_PutVCache(uvc);	/* we're done with it */
 

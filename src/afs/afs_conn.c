@@ -287,6 +287,19 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     *rxconn = NULL;
 
     AFS_STATCNT(afs_Conn);
+    if (afid) {
+	int code;
+	char *volname;
+	size_t volname_len;
+
+	code = afs_VolNameCacheGet(afid->Fid.Volume, &volname, &volname_len);
+	if (code == 0) {
+	    afs_warn("<marcio> volume %d found: %s\n", afid->Fid.Volume, volname);
+	    afs_osi_Free(volname, volname_len);
+	} else {
+	    afs_warn("<marcio> volume %d not found\n", afid->Fid.Volume);
+	}
+    }
     /* Get fid's volume. */
     tv = afs_GetVolume(afid, areq, READ_LOCK);
     if (!tv) {

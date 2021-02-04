@@ -196,6 +196,7 @@ struct ClearToken {
 struct VenusFid {
     afs_int32 Cell;		/* better sun packing if at end of structure */
     struct AFSFid Fid;
+    char *VolumeName;
 };
 
 /* Temporary struct to be passed between afs_fid and afs_vget */

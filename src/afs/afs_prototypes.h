@@ -1428,6 +1428,7 @@ extern void afs_CheckVolumeNames(int flags);
 extern int afs_VolNameCacheInit(int a_nbuckets, int a_nentries);
 extern int afs_VolNameCacheIncRef(int a_volid, char *a_volname);
 extern int afs_VolNameCacheDecRef(int a_volid);
+extern int afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len);
 
 /* Prototypes for generated files that aren't really in src/afs/ */
 

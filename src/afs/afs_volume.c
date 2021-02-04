@@ -1458,3 +1458,33 @@ afs_VolNameCacheDecRef(int a_volid)
  done:
     return code;
 }
+
+/**
+ * Get entry from the volume name cache.
+ *
+ * @param[in]   a_volid    volume id
+ * @param[out]  a_volname  volume name
+ * @param[out]  a_len      length of a_volname
+ *
+ * @note volume name must be freed by the caller.
+ *
+ * @return 0 on success; errno otherwise.
+ */
+int
+afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len)
+{
+    int code;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+    memset(&entry, 0, sizeof(entry));
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code == 0) {
+	*a_volname = entry.name;
+	*a_len = entry.len;
+    }
+    return code;
+}
