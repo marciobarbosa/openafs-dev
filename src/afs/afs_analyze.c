@@ -575,6 +575,8 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 		    /* do not promote to shouldRetry if not already */
 		    if (afs_ClearStatus(afid, op, NULL) == 0)
 			shouldRetry = 0;
+		    if (afs_fallbackcell && !(areq->flags & O_NOFOLLOW))
+			shouldRetry = 1;
 		}
 	    }
 	}
