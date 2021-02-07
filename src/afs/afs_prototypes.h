@@ -1429,6 +1429,9 @@ extern int afs_VolNameCacheInit(int a_nbuckets, int a_nentries);
 extern int afs_VolNameCacheIncRef(int a_volid, char *a_volname);
 extern int afs_VolNameCacheDecRef(int a_volid);
 extern int afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len);
+extern void afs_VolNameCacheMapIds(int a_maincell_id, int a_fbcell_id);
+extern int afs_VolNameCacheGetMainCellId(int a_fbcell_id, int *a_maincell_id);
+extern int afs_VolNameCacheGetFallbackCellId(int a_maincell_id, int *a_fbcell_id);
 
 /* Prototypes for generated files that aren't really in src/afs/ */
 

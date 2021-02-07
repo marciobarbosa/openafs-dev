@@ -71,6 +71,9 @@ struct afs_volnamecache_entry {
 };
 struct opr_cache *afs_volnamecache;
 
+struct opr_cache *afs_map_to_fallbackcell;
+struct opr_cache *afs_map_to_maincell;
+
 /* Forward declarations */
 static struct volume *afs_NewVolumeByName(char *aname, afs_int32 acell,
 					  int agood, struct vrequest *areq,
@@ -1373,6 +1376,19 @@ afs_VolNameCacheInit(int a_nbuckets, int a_nentries)
     opts.destructor = afs_VolNameCacheDestroy;
 
     code = opr_cache_init(&opts, &afs_volnamecache);
+    if (code != 0) {
+	goto done;
+    }
+
+    opts.fillentry = NULL;
+    opts.destructor = NULL;
+
+    code = opr_cache_init(&opts, &afs_map_to_fallbackcell);
+    if (code != 0) {
+	goto done;
+    }
+
+    code = opr_cache_init(&opts, &afs_map_to_maincell);
  done:
     return code;
 }
@@ -1487,4 +1503,42 @@ afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len)
 	*a_len = entry.len;
     }
     return code;
+}
+
+/**
+ * Map volume ids of main cell and fallback cell.
+ *
+ * @param[in]  a_maincell_id  volume id used in the main cell
+ * @param[in]  a_fbcell_id    volume id used in the fallback cell
+ */
+void
+afs_VolNameCacheMapIds(int a_maincell_id, int a_fbcell_id)
+{
+    opr_cache_put(afs_map_to_fallbackcell,
+	    	  &a_maincell_id, sizeof(a_maincell_id),
+		  &a_fbcell_id, sizeof(a_fbcell_id));
+
+    opr_cache_put(afs_map_to_maincell,
+	    	  &a_fbcell_id, sizeof(a_fbcell_id),
+		  &a_maincell_id, sizeof(a_maincell_id));
+}
+
+int
+afs_VolNameCacheGetMainCellId(int a_fbcell_id, int *a_maincell_id)
+{
+    size_t idlen = sizeof(*a_maincell_id);
+
+    return opr_cache_get(afs_map_to_maincell,
+	    		 &a_fbcell_id, sizeof(a_fbcell_id),
+			 a_maincell_id, &idlen);
+}
+
+int
+afs_VolNameCacheGetFallbackCellId(int a_maincell_id, int *a_fbcell_id)
+{
+    size_t idlen = sizeof(*a_fbcell_id);
+
+    return opr_cache_get(afs_map_to_fallbackcell,
+	    		 &a_maincell_id, sizeof(a_maincell_id),
+			 a_fbcell_id, &idlen);
 }

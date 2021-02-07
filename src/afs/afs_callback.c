@@ -408,10 +408,18 @@ ClearCallBack(struct rx_connection *a_conn,
 #ifdef AFS_DARWIN80_ENV
     vnode_t vp;
 #endif
+    int code, volid;
 
     AFS_STATCNT(ClearCallBack);
 
     AFS_ASSERT_GLOCK();
+
+    code = afs_VolNameCacheGetMainCellId(a_fid->Volume, &volid);
+    if (code == 0) {
+	afs_warn("<marcio> volume id found: %d\n", volid);
+    } else {
+	afs_warn("<marcio> volume not found\n");
+    }
 
     /*
      * XXXX Don't hold any server locks here because of callback protocol XXX

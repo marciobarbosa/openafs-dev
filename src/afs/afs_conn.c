@@ -307,6 +307,9 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
 	code = afs_VolNameCacheGet(afid->Fid.Volume, &volname, &volname_len);
 	if (code == 0) {
 	    tv = afs_GetVolumeByName(volname, tcell, 1, areq, READ_LOCK);
+	    if (tv != NULL) {
+		afs_VolNameCacheMapIds(afid->Fid.Volume, tv->volume);
+	    }
 	    afs_osi_Free(volname, volname_len);
 	} else {
 	    afs_warn("<marcio> volume %d not found\n", afid->Fid.Volume);
