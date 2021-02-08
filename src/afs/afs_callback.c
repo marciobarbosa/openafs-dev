@@ -409,16 +409,40 @@ ClearCallBack(struct rx_connection *a_conn,
     vnode_t vp;
 #endif
     int code, volid;
+    struct server *ts;
+    struct rx_peer *peer;
+    struct cell *pcell;
+    struct VenusFid tfid;
+    int fallbackcell;
+    int fallbackvol;
+    int fallbackclear = 0;
 
     AFS_STATCNT(ClearCallBack);
 
     AFS_ASSERT_GLOCK();
 
-    code = afs_VolNameCacheGetMainCellId(a_fid->Volume, &volid);
-    if (code == 0) {
-	afs_warn("<marcio> volume id found: %d\n", volid);
-    } else {
-	afs_warn("<marcio> volume not found\n");
+    if (afs_fallbackcell) {
+	pcell = afs_GetPrimaryCell(READ_LOCK);
+	if (pcell && pcell->lcellp) {
+	    peer = rx_PeerOf(a_conn);
+	    ts = afs_FindServer(rx_HostOf(peer), rx_PortOf(peer), 0, 0);
+	    if (ts && (pcell->lcellp->cellNum == ts->cell->cellNum)) {
+		/* callback came from the fallback cell */
+		fallbackcell = pcell->lcellp->cellNum;
+		fallbackvol = a_fid->Volume;
+		code = afs_VolNameCacheGetMainCellId(fallbackvol, &volid);
+		if (code == 0) {
+		    a_fid->Volume = volid;
+		    fallbackclear = 1;
+		    afs_warn("<marcio> clear %d (fb: %d)\n", volid, fallbackvol);
+		} else {
+		    afs_warn("<marcio> volume %d not found\n", fallbackvol);
+		}
+	    }
+	}
+	if (pcell) {
+	    afs_PutCell(pcell, READ_LOCK);
+	}
     }
 
     /*
@@ -504,7 +528,12 @@ loop1:
 	    /*
 	     * XXXX Don't hold any locks here XXXX
 	     */
-	    tv = afs_FindVolume(&localFid, 0);
+	    tfid = localFid;
+	    if (fallbackclear) {
+		tfid.Cell = fallbackcell;
+		tfid.Fid.Volume = fallbackvol;
+	    }
+	    tv = afs_FindVolume(&tfid, 0);
 	    if (tv) {
 		afs_ResetVolumeInfo(tv);
 		afs_PutVolume(tv, 0);

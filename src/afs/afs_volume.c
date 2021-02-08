@@ -67,6 +67,7 @@ afs_int32 fvTable[NFENTRIES];
 struct afs_volnamecache_entry {
     char *name;
     size_t len;
+    char readonly;
     unsigned int refcount;
 };
 struct opr_cache *afs_volnamecache;
@@ -1407,7 +1408,7 @@ afs_VolNameCacheInit(int a_nbuckets, int a_nentries)
  * @return 0 on success; -1 otherwise.
  */
 int
-afs_VolNameCacheIncRef(int a_volid, char *a_volname)
+afs_VolNameCacheIncRef(int a_volid, char *a_volname, char a_readonly)
 {
     int code = -1;
     size_t ilen, elen;
@@ -1426,7 +1427,11 @@ afs_VolNameCacheIncRef(int a_volid, char *a_volname)
 	memset(&entry, 0, sizeof(entry));
 	entry.name = afs_strdup(a_volname);
 	entry.len = strlen(a_volname);
+	entry.readonly = a_readonly;
 	entry.refcount = 1;
+	if (a_readonly) {
+	    afs_warn("<marcio> adding read-only entry: %d\n", a_volid);
+	}
     } else {
 	goto done;
     }
@@ -1481,13 +1486,14 @@ afs_VolNameCacheDecRef(int a_volid)
  * @param[in]   a_volid    volume id
  * @param[out]  a_volname  volume name
  * @param[out]  a_len      length of a_volname
+ * @param[out]  a_ro       set if volume is read-only
  *
  * @note volume name must be freed by the caller.
  *
  * @return 0 on success; errno otherwise.
  */
 int
-afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len)
+afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len, char *a_ro)
 {
     int code;
     size_t ilen, elen;
@@ -1501,6 +1507,7 @@ afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len)
     if (code == 0) {
 	*a_volname = entry.name;
 	*a_len = entry.len;
+	*a_ro = entry.readonly;
     }
     return code;
 }

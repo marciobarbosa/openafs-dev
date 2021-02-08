@@ -294,6 +294,7 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
 	int code;
 	char *volname;
 	size_t volname_len;
+	char ro;
 	struct cell *cellp;
 
 	areq->initd = 0;
@@ -304,11 +305,21 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
 	tcell = cellp->lcellp->cellNum;
 	afs_PutCell(cellp, READ_LOCK);
 
-	code = afs_VolNameCacheGet(afid->Fid.Volume, &volname, &volname_len);
+	code =
+	    afs_VolNameCacheGet(afid->Fid.Volume, &volname, &volname_len, &ro);
 	if (code == 0) {
 	    tv = afs_GetVolumeByName(volname, tcell, 1, areq, READ_LOCK);
 	    if (tv != NULL) {
-		afs_VolNameCacheMapIds(afid->Fid.Volume, tv->volume);
+		if (ro) {
+		    afs_warn("<marcio> using ro copy\n");
+		    afs_VolNameCacheMapIds(afid->Fid.Volume, tv->roVol);
+		    afid->Fid.Volume = tv->roVol;
+		} else {
+		    afs_warn("<marcio> using rw copy\n");
+		    afs_VolNameCacheMapIds(afid->Fid.Volume, tv->volume);
+		    afid->Fid.Volume = tv->volume;
+		}
+		afs_warn("<marcio> rw: %d ro: %d\n", tv->volume, tv->roVol);
 	    }
 	    afs_osi_Free(volname, volname_len);
 	} else {

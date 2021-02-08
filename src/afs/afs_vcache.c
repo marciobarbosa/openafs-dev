@@ -1138,7 +1138,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
     afs_PostPopulateVCache(tvc, afid, seq);
 
     if (afs_fallbackcell) {
-	code = afs_VolNameCacheIncRef(afid->Fid.Volume, afid->VolumeName);
+	code = afs_VolNameCacheIncRef(afid->Fid.Volume, afid->VolumeName, afid->ReadOnlyVol);
 	if (code != 0) {
 	    afs_warn("afs_NewVCache: can't change ref of %d\n", afid->Fid.Volume);
 	}

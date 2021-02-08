@@ -990,6 +990,10 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 
 		afs_PutVCache(tvcp);
 		tvcp = NULL;
+
+		if (vfid.Fid.Volume != adp->f.fid.Fid.Volume) {
+		    fidParm.AFSCBFids_val[i].Volume = vfid.Fid.Volume;
+		}
 	    }
 
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_BULKSTATUS);
@@ -1878,9 +1882,16 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 			char *cpos;
 
 			mfid.VolumeName = tvc->linkData + 1;
+			mfid.ReadOnlyVol = 0;
+
 			cpos = afs_strchr(mfid.VolumeName, ':');
 			if (cpos) {
 			    mfid.VolumeName = cpos + 1;
+			}
+
+			if ((tvc->f.states & CRO)) {
+			    /* read-only volume */
+			    mfid.ReadOnlyVol = 1;
 			}
 		    }
 

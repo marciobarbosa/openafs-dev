@@ -1426,9 +1426,9 @@ extern struct volume *afs_UFSGetVolSlot(afs_int32 volid, struct cell *cell);
 extern void afs_CheckVolumeNames(int flags);
 
 extern int afs_VolNameCacheInit(int a_nbuckets, int a_nentries);
-extern int afs_VolNameCacheIncRef(int a_volid, char *a_volname);
+extern int afs_VolNameCacheIncRef(int a_volid, char *a_volname, char a_readonly);
 extern int afs_VolNameCacheDecRef(int a_volid);
-extern int afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len);
+extern int afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len, char *a_ro);
 extern void afs_VolNameCacheMapIds(int a_maincell_id, int a_fbcell_id);
 extern int afs_VolNameCacheGetMainCellId(int a_fbcell_id, int *a_maincell_id);
 extern int afs_VolNameCacheGetFallbackCellId(int a_maincell_id, int *a_fbcell_id);

@@ -571,15 +571,19 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 		if (acode == RX_MSGSIZE)
 		    shouldRetry = 1;
 		else {
+		    afs_warn("<marcio> here 1\n");
 		    areq->networkError = 1;
 		    /* do not promote to shouldRetry if not already */
 		    if (afs_ClearStatus(afid, op, NULL) == 0)
 			shouldRetry = 0;
-		    if (afs_fallbackcell && !(areq->flags & O_NOFOLLOW))
+		    if (afs_fallbackcell) {
 			shouldRetry = 1;
+			afs_warn("<marcio> here 2\n");
+		    }
 		}
 	    }
 	}
+	afs_warn("<marcio> here 3\n");
 	if (aconn) /* simply lacking aconn->server doesn't absolve this */
 	    afs_PutConn(aconn, rxconn, locktype);
 	return shouldRetry;
