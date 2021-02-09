@@ -855,6 +855,11 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
     struct vrequest *treq = NULL;
     struct rx_connection *rxconn;
 
+    char *volname = NULL;
+    size_t vollen = 0;
+    afs_int32 volid = 0;
+    char ro;
+
     if (strlen(aname) > VL_MAXNAMELEN)	/* Invalid volume name */
 	return NULL;
 
@@ -880,37 +885,44 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
     ntve = (struct nvldbentry *)tve;
     utve = (struct uvldbentry *)tve;
 
+    volname = aname;
+    if (afs_fallbackcell) {
+	volid = afs_vtoi(aname);
+	if (volid != 0) {
+	    afs_VolNameCacheGet(volid, &volname, &vollen, &ro);
+	}
+    }
+
     do {
 	tconn =
-	    afs_ConnByMHosts(tcell->cellHosts, tcell->vlport, tcell->cellNum,
-			     treq, SHARED_LOCK, 0, &rxconn);
+	    afs_ConnByMHosts(&tcell, treq, SHARED_LOCK, 0, &rxconn);
 	if (tconn) {
 	    if (tconn->parent->srvr->server->flags & SNO_LHOSTS) {
 		type = 0;
 		RX_AFS_GUNLOCK();
-		code = VL_GetEntryByNameO(rxconn, aname, tve);
+		code = VL_GetEntryByNameO(rxconn, volname, tve);
 		RX_AFS_GLOCK();
 	    } else if (tconn->parent->srvr->server->flags & SYES_LHOSTS) {
 		type = 1;
 		RX_AFS_GUNLOCK();
-		code = VL_GetEntryByNameN(rxconn, aname, ntve);
+		code = VL_GetEntryByNameN(rxconn, volname, ntve);
 		RX_AFS_GLOCK();
 	    } else {
 		type = 2;
 		RX_AFS_GUNLOCK();
-		code = VL_GetEntryByNameU(rxconn, aname, utve);
+		code = VL_GetEntryByNameU(rxconn, volname, utve);
 		RX_AFS_GLOCK();
 		if (!(tconn->parent->srvr->server->flags & SVLSRV_UUID)) {
 		    if (code == RXGEN_OPCODE) {
 			type = 1;
 			RX_AFS_GUNLOCK();
-			code = VL_GetEntryByNameN(rxconn, aname, ntve);
+			code = VL_GetEntryByNameN(rxconn, volname, ntve);
 			RX_AFS_GLOCK();
 			if (code == RXGEN_OPCODE) {
 			    type = 0;
 			    tconn->parent->srvr->server->flags |= SNO_LHOSTS;
 			    RX_AFS_GUNLOCK();
-			    code = VL_GetEntryByNameO(rxconn, aname, tve);
+			    code = VL_GetEntryByNameO(rxconn, volname, tve);
 			    RX_AFS_GLOCK();
 			} else if (!code)
 			    tconn->parent->srvr->server->flags |= SYES_LHOSTS;
@@ -948,7 +960,7 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
 	ve = (char *)ntve;
     else
 	ve = (char *)tve;
-    tv = afs_SetupVolume(0, aname, ve, tcell, agood, type, treq);
+    tv = afs_SetupVolume(0, volname, ve, tcell, agood, type, treq);
     if ((agood == 3) && tv && tv->backVol) {
 	/*
 	 * This means that very soon we'll ask for the BK volume so
@@ -969,6 +981,9 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
 	if (tv1) {
 	    tv1->refCount--;
 	}
+    }
+    if (vollen != 0) {
+	afs_osi_Free(volname, vollen);
     }
     osi_FreeLargeSpace(tbuffer);
     afs_PutCell(tcell, READ_LOCK);
@@ -1212,8 +1227,8 @@ LockAndInstallUVolumeEntry(struct volume *av, struct uvldbentry *ve, int acell,
 		memset(&addrs, 0, sizeof(addrs));
 		do {
 		    tconn =
-			afs_ConnByMHosts(tcell->cellHosts, tcell->vlport,
-					 tcell->cellNum, areq, SHARED_LOCK,
+			afs_ConnByMHosts(&tcell,
+					 areq, SHARED_LOCK,
 					 0, &rxconn);
 		    if (tconn) {
 			RX_AFS_GUNLOCK();

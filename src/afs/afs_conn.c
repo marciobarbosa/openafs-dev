@@ -329,6 +329,13 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     } else {
 	/* Get fid's volume. */
 	tv = afs_GetVolume(afid, areq, READ_LOCK);
+	if (tv) {
+	    if (tv->cell != afid->Cell) {
+		afs_warn("<marcio> different cell!\n");
+		/* <marcio> change this */
+		afid->Fid.Volume = tv->volume;
+	    }
+	}
     }
     if (!tv) {
 	if (areq) {
@@ -670,8 +677,7 @@ afs_ConnByHost(struct server *aserver, unsigned short aport, afs_int32 acell,
  * @return The established connection or NULL.
  */
 struct afs_conn *
-afs_ConnByMHosts(struct server *ahosts[], unsigned short aport,
-		 afs_int32 acell, struct vrequest *areq,
+afs_ConnByMHosts(struct cell **acell, struct vrequest *areq,
 		 afs_int32 locktype, afs_int32 replicated,
 		 struct rx_connection **rxconn)
 {
@@ -679,14 +685,35 @@ afs_ConnByMHosts(struct server *ahosts[], unsigned short aport,
     struct afs_conn *tconn;
     struct server *ts;
 
+    struct server **hosts;
+    unsigned short port;
+    afs_int32 cellnum;
+    struct cell *tcell = NULL;
+
+    hosts = (*acell)->cellHosts;
+    port = (*acell)->vlport;
+    cellnum = (*acell)->cellNum;
+
+    if (afs_fallbackcell && areq->networkError) {
+	tcell = afs_GetCell((*acell)->lcellp->cellNum, READ_LOCK);
+	if (tcell) {
+	    hosts = tcell->cellHosts;
+	    port = tcell->vlport;
+	    cellnum = tcell->cellNum;
+	    afs_PutCell(*acell, READ_LOCK);
+	    *acell = tcell;
+	}
+	/* <marcio> handle */
+    }
+
     *rxconn = NULL;
 
     /* try to find any connection from the set */
     AFS_STATCNT(afs_ConnByMHosts);
     for (i = 0; i < AFS_MAXCELLHOSTS; i++) {
-	if ((ts = ahosts[i]) == NULL)
+	if ((ts = hosts[i]) == NULL)
 	    break;
-	tconn = afs_ConnByHost(ts, aport, acell, areq, 0, locktype,
+	tconn = afs_ConnByHost(ts, port, cellnum, areq, 0, locktype,
 			       replicated, rxconn);
 	if (tconn) {
 	    return tconn;
