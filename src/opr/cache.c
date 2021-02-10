@@ -481,3 +481,37 @@ opr_cache_free(struct opr_cache **a_cache)
 
     opr_Free(cache, sizeof(*cache));
 }
+
+/**
+ * Remove an item from the cache.
+ *
+ * @param[in] cache   The opr_cache to use.
+ * @param[in] key_buf The key of the entry to be removed.
+ * @param[in] key_len The size of 'key_buf'.
+ */
+void
+opr_cache_drop(struct opr_cache *cache, void *key_buf, size_t key_len)
+{
+    struct cache_entry *entry;
+    int code;
+
+    if (cache == NULL || key_buf == NULL || key_len < 1) {
+	return;
+    }
+
+    opr_mutex_enter(&cache->lock);
+
+    code = find_entry(cache, key_buf, key_len, &entry);
+    if (code != 0) {
+	goto done;
+    }
+
+    if (cache->destructor != NULL) {
+	/* Release memory pointed by the members of val_buf. */
+	(*cache->destructor)(entry->val_buf);
+    }
+    free_entry_contents(entry);
+    opr_Free(entry, sizeof(*entry));
+ done:
+    opr_mutex_exit(&cache->lock);
+}
