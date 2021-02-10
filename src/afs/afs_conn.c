@@ -285,18 +285,18 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     afs_int32 replicated = -1; /* a single RO will increment to 0 */
     afs_int32 tcell;
 
+    int code;
+    char *volname;
+    size_t volname_len;
+    char ro;
+    struct cell *cellp;
+
     *rxconn = NULL;
     tcell = afid->Cell;
 
     AFS_STATCNT(afs_Conn);
 
     if (afs_fallbackcell && areq->networkError) {
-	int code;
-	char *volname;
-	size_t volname_len;
-	char ro;
-	struct cell *cellp;
-
 	areq->initd = 0;
 	afs_FinalizeReq(areq);
 	areq->flags |= O_NOFOLLOW;
@@ -331,9 +331,24 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
 	tv = afs_GetVolume(afid, areq, READ_LOCK);
 	if (tv) {
 	    if (tv->cell != afid->Cell) {
+		code = afs_VolNameCacheGet(afid->Fid.Volume,
+					   &volname,
+					   &volname_len,
+					   &ro);
+		if (code == 0) {
+		    afs_osi_Free(volname, volname_len);
+		    if (ro) {
+			afs_VolNameCacheMapIds(afid->Fid.Volume, tv->roVol);
+			afid->Fid.Volume = tv->roVol;
+			afs_warn("<marcio> different cell read-only\n");
+		    } else {
+			afs_VolNameCacheMapIds(afid->Fid.Volume, tv->volume);
+			afid->Fid.Volume = tv->volume;
+			afs_warn("<marcio> different cell read-write\n");
+		    }
+		}
 		afs_warn("<marcio> different cell!\n");
 		/* <marcio> change this */
-		afid->Fid.Volume = tv->volume;
 	    }
 	}
     }
