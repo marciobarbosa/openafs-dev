@@ -1705,17 +1705,19 @@ afs_RemoteLookup(struct VenusFid *afid, struct vrequest *areq,
     struct rx_connection *rxconn;
     struct AFSFetchStatus OutDirStatus;
     XSTATS_DECLS;
+    struct VenusFid vfid;	/* Local copy of afid */
     if (!name)
 	name = "";		/* XXX */
+    vfid = *afid;
     do {
-	tc = afs_Conn(afid, areq, SHARED_LOCK, &rxconn);
+	tc = afs_Conn(&vfid, areq, SHARED_LOCK, &rxconn);
 	if (tc) {
 	    if (serverp)
 		*serverp = tc->parent->srvr->server;
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_XLOOKUP);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_Lookup(rxconn, (struct AFSFid *)&afid->Fid, name,
+		RXAFS_Lookup(rxconn, (struct AFSFid *)&vfid.Fid, name,
 			     (struct AFSFid *)&nfid->Fid, OutStatusp,
 			     &OutDirStatus, CallBackp, tsyncp);
 	    RX_AFS_GLOCK();
@@ -1723,7 +1725,7 @@ afs_RemoteLookup(struct VenusFid *afid, struct vrequest *areq,
 	} else
 	    code = -1;
     } while (afs_Analyze
-	     (tc, rxconn, code, afid, areq, AFS_STATS_FS_RPCIDX_XLOOKUP, SHARED_LOCK,
+	     (tc, rxconn, code, &vfid, areq, AFS_STATS_FS_RPCIDX_XLOOKUP, SHARED_LOCK,
 	      NULL));
 
     return code;
@@ -2466,8 +2468,11 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
     struct AFSVolSync tsync;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+    struct VenusFid vfid; /* Local copy of afid */
+
+    vfid = *afid;
     do {
-	tc = afs_Conn(afid, areq, SHARED_LOCK, &rxconn);
+	tc = afs_Conn(&vfid, areq, SHARED_LOCK, &rxconn);
 	avc->dchint = NULL;	/* invalidate hints */
 	if (tc) {
 	    avc->callback = tc->parent->srvr->server;
@@ -2475,7 +2480,7 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHSTATUS);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_FetchStatus(rxconn, (struct AFSFid *)&afid->Fid, Outsp,
+		RXAFS_FetchStatus(rxconn, (struct AFSFid *)&vfid.Fid, Outsp,
 				  &CallBack, &tsync);
 	    RX_AFS_GLOCK();
 
@@ -2488,7 +2493,7 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
 	} else
 	    code = -1;
     } while (afs_Analyze
-	     (tc, rxconn, code, afid, areq, AFS_STATS_FS_RPCIDX_FETCHSTATUS,
+	     (tc, rxconn, code, &vfid, areq, AFS_STATS_FS_RPCIDX_FETCHSTATUS,
 	      SHARED_LOCK, NULL));
 
     if (!code) {
