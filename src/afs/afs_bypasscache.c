@@ -541,6 +541,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 #ifdef AFS_64BIT_CLIENT
     afs_int32 length_hi, bytes, locked;
 #endif
+    struct VenusFid vfid;	/* Local copy of the fid stored by avc */
 
     struct afs_conn *tc;
     struct rx_call *tcall;
@@ -558,15 +559,16 @@ afs_PrefetchNoCache(struct vcache *avc,
 #endif
 
     tcallspec = osi_Alloc(sizeof(struct tlocal1));
+    vfid = avc->f.fid;
     do {
-	tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK /* ignored */, &rxconn);
+	tc = afs_Conn(&vfid, areq, SHARED_LOCK /* ignored */, &rxconn);
 	if (tc) {
 	    avc->callback = tc->parent->srvr->server;
 	    tcall = rx_NewCall(rxconn);
 #ifdef AFS_64BIT_CLIENT
 	    if (!afs_serverHasNo64Bit(tc)) {
 		code = StartRXAFS_FetchData64(tcall,
-					      (struct AFSFid *) &avc->f.fid.Fid,
+					      (struct AFSFid *) &vfid.Fid,
 					      auio->uio_offset,
 					      bparms->length);
 		if (code == 0) {
@@ -594,7 +596,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 		    if (!tcall)
 			tcall = rx_NewCall(rxconn);
 		    code = StartRXAFS_FetchData(tcall,
-					(struct AFSFid *) &avc->f.fid.Fid,
+					(struct AFSFid *) &vfid.Fid,
 					pos, bparms->length);
 		    COND_RE_GLOCK(locked);
 		}
@@ -602,7 +604,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 	    }
 #else
 	    code = StartRXAFS_FetchData(tcall,
-			                (struct AFSFid *) &avc->f.fid.Fid,
+					(struct AFSFid *) &vfid.Fid,
 					auio->uio_offset, bparms->length);
 #endif
 	    if (code == 0) {
@@ -612,7 +614,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 	    } else {
 		afs_warn("BYPASS: StartRXAFS_FetchData failed: %d\n", code);
 		unlock_and_release_pages(auio);
-		(void)afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+		(void)afs_Analyze(tc, rxconn, code, &vfid, areq,
 				  AFS_STATS_FS_RPCIDX_FETCHDATA,
 				  SHARED_LOCK, NULL);
 		goto done;
@@ -629,12 +631,12 @@ afs_PrefetchNoCache(struct vcache *avc,
 	    afs_warn("BYPASS: No connection.\n");
 	    code = -1;
 	    unlock_and_release_pages(auio);
-	    (void)afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+	    (void)afs_Analyze(tc, rxconn, code, &vfid, areq,
 			      AFS_STATS_FS_RPCIDX_FETCHDATA,
 			      SHARED_LOCK, NULL);
 	    goto done;
 	}
-    } while (afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+    } while (afs_Analyze(tc, rxconn, code, &vfid, areq,
 						 AFS_STATS_FS_RPCIDX_FETCHDATA,
 						 SHARED_LOCK,0));
 done:
