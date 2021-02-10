@@ -105,6 +105,19 @@ opr_threadname_set(const char *threadname)
 struct opr_cache_opts {
     afs_uint32 max_entries;
     afs_uint32 n_buckets;
+
+    /*
+     * If the entries of this cache have members that point to dynamically
+     * allocated memory, use this callback to inform opr_cache how to properly
+     * copy the members of the fetched entry.
+     */
+    int (*fillentry)(void *, void*);
+    /*
+     * If the entries of this cache have members that point to dynamically
+     * allocated memory, use this callback to inform opr_cache how to properly
+     * release the memory used by them.
+     */
+    void (*destructor)(void *);
 };
 struct opr_cache;
 
