@@ -199,6 +199,9 @@ afs_FlushVCache(struct vcache *avc, int *slept)
 	}
     }
 
+    if (afs_fallbackcell_enable) {
+	afs_VolNameCacheDecRef(avc->f.fid.Fid.Volume);
+    }
     /* remove entry from the volume hash table */
     QRemove(&avc->vhashq);
 
@@ -1128,6 +1131,12 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 #endif
     afs_PostPopulateVCache(tvc, afid, seq);
 
+    if (afs_fallbackcell_enable) {
+	/* mt point already incremented this entry when created it */
+	if (tvc->mvstat != AFS_MVSTAT_MTPT) {
+	    afs_VolNameCacheIncRef(afid->Fid.Volume);
+	}
+    }
     return tvc;
 }				/*afs_NewVCache */
 
