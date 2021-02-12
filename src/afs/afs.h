@@ -314,6 +314,7 @@ struct afs_cbr {
 #define CHasVolRef		0x10	/* volumes were referenced */
 #define CLinkedCell		0x20	/* has a linked cell in lcellp */
 #define CHush                   0x40    /* don't display until referenced */
+#define CFallBackCell           0x80    /* use linked cell as a fallback cell */
 
 struct cell {
     struct afs_q lruq;		/* lru q next and prev */
@@ -1548,6 +1549,7 @@ struct afs_fakestat_state {
 extern int afs_fakestat_enable;
 extern int afs_rmtsys_enable;
 extern int afsd_dynamic_vcaches;
+extern int afs_fallbackcell_enable;
 
 /*
  * Wrappers for access to credentials structure members

@@ -383,6 +383,75 @@ afs_PrintServerErrors(struct vrequest *areq, struct VenusFid *afid)
     afs_warnuser("%s\n", term);
 }
 
+/**
+ * Check if we should retry on the fallback cell.
+ *
+ * Check a given operation should be retried on the fallback cell. If so,
+ * translate the volume id / cell number accordingly.
+ *
+ * @param[inout]  afid   fid of the file involved in the action
+ * @param[inout]  areq   request associated with this operation
+ * @param[inout]  acell  cell where afid can be found
+ *
+ * @return 1 if we should retry; 0 otherwise.
+ */
+static int
+RetryOnFBCell(struct VenusFid *afid, struct vrequest *areq, struct cell **acell)
+{
+    int code = -1, retry = 0;
+    struct volume *vol;
+    struct cell *pcell;
+    int cellnum;
+
+    char *volname = NULL;
+    size_t volname_len;
+
+    if (areq == NULL) {
+	goto done;
+    }
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell == NULL || pcell->lcellp == NULL) {
+	goto done;
+    }
+
+    cellnum = pcell->lcellp->cellNum;
+    afs_PutCell(pcell, READ_LOCK);
+
+    if (afid != NULL) {
+	/* fileserver op */
+	code = afs_VolNameCacheGet(afid->Fid.Volume, &volname, &volname_len);
+	if (code != 0) {
+	    goto done;
+	}
+
+	vol = afs_GetVolumeByName(volname, cellnum, 1, areq, READ_LOCK);
+	if (vol == NULL) {
+	    goto done;
+	}
+	afs_VolNameCacheMapIds(afid->Fid.Volume, vol->roVol);
+	afid->Fid.Volume = vol->roVol;
+	afid->Cell = cellnum;
+    } else {
+	/* vlserver / ptserver op */
+	pcell = afs_GetCell(cellnum, READ_LOCK);
+	if (pcell == NULL) {
+	    goto done;
+	}
+	afs_PutCell(*acell, READ_LOCK);
+	*acell = pcell;
+    }
+
+    retry = 1;
+    areq->initd = 0;
+    afs_FinalizeReq(areq);
+ done:
+    if (volname != NULL) {
+	afs_osi_Free(volname, volname_len);
+    }
+    return retry;
+}
+
 /*!
  * \brief
  *	Analyze the outcome of an RPC operation, taking whatever support
@@ -580,6 +649,8 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 		    /* do not promote to shouldRetry if not already */
 		    if (afs_ClearStatus(afid, op, NULL) == 0)
 			shouldRetry = 0;
+		    if (afs_fallbackcell_enable)
+			shouldRetry = RetryOnFBCell(afid, areq, acell);
 		}
 	    }
 	}

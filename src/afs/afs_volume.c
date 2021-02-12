@@ -39,6 +39,7 @@
 #include "afsincludes.h"	/* Afs-based standard headers */
 #include "afs/afs_stats.h"	/* afs statistics */
 #include "afs/afs_dynroot.h"
+#include "afs/opr.h"
 
 #if	defined(AFS_SUN5_ENV)
 #include <inet/led.h>
@@ -52,6 +53,19 @@
 #define ERROR_TABLE_BASE_VL     (363520L)
 #define VL_NOENT                (363524L)
 #endif /* vlserver error base define */
+
+/* Volume name cache used if afs_fallbackcell_enable is set. */
+struct afs_volnamecache_entry {
+    char *name;
+    size_t len;
+    unsigned int refcount;
+};
+/* map volid to volume name */
+static struct opr_cache *afs_volnamecache;
+/* map our volid to the fallback cell volid */
+static struct opr_cache *afs_main_to_fallback;
+/* map the fallback cell volid to our volid */
+static struct opr_cache *afs_fallback_to_main;
 
 /* Exported variables */
 afs_int32 afs_volume_ttl = 0;
@@ -1294,4 +1308,306 @@ afs_ResetVolumeInfo(struct volume *tv)
 	tv->name = NULL;
     }
     ReleaseWriteLock(&tv->lock);
+}
+
+/* Volume name cache used if afs_fallbackcell_enable is set. */
+
+/**
+ * Copy volume name associated with a given entry.
+ *
+ * @param[in]   a_src_entry  entry from the cache
+ * @param[out]  a_dst_entry  entry provided by the caller
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+static int
+afs_VolNameCacheFillEntry(void *a_src_entry, void *a_dst_entry)
+{
+    struct afs_volnamecache_entry *s_entry = a_src_entry;
+    struct afs_volnamecache_entry *d_entry = a_dst_entry;
+
+    if (s_entry == NULL || d_entry == NULL) {
+	return -1;
+    }
+
+    d_entry->name = afs_strdup(s_entry->name);
+    if (d_entry->name == NULL) {
+	return -1;
+    }
+    return 0;
+}
+
+/**
+ * Release volume name associated with a given entry.
+ *
+ * @param[in]  a_entry  entry from the cache
+ */
+static void
+afs_VolNameCacheDestroy(void *a_entry)
+{
+    struct afs_volnamecache_entry *entry = a_entry;
+
+    if (entry == NULL) {
+	return;
+    }
+    afs_osi_Free(entry->name, entry->len);
+    memset(entry, 0, sizeof(*entry));
+}
+
+/**
+ * Initialize volume name cache.
+ *
+ * @param[in]  a_nbuckets  number of buckets
+ * @param[in]  a_nentries  maximum number of entries
+ *
+ * @return zero on success; non-zero otherwise.
+ */
+int
+afs_VolNameCacheInit(int a_nbuckets, int a_nentries)
+{
+    int code = -1;
+    struct opr_cache_opts opts;
+
+    if (a_nbuckets <= 0 || a_nentries <= 0) {
+	goto done;
+    }
+    memset(&opts, 0, sizeof(opts));
+    opts.n_buckets = a_nbuckets;
+    opts.max_entries = a_nentries;
+    opts.fillentry = afs_VolNameCacheFillEntry;
+    opts.destructor = afs_VolNameCacheDestroy;
+
+    code = opr_cache_init(&opts, &afs_volnamecache);
+
+    opts.fillentry = NULL;
+    opts.destructor = NULL;
+
+    code |= opr_cache_init(&opts, &afs_main_to_fallback);
+    code |= opr_cache_init(&opts, &afs_fallback_to_main);
+ done:
+    if (code != 0) {
+	opr_cache_free(&afs_volnamecache);
+	opr_cache_free(&afs_main_to_fallback);
+	opr_cache_free(&afs_fallback_to_main);
+    }
+    return code;
+}
+
+/**
+ * Add entry into the volume name cache.
+ *
+ * @param[in]  a_volid    volume id
+ * @param[in]  a_volname  volume name
+ *
+ * @note afs_xvcache write lock must be held.
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+afs_VolNameCacheInsert(int a_volid, char *a_volname)
+{
+    int code = -1;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    if (a_volid <= 0 || a_volname == NULL) {
+	goto done;
+    }
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code != ENOENT) {
+	code = -1;
+	goto done;
+    }
+
+    memset(&entry, 0, sizeof(entry));
+    entry.len = strlen(a_volname);
+    entry.refcount = 1;
+
+    entry.name = afs_strdup(a_volname);
+    if (entry.name == NULL) {
+	code = -1;
+	goto done;
+    }
+
+    opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
+    code = 0;
+ done:
+    return code;
+}
+
+/**
+ * Increase reference count of a given entry.
+ *
+ * @param[in]  a_volid    volume id
+ *
+ * @note afs_xvcache write lock must be held.
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+afs_VolNameCacheIncRef(int a_volid)
+{
+    int code = -1;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    if (a_volid <= 0) {
+	goto done;
+    }
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code != 0) {
+	code = -1;
+	goto done;
+    }
+
+    entry.refcount++;
+    opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
+ done:
+    return code;
+}
+
+/**
+ * Decrement reference count of a given entry.
+ *
+ * @param[in]  a_volid  volume id
+ *
+ * @note afs_xvcache write lock must be held.
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+int
+afs_VolNameCacheDecRef(int a_volid)
+{
+    int code = -1;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    if (a_volid <= 0) {
+	goto done;
+    }
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code != 0) {
+	code = -1;
+	goto done;
+    }
+
+    if (entry.refcount > 1) {
+	entry.refcount--;
+	opr_cache_put(afs_volnamecache, &a_volid, ilen, &entry, elen);
+    } else {
+	int rcode, fbid;
+	/* no vcache is referencing this entry. remove it. */
+	rcode = afs_VolNameCacheGetFallbackCellId(a_volid, &fbid);
+	if (rcode == 0) {
+	    opr_cache_drop(afs_fallback_to_main, &fbid, sizeof(fbid));
+	}
+	opr_cache_drop(afs_main_to_fallback, &a_volid, sizeof(a_volid));
+	opr_cache_drop(afs_volnamecache, &a_volid, ilen);
+    }
+ done:
+    return code;
+}
+
+/**
+ * Get entry from the volume name cache.
+ *
+ * @param[in]   a_volid    volume id
+ * @param[out]  a_volname  volume name
+ * @param[out]  a_len      length of a_volname
+ *
+ * @note volume name must be freed by the caller.
+ *
+ * @return 0 on success; errno otherwise.
+ */
+int
+afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len)
+{
+    int code;
+    size_t ilen, elen;
+    struct afs_volnamecache_entry entry;
+
+    ilen = sizeof(a_volid);
+    elen = sizeof(entry);
+    memset(&entry, 0, sizeof(entry));
+
+    code = opr_cache_get(afs_volnamecache, &a_volid, ilen, &entry, &elen);
+    if (code == 0) {
+	*a_volname = entry.name;
+	*a_len = entry.len;
+    }
+    return code;
+}
+
+/**
+ * Map volume ids between cells.
+ *
+ * @param[in]  a_mcell_id   volume id used in the main cell
+ * @param[in]  a_fbcell_id  volume id used in the fallback cell
+ */
+void
+afs_VolNameCacheMapIds(int a_mcell_id, int a_fbcell_id)
+{
+    size_t mlen = sizeof(a_mcell_id);
+    size_t fblen = sizeof(a_fbcell_id);
+
+    opr_cache_put(afs_main_to_fallback, &a_mcell_id, mlen, &a_fbcell_id, fblen);
+    opr_cache_put(afs_fallback_to_main, &a_fbcell_id, fblen, &a_mcell_id, mlen);
+}
+
+/**
+ * Translate fallback cell volume id to the id used in the main cell.
+ *
+ * @param[in]   a_fbcell_id  volume id used in the fallback cell
+ * @param[out]  a_mcell_id   volume id used in the main cell
+ *
+ * @return 0 on success; errno otherwise.
+ */
+int
+afs_VolNameCacheGetMainCellId(int a_fbcell_id, int *a_mcell_id)
+{
+    size_t mlen = sizeof(*a_mcell_id);
+    size_t fblen = sizeof(a_fbcell_id);
+
+    return opr_cache_get(afs_fallback_to_main,
+			 &a_fbcell_id, fblen,
+			 a_mcell_id, &mlen);
+}
+
+/**
+ * Translate main cell volume id to the id used in the fallback cell.
+ *
+ * @param[in]   a_mcell_id   volume id used in the main cell
+ * @param[out]  a_fbcell_id  volume id used in the fallback cell
+ *
+ * @return 0 on success; errno otherwise.
+ */
+int
+afs_VolNameCacheGetFallbackCellId(int a_mcell_id, int *a_fbcell_id)
+{
+    size_t fblen = sizeof(*a_fbcell_id);
+    size_t mlen = sizeof(a_mcell_id);
+
+    return opr_cache_get(afs_main_to_fallback,
+			 &a_mcell_id, mlen,
+			 a_fbcell_id, &fblen);
+}
+
+/**
+ * Release caches.
+ */
+void
+afs_VolNameCacheRelease(void)
+{
+    opr_cache_free(&afs_volnamecache);
+    opr_cache_free(&afs_main_to_fallback);
+    opr_cache_free(&afs_fallback_to_main);
 }

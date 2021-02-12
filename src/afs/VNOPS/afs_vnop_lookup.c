@@ -1872,11 +1872,27 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 		/* next, we want to continue using the target of the mt point */
 		if (tvc->mvid.target_root && (tvc->f.states & CMValid)) {
 		    struct vcache *uvc;
+		    int volid = -1, rcode = -1;
 		    /* now lookup target, to set .. pointer */
 		    afs_Trace2(afs_iclSetp, CM_TRACE_LOOKUP1,
 			       ICL_TYPE_POINTER, tvc, ICL_TYPE_FID,
 			       &tvc->f.fid);
 		    uvc = tvc;	/* remember for later */
+
+		    if (afs_fallbackcell_enable && (tvc->f.states & CRO)) {
+			/* fallback cell is supposed to be read-only */
+			char *volname, *cpos;
+
+			volid = tvc->mvid.target_root->Fid.Volume;
+			volname = tvc->linkData + 1;
+			cpos = afs_strchr(volname, ':');
+			if (cpos) {
+			    volname = cpos + 1;
+			}
+			ObtainWriteLock(&afs_xvcache, 1003);
+			rcode = afs_VolNameCacheInsert(volid, volname);
+			ReleaseWriteLock(&afs_xvcache);
+		    }
 
 		    if (tvolp && (tvolp->states & VForeign)) {
 			/* XXXX tvolp has ref cnt on but not locked! XXX */
@@ -1886,6 +1902,19 @@ afs_lookup(OSI_VC_DECL(adp), char *aname, struct vcache **avcp, afs_ucred_t *acr
 			tvc = afs_GetVCache(tvc->mvid.target_root, treq);
 		    }
 		    afs_PutVCache(uvc);	/* we're done with it */
+
+		    if (rcode == 0) {
+			/*
+			 * We successfully added a new entry into the volume
+			 * name cache. If afs_GetVCache created a new vcache
+			 * (afs_NewVCache), the refcount of this cache entry was
+			 * increased and it is gonna be around. If not, the
+			 * cache entry in question can be removed.
+			 */
+			ObtainWriteLock(&afs_xvcache, 1004);
+			afs_VolNameCacheDecRef(volid);
+			ReleaseWriteLock(&afs_xvcache);
+		    }
 
 		    if (!tvc) {
 			code = EIO;

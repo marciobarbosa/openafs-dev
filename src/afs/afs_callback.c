@@ -370,6 +370,52 @@ SRXAFSCB_GetLock(struct rx_call *a_call, afs_int32 a_index,
 
 }				/*SRXAFSCB_GetLock */
 
+/**
+ * Convert volume id if the callback came from the fallback cell.
+ *
+ * This function checks if the callback came from the fallback cell. If so, it
+ * converts the received volume id to the corresponding volume id used in the
+ * primary cell. Also, this function provides the cell number associated with
+ * the fallback cell so the correct volume can be reset by the caller.
+ *
+ * @param[in]   a_conn    connection involved
+ * @param[in]   a_fid     fid being cleared
+ * @param[out]  a_volid   volume id of a_fid used in the primary cell
+ * @param[out]  a_fbcell  cell number associated with the fallback cell
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+static int
+GetLocalFid(struct rx_connection *a_conn, struct AFSFid *a_fid, int *a_volid,
+	    int *a_fbcell)
+{
+    int code = -1, volid;
+    struct cell *pcell;
+    struct rx_peer *peer;
+    struct server *ts;
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell == NULL || pcell->lcellp == NULL) {
+	goto done;
+    }
+
+    peer = rx_PeerOf(a_conn);
+    ts = afs_FindServer(rx_HostOf(peer), rx_PortOf(peer), 0, 0);
+    if (ts && (ts->cell->cellNum == pcell->lcellp->cellNum)) {
+	/* callback came from the fallback cell */
+	code = afs_VolNameCacheGetMainCellId(a_fid->Volume, &volid);
+	if (code != 0) {
+	    goto done;
+	}
+	*a_volid = volid;
+	*a_fbcell = pcell->lcellp->cellNum;
+    }
+  done:
+    if (pcell) {
+	afs_PutCell(pcell, READ_LOCK);
+    }
+    return code;
+}
 
 /*------------------------------------------------------------------------
  * static ClearCallBack
@@ -408,10 +454,23 @@ ClearCallBack(struct rx_connection *a_conn,
 #ifdef AFS_DARWIN80_ENV
     vnode_t vp;
 #endif
+    int rcode;
+    int volid = -1;
+    int fallbackvol = -1;
+    int fallbackcell = -1;
 
     AFS_STATCNT(ClearCallBack);
 
     AFS_ASSERT_GLOCK();
+
+    if (afs_fallbackcell_enable) {
+	rcode = GetLocalFid(a_conn, a_fid, &volid, &fallbackcell);
+	if (rcode == 0) {
+	    /* this callback came from the fallback cell */
+	    fallbackvol = a_fid->Volume;
+	    a_fid->Volume = volid;
+	}
+    }
 
     /*
      * XXXX Don't hold any server locks here because of callback protocol XXX
@@ -496,6 +555,11 @@ loop1:
 	    /*
 	     * XXXX Don't hold any locks here XXXX
 	     */
+	    if (fallbackvol != -1 && fallbackcell != -1) {
+		/* this callback came from the fallback cell */
+		localFid.Fid.Volume = fallbackvol;
+		localFid.Cell = fallbackcell;
+	    }
 	    tv = afs_FindVolume(&localFid, 0);
 	    if (tv) {
 		afs_ResetVolumeInfo(tv);
