@@ -2188,6 +2188,77 @@ DECL_PIOCTL(PFlush)
 }
 
 /*!
+ * Lookup name in the directory associated with given vcache.
+ *
+ * \param[in]  avc	vcache associated with directory
+ * \param[in]  areq	request to be passed on
+ * \param[in]  aname	name to be searched
+ * \param[out] asys	resolved name (replace @sys by system type)
+ * \param[out] afid	fid associated with aname
+ *
+ * \note On success, the caller must free asys->name.
+ *
+ * \return 0 on success; non-zero otherwise.
+ *
+ * \notes  On success, the caller must free asys->name.
+ */
+static int
+afs_LookupName(struct vcache *avc, struct vrequest *areq, char *aname,
+	       struct sysname_info *asys, struct VenusFid *afid)
+{
+    int code;
+    struct dcache *tdc;
+    afs_size_t offset, len;
+
+    if (!avc || !areq || !aname || !asys || !afid) {
+	code = -1;
+	goto done;
+    }
+
+    memset(asys, 0, sizeof(*asys));
+    memset(afid, 0, sizeof(*afid));
+
+    /* check if vcache is up to date */
+    code = afs_VerifyVCache(avc, areq);
+    if (code != 0) {
+	goto done;
+    }
+
+    /* must be a directory */
+    if (vType(avc) != VDIR) {
+	code = ENOTDIR;
+	goto done;
+    }
+
+    tdc = afs_GetDCache(avc, (afs_size_t) 0, areq, &offset, &len, 1);
+    if (tdc == NULL) {
+	code = EIO;
+	goto done;
+    }
+
+    /* if @sys is present, replace it by the machine's system type */
+    Check_AtSys(avc, aname, asys, areq);
+    ObtainReadLock(&tdc->lock);
+
+    do {
+	/*
+	 * Lookup name in the appropriate directory. If name is not found, try
+	 * again with the next sysname from the @sys list.
+	 */
+	code = afs_dir_Lookup(tdc, asys->name, &afid->Fid);
+    } while (code == ENOENT && Next_AtSys(avc, areq, asys));
+
+    ReleaseReadLock(&tdc->lock);
+    afs_PutDCache(tdc);
+ done:
+    if (code != 0 && asys->allocked) {
+	osi_FreeLargeSpace(asys->name);
+	memset(asys, 0, sizeof(*asys));
+    }
+    return code;
+}
+
+/*!
  * VIOC_AFS_STAT_MT_PT (29) - Stat mount point
  *
  * \ingroup pioctl
@@ -2208,12 +2279,10 @@ DECL_PIOCTL(PNewStatMount)
 {
     afs_int32 code;
     struct vcache *tvc;
-    struct dcache *tdc;
     struct VenusFid tfid;
     char *bufp;
     char *name;
     struct sysname_info sysState;
-    afs_size_t offset, len;
 
     AFS_STATCNT(PNewStatMount);
     if (!avc)
@@ -2222,26 +2291,12 @@ DECL_PIOCTL(PNewStatMount)
     if (afs_pd_getStringPtr(ain, &name) != 0)
 	return EINVAL;
 
-    code = afs_VerifyVCache(avc, areq);
-    if (code)
-	return code;
-    if (vType(avc) != VDIR) {
-	return ENOTDIR;
-    }
-    tdc = afs_GetDCache(avc, (afs_size_t) 0, areq, &offset, &len, 1);
-    if (!tdc)
-	return EIO;
-    Check_AtSys(avc, name, &sysState, areq);
-    ObtainReadLock(&tdc->lock);
-    do {
-	code = afs_dir_Lookup(tdc, sysState.name, &tfid.Fid);
-    } while (code == ENOENT && Next_AtSys(avc, areq, &sysState));
-    ReleaseReadLock(&tdc->lock);
-    afs_PutDCache(tdc);		/* we're done with the data */
-    bufp = sysState.name;
+    code = afs_LookupName(avc, areq, name, &sysState, &tfid);
     if (code) {
-	goto out;
+	return code;
     }
+
+    bufp = sysState.name;
     tfid.Cell = avc->f.fid.Cell;
     tfid.Fid.Volume = avc->f.fid.Fid.Volume;
     if (!tfid.Fid.Unique && (avc->f.states & CForeign)) {
@@ -4824,12 +4879,10 @@ DECL_PIOCTL(PFlushMount)
 {
     afs_int32 code;
     struct vcache *tvc;
-    struct dcache *tdc;
     struct VenusFid tfid;
     char *bufp;
     char *mount;
     struct sysname_info sysState;
-    afs_size_t offset, len;
 
     AFS_STATCNT(PFlushMount);
     if (!avc)
@@ -4838,26 +4891,12 @@ DECL_PIOCTL(PFlushMount)
     if (afs_pd_getStringPtr(ain, &mount) != 0)
 	return EINVAL;
 
-    code = afs_VerifyVCache(avc, areq);
-    if (code)
-	return code;
-    if (vType(avc) != VDIR) {
-	return ENOTDIR;
-    }
-    tdc = afs_GetDCache(avc, (afs_size_t) 0, areq, &offset, &len, 1);
-    if (!tdc)
-	return EIO;
-    Check_AtSys(avc, mount, &sysState, areq);
-    ObtainReadLock(&tdc->lock);
-    do {
-	code = afs_dir_Lookup(tdc, sysState.name, &tfid.Fid);
-    } while (code == ENOENT && Next_AtSys(avc, areq, &sysState));
-    ReleaseReadLock(&tdc->lock);
-    afs_PutDCache(tdc);		/* we're done with the data */
-    bufp = sysState.name;
+    code = afs_LookupName(avc, areq, mount, &sysState, &tfid);
     if (code) {
-	goto out;
+	return code;
     }
+
+    bufp = sysState.name;
     tfid.Cell = avc->f.fid.Cell;
     tfid.Fid.Volume = avc->f.fid.Fid.Volume;
     if (!tfid.Fid.Unique && (avc->f.states & CForeign)) {
