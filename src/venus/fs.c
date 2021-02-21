@@ -68,6 +68,7 @@ static int CleanAcl(struct Acl *, char *);
 static int SetVolCmd(struct cmd_syndesc *as, void *arock);
 static int GetCellName(char *, struct afsconf_cell *);
 static void Die(int, char *);
+static int GetLastComponent(const char *, char **, char **, int *);
 
 /*
  * Character to use between name and rights in printed representation for
@@ -1549,7 +1550,17 @@ ExamineCmd(struct cmd_syndesc *as, void *arock)
     char *name, *offmsg;
     int error = 0;
 
+    int symlink, follow;
+    char *parent_dir, *last_component;
+
+    follow = 1;
+    parent_dir = last_component = NULL;
+
     SetDotDefault(&as->parms[0].items);
+    if (as->parms[1].items) {
+	/* -no-follow */
+	follow = 0;
+    }
     for (ti = as->parms[0].items; ti; ti = ti->next) {
 	struct VenusFid vfid;
 
@@ -1567,9 +1578,36 @@ ExamineCmd(struct cmd_syndesc *as, void *arock)
 	name = (char *)status + sizeof(*status);
 	offmsg = name + strlen(name) + 1;
 
+	symlink = 0;
+	if (!follow) {
+	    /*
+	     * If ti->data is a symlink, GetLastComponent sets symlink to 1 and
+	     * last_component to the name of the target. Given that we want to
+	     * evaluate the symlink, call the regular VIOCGETFID pioctl if
+	     * symlink is set.
+	     */
+	    GetLastComponent(ti->data, &parent_dir, &last_component, &symlink);
+	}
+
 	blob.out_size = sizeof(struct VenusFid);
 	blob.out = (char *) &vfid;
-	if (0 == pioctl(ti->data, VIOCGETFID, &blob, 1)) {
+
+	if (follow || symlink) {
+	    code = pioctl(ti->data, VIOCGETFID, &blob, follow);
+	} else {
+	    blob.in = last_component;
+	    blob.in_size = strlen(last_component) + 1;
+	    code = pioctl(parent_dir, VIOC_GETLINKFID, &blob, follow);
+	}
+	if (parent_dir) {
+	    free(parent_dir);
+	    parent_dir = NULL;
+	}
+	if (last_component) {
+	    free(last_component);
+	    last_component = NULL;
+	}
+	if (code == 0) {
 	    printf("File %s (%u.%u.%u) contained in volume %u\n",
 		   ti->data, vfid.Fid.Volume, vfid.Fid.Vnode, vfid.Fid.Unique,
 		   vfid.Fid.Volume);
@@ -3743,6 +3781,7 @@ main(int argc, char **argv)
 
     ts = cmd_CreateSyntax("examine", ExamineCmd, NULL, 0, "display file/volume status");
     cmd_AddParm(ts, "-path", CMD_LIST, CMD_OPTIONAL, "dir/file path");
+    cmd_AddParm(ts, "-no-follow", CMD_FLAG, CMD_OPTIONAL, "Don't follow links.");
     cmd_CreateAlias(ts, "lv");
     cmd_CreateAlias(ts, "listvol");
 
