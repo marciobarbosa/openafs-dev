@@ -3941,6 +3941,7 @@ defect 3069
     ts = cmd_CreateSyntax("getfid", GetFidCmd, NULL, 0,
 			  "get fid for file(s)");
     cmd_AddParm(ts, "-path", CMD_LIST, CMD_OPTIONAL, "dir/file path");
+    cmd_AddParm(ts, "-no-follow", CMD_FLAG, CMD_OPTIONAL, "Don't follow links.");
 
     ts = cmd_CreateSyntax("discon", DisconCmd, NULL, 0,
 			  "disconnection mode");
@@ -4247,15 +4248,50 @@ GetFidCmd(struct cmd_syndesc *as, void *arock)
     int error = 0;
     char cell[MAXCELLCHARS];
 
+    int symlink, follow;
+    char *parent_dir, *last_component;
+
+    follow = 1;
+    parent_dir = last_component = NULL;
+
     SetDotDefault(&as->parms[0].items);
+    if (as->parms[1].items) {
+	/* -no-follow */
+	follow = 0;
+    }
     for (ti = as->parms[0].items; ti; ti = ti->next) {
         struct VenusFid vfid;
+
+	symlink = 0;
+	if (!follow) {
+	    /*
+	     * If ti->data is a symlink, GetLastComponent sets symlink to 1 and
+	     * last_component to the name of the target. Given that we want to
+	     * evaluate the symlink, call the regular VIOCGETFID pioctl if
+	     * symlink is set.
+	     */
+	    GetLastComponent(ti->data, &parent_dir, &last_component, &symlink);
+	}
 
         blob.out_size = sizeof(struct VenusFid);
         blob.out = (char *) &vfid;
         blob.in_size = 0;
 
-        code = pioctl(ti->data, VIOCGETFID, &blob, 1);
+	if (follow || symlink) {
+	    code = pioctl(ti->data, VIOCGETFID, &blob, follow);
+	} else {
+	    blob.in = last_component;
+	    blob.in_size = strlen(last_component) + 1;
+	    code = pioctl(parent_dir, VIOC_GETLINKFID, &blob, follow);
+	}
+	if (parent_dir) {
+	    free(parent_dir);
+	    parent_dir = NULL;
+	}
+	if (last_component) {
+	    free(last_component);
+	    last_component = NULL;
+	}
         if (code) {
             Die(errno,ti->data);
             error = 1;

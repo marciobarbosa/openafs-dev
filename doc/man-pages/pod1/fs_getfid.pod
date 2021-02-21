@@ -7,7 +7,7 @@ fs_getfid - Display the fid for a given path in AFS
 =for html
 <div class="synopsis">
 
-B<fs getfid> S<<< [B<-path>] I<path> >>> [B<-literal>] [B<-help>]
+B<fs getfid> S<<< [B<-path>] I<path> >>> [B<-literal>] [B<-no-follow>] [B<-help>]
 
 =for html
 </div>
@@ -34,6 +34,11 @@ The path of the file (or directory).
 
 Windows only: for a symlink or mount point, evaluates the specified object
 rather than the object it refers to.
+
+=item B<-no-follow>
+
+Unix only: for a symlink or mount point, evaluates the specified object rather
+than the object it refers to.
 
 =item B<-help>
 

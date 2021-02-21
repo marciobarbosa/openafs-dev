@@ -462,6 +462,7 @@ struct afs_MeanStats {
     AFS_CS(PGetUserCell)	/* afs_pioctl.c */ \
     AFS_CS(PSetTokens)		/* afs_pioctl.c */ \
     AFS_CS(PGetVolumeStatus)	/* afs_pioctl.c */ \
+    AFS_CS(PGetLinkFID)		/* afs_pioctl.c */ \
     AFS_CS(afs_ResetAccessCache)	/* afs_resource.c */ \
     AFS_CS(afs_FindUser)	/* afs_resource.c */ \
     AFS_CS(afs_ResetUserConns)	/* afs_resource.c */ \
