@@ -20,13 +20,13 @@ INCFILES = \
 	$(DESTDIR)\include\opr\proc.h \
 	$(DESTDIR)\include\opr\queue.h \
 	$(DESTDIR)\include\opr\rbtree.h \
-	$(DESTDIR)\include\opr\time.h \
+	$(DESTDIR)\include\opr\time64.h \
 	$(DESTDIR)\include\opr\lock.h \
 	$(DESTDIR)\include\opr\lockstub.h \
 	$(DESTDIR)\include\opr\softsig.h \
 	$(DESTDIR)\include\opr\uuid.h
 
-$(DESTDIR)\include\opr\time.h: opr_time.h
+$(DESTDIR)\include\opr\time64.h: opr_time64.h
         $(COPY) $** $@
 
 $(DESTDIR)\include\opr\lock.h: opr_lock.h

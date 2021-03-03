@@ -112,6 +112,8 @@ extern char *afstest_asprintf(const char *fmt, ...)
 	AFS_ATTRIBUTE_FORMAT(__printf__, 1, 2);
 extern int is_pointer(void *left, void *right, const char *fmt, ...)
 	AFS_ATTRIBUTE_FORMAT(__printf__, 3, 4);
+extern int is_int64(afs_int64 left, afs_int64 right, const char *fmt, ...)
+	AFS_ATTRIBUTE_FORMAT(__printf__, 3, 4);
 
 /* opaque.c */
 extern int is_opaque(struct rx_opaque *left, struct rx_opaque *right,
