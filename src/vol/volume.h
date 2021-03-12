@@ -249,6 +249,7 @@ typedef struct VolumePackageOptions {
     afs_int32 canUseSALVSYNC;     /**< can we use the SALVSYNC channel? (DAFS) */
     afs_int32 unsafe_attach;      /**< can we bypass checking the inUse vol
                                    *   header on attach? */
+    int (*vlentry_exists) (afs_uint32 a_volid, afs_int32 a_part);
     void (*interrupt_rxcall) (struct rx_call *call, afs_int32 error);
                                   /**< callback to interrupt RX calls accessing
                                    *   a going-offline volume */
@@ -853,6 +854,9 @@ extern int VLockFileLock(struct VLockFile *lf, afs_uint32 offset,
 extern void VLockFileUnlock(struct VLockFile *lf, afs_uint32 offset);
 
 extern int VSetVolHashSize(int logsize);
+extern int VVLEntryExists(afs_uint32 a_volid, afs_int32 a_part);
+extern int VVolumeHeaderExists(VolumeId a_volid, char *a_partname);
+extern int VOphanVolumeExists(VolumeId a_volid, afs_int32 a_skip);
 
 #ifdef AFS_DEMAND_ATTACH_FS
 extern Volume *VPreAttachVolumeByName(Error * ec, char *partition, char *name);

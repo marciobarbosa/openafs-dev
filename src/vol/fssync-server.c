@@ -178,6 +178,8 @@ static void FSYNC_com_to_info(FSSYNC_VolOp_command * vcom, FSSYNC_VolOp_info * i
 
 static int FSYNC_partMatch(FSSYNC_VolOp_command * vcom, Volume * vp, int match_anon);
 
+static int FSYNC_VLEntryExists(FSSYNC_VolOp_command * vcom, SYNC_response * res);
+
 
 /*
  * This lock controls access to the handler array. The overhead
@@ -511,6 +513,7 @@ FSYNC_com(osi_socket fd)
     case FSYNC_VOL_DONE:
     case FSYNC_VOL_QUERY:
     case FSYNC_VOL_QUERY_HDR:
+    case FSYNC_VLENTRY_EXISTS:
 #ifdef AFS_DEMAND_ATTACH_FS
     case FSYNC_VOL_QUERY_VOP:
     case FSYNC_VG_QUERY:
@@ -633,6 +636,9 @@ FSYNC_com_VolOp(osi_socket fd, SYNC_command * com, SYNC_response * res)
 	code = FSYNC_com_VGScanAll(&vcom, res);
 	break;
 #endif /* AFS_DEMAND_ATTACH_FS */
+    case FSYNC_VLENTRY_EXISTS:
+	code = FSYNC_VLEntryExists(&vcom, res);
+	break;
     default:
 	code = SYNC_BAD_COMMAND;
     }
@@ -2188,5 +2194,15 @@ GetHandler(fd_set * fdsetp, int *maxfdp)
     ReleaseReadLock(&FSYNC_handler_lock);	/* just in case */
 }
 #endif /* HAVE_POLL && AFS_PTHREAD_ENV */
+
+static int
+FSYNC_VLEntryExists(FSSYNC_VolOp_command * vcom, SYNC_response * res)
+{
+    int code = 0;
+    struct DiskPartition64 *dp = VGetPartition_r(vcom->vop->partName, 0);
+
+    code = VVLEntryExists(vcom->vop->volume, dp->index);
+    return code;
+}
 
 #endif /* FSSYNC_BUILD_SERVER */

@@ -1704,6 +1704,52 @@ WriteSysIdFile(void)
     return 0;
 }
 
+static_inline int
+GetVLEntryIndex(afs_int32 a_server, afs_uint32 a_volid, afs_int32 a_part,
+		struct vldbentry *a_entry)
+{
+    int vl_i, index = -1;
+
+    for (vl_i = 0; vl_i < OMAXNSERVERS; vl_i++) {
+	afs_int32 vlserv = htonl(a_entry->serverNumber[vl_i]);
+	afs_int32 vlpart = a_entry->serverPartition[vl_i];
+
+	if (vlserv == BADSERVERID) {
+	    break;
+	}
+	if (vlserv == a_server && vlpart == a_part) {
+	    index = vl_i;
+	    break;
+	}
+    }
+    return index;
+}
+
+static int
+VLEntryExists(afs_uint32 a_volid, afs_int32 a_part)
+{
+    int code;
+    int found, index, fs_i;
+    struct vldbentry tentry;
+
+    found = 0;
+    memset(&tentry, 0, sizeof(tentry));
+
+    code = ubik_VL_GetEntryByID(cstruct, 0, a_volid, -1, &tentry);
+    if (code) {
+	return 0;
+    }
+
+    for (fs_i = 0; fs_i < FS_HostAddr_cnt; fs_i++) {
+	index = GetVLEntryIndex(FS_HostAddrs[fs_i], a_volid, a_part, &tentry);
+	if (index != -1) {
+	    found = 1;
+	    break;
+	}
+    }
+    return found;
+}
+
 /*
  * defect 10966
  * This routine sets up the buffers for the VL_RegisterAddrs RPC. All addresses
@@ -2141,6 +2187,7 @@ main(int argc, char *argv[])
     opts.nSmallVnodes = nSmallVns;
     opts.volcache = volcache;
     opts.unsafe_attach = unsafe_attach;
+    opts.vlentry_exists = VLEntryExists;
     if (offline_timeout != -1) {
 	opts.interrupt_rxcall = rx_InterruptCall;
 	opts.offline_timeout = offline_timeout;

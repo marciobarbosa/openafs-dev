@@ -9331,3 +9331,86 @@ VCanUnsafeAttach(void)
 {
     return vol_opts.unsafe_attach;
 }
+
+int
+VVLEntryExists(afs_uint32 a_volid, afs_int32 a_part)
+{
+    int code = 0;
+
+    if (vol_opts.vlentry_exists) {
+	code = (*vol_opts.vlentry_exists)(a_volid, a_part);
+    }
+    return code;
+}
+
+/**
+ * Check if volume header exists in a given partition.
+ *
+ * @param[in]  a_volid     volume id
+ * @param[in]  a_partname  name of partition
+ *
+ * @return 1 if volume header exists; 0 otherwise.
+ */
+int
+VVolumeHeaderExists(VolumeId a_volid, char *a_partname)
+{
+    int code, found = 0;
+    struct afs_stat_st status;
+
+    char path[VMAXPATHLEN];
+    char name[VMAXPATHLEN];
+
+    memset(path, 0, sizeof(path));
+    memset(name, 0, sizeof(name));
+
+    name[0] = OS_DIRSEPC;
+    VolumeExternalName_r(a_volid, &name[1], sizeof(name) - 1);
+
+    strncpy(path, a_partname, sizeof(path));
+    strncat(path, name, sizeof(path) - strlen(path));
+
+    code = afs_stat(path, &status);
+    if (code == 0) {
+	found = 1;
+    }
+    return found;
+}
+
+/**
+ * Check if an orphan volume already exist in another partition.
+ *
+ * This function ignores the partition on which the volume will be created
+ * (a_skip) and the case where the volume is being moved (vos move) within the
+ * same server.
+ *
+ * @param[in]  a_volid  volume id
+ * @param[in]  a_skip   skip this partition
+ *
+ * @return 1 if volume already exist; 0 otherwise.
+ */
+int
+VOphanVolumeExists(VolumeId a_volid, afs_int32 a_skip)
+{
+    int found = 0;
+#ifdef FSSYNC_BUILD_CLIENT
+    int exist = 0;
+    struct DiskPartition64 *dp;
+
+    for (dp = DiskPartitionList; dp; dp = dp->next) {
+	if (dp->index == a_skip) {
+	    continue;
+	}
+	if (!VVolumeHeaderExists(a_volid, dp->name)) {
+	    continue;
+	}
+
+	exist = FSYNC_VolOp(a_volid, dp->name, FSYNC_VLENTRY_EXISTS, 0, NULL);
+	if (!exist) {
+	    /* orphan volume found */
+	    found = 1;
+	    break;
+	}
+    }
+#endif
+    return found;
+}
