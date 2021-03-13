@@ -182,6 +182,11 @@ extern struct afs_conn *afs_ConnByMHosts(struct server *ahosts[],
 				     afs_int32 locktype,
 				     afs_int32 replicated,
 				     struct rx_connection **rxconn);
+extern struct afs_conn *afs_ConnByMCells(struct cell **acell,
+				     struct vrequest *areq,
+				     afs_int32 locktype,
+				     afs_int32 replicated,
+				     struct rx_connection **rxconn);
 extern struct afs_conn *afs_ConnByHost(struct server *aserver,
 				   unsigned short aport, afs_int32 acell,
 				   struct vrequest *areq, int aforce,
@@ -1424,6 +1429,17 @@ extern struct volume *afs_GetVolumeByName(char *aname,
 					  afs_int32 locktype);
 extern struct volume *afs_UFSGetVolSlot(afs_int32 volid, struct cell *cell);
 extern void afs_CheckVolumeNames(int flags);
+
+/* Used if afs_fallbackcell_enable is set. */
+extern int afs_VolNameCacheInit(int a_nbuckets, int a_nentries);
+extern int afs_VolNameCacheInsert(int a_volid, char *a_volname);
+extern int afs_VolNameCacheIncRef(int a_volid);
+extern int afs_VolNameCacheDecRef(int a_volid);
+extern int afs_VolNameCacheGet(int a_volid, char **a_volname, size_t *a_len);
+extern void afs_VolNameCacheMapIds(int a_mcell_id, int a_fbcell_id);
+extern int afs_VolNameCacheGetMainCellId(int a_fbcell_id, int *a_mcell_id);
+extern int afs_VolNameCacheGetFallbackCellId(int a_mcell_id, int *a_fbcell_id);
+extern void afs_VolNameCacheRelease(void);
 
 /* Prototypes for generated files that aren't really in src/afs/ */
 
