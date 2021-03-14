@@ -79,6 +79,7 @@ afs_int32 afs_numcachefiles = -1;
 afs_int32 afs_numfilesperdir = -1;
 char afs_cachebasedir[1024];
 afs_int32 afs_rmtsys_enable = 0;
+int afs_fallbackcell_enable = 0;
 
 afs_int32 afs_rx_deadtime = AFS_RXDEADTIME;
 afs_int32 afs_rx_harddead = AFS_HARDDEADTIME;
@@ -938,6 +939,19 @@ afs_syscall_call(long parm, long parm2, long parm3,
 		    AFS_COPYINSTR(AFSKPTR(parm5), tbuffer, AFS_SMALLOCSIZ,
 				  &bufferSize, code);
 		    if (!code) {
+			if ((parm4 & CFallBackCell)) {
+			    int nentries = cm_initParams.cmi_nVolumeCaches;
+			    int nbuckets = nentries / 2;
+
+			    code = afs_VolNameCacheInit(nbuckets, nentries);
+			    if (code == 0) {
+				cflags |= CFallBackCell;
+				afs_fallbackcell_enable = 1;
+			    } else {
+				afs_warn("afs: couldn't enable fallback cell.\n");
+				code = 0;
+			    }
+			}
 			lcnamep = tbuffer;
 			cflags |= CLinkedCell;
 		    }
@@ -1419,6 +1433,9 @@ afs_shutdown(void)
      * of bugs, flushing again here can cause panics. */
     afs_FlushAllVCaches();
 #endif
+    if (afs_fallbackcell_enable) {
+	afs_VolNameCacheRelease();
+    }
 
     afs_termState = AFSOP_STOP_BKG;
 
