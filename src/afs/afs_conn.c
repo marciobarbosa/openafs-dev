@@ -259,6 +259,62 @@ afs_pickSecurityObject(struct afs_conn *conn, int *secLevel)
      return secObj;
 }
 
+/**
+ * Convert volume id to the value used in the fallback cell.
+ *
+ * @param[inout]  afid  fid of the file involved in the action
+ * @param[inout]  areq  request associated with this operation
+ *
+ * @note On success, caller must call afs_PutVolume().
+ *
+ * @return 0 on success; -1 otherwise.
+ */
+struct volume *
+ConvertFID(struct VenusFid *afid, struct vrequest *areq)
+{
+    int code = -1;
+
+    int cellnum = -1;
+    struct cell *pcell = NULL;
+
+    char *volname = NULL;
+    size_t volname_len = 0;
+    struct volume *vol = NULL;
+
+    if (afid == NULL || areq == NULL) {
+	goto done;
+    }
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell == NULL || pcell->lcellp == NULL) {
+	goto done;
+    }
+
+    code = afs_VolNameCacheGet(afid->Fid.Volume, &volname, &volname_len);
+    if (code != 0) {
+	goto done;
+    }
+
+    cellnum = pcell->lcellp->cellNum;
+    vol = afs_GetVolumeByName(volname, cellnum, 1, areq, READ_LOCK);
+    if (vol == NULL) {
+	goto done;
+    }
+    afs_VolNameCacheMapIds(afid->Fid.Volume, vol->roVol);
+    afid->Fid.Volume = vol->roVol;
+    afid->Cell = cellnum;
+
+    areq->initd = 0;
+    afs_FinalizeReq(areq);
+ done:
+    if (pcell != NULL) {
+	afs_PutCell(pcell, READ_LOCK);
+    }
+    if (volname != NULL) {
+	afs_osi_Free(volname, volname_len);
+    }
+    return vol;
+}
 
 /**
  * Try setting up a connection to the server containing the specified fid.
@@ -287,8 +343,15 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     *rxconn = NULL;
 
     AFS_STATCNT(afs_Conn);
-    /* Get fid's volume. */
-    tv = afs_GetVolume(afid, areq, READ_LOCK);
+
+    if (afs_fallbackcell_enable && areq && areq->networkError) {
+	/* Get fid's volume from the fallback cell. */
+	tv = ConvertFID(afid, areq);
+    } else {
+	/* Get fid's volume. */
+	tv = afs_GetVolume(afid, areq, READ_LOCK);
+    }
+
     if (!tv) {
 	if (areq) {
 	    afs_FinalizeReq(areq);
@@ -655,6 +718,78 @@ afs_ConnByMHosts(struct server *ahosts[], unsigned short aport,
 
 }				/*afs_ConnByMHosts */
 
+struct cell *
+ConvertCell(struct vrequest *areq, struct cell *acell)
+{
+    int cellnum;
+    struct cell *pcell = NULL;
+    struct cell *fbcell = NULL;
+
+    if (areq == NULL) {
+	goto done;
+    }
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell == NULL || pcell->lcellp == NULL) {
+	goto done;
+    }
+
+    cellnum = pcell->lcellp->cellNum;
+    /* vlserver / ptserver op */
+    fbcell = afs_GetCell(cellnum, READ_LOCK);
+    if (fbcell == NULL) {
+	goto done;
+    }
+
+    areq->initd = 0;
+    afs_FinalizeReq(areq);
+ done:
+    if (pcell != NULL) {
+	afs_PutCell(pcell, READ_LOCK);
+    }
+    return fbcell;
+}
+
+struct afs_conn *
+afs_ConnByMCells(struct cell **acell, struct vrequest *areq,
+		 afs_int32 locktype, afs_int32 replicated,
+		 struct rx_connection **rxconn)
+{
+    afs_int32 i, cellnum;
+    struct afs_conn *tconn;
+    struct server *ts, **hosts;
+    struct cell *fbcell;
+    unsigned short port;
+
+    *rxconn = NULL;
+
+    /* try to find any connection from the set */
+    AFS_STATCNT(afs_ConnByMCells);
+
+    if (afs_fallbackcell_enable && areq && areq->networkError) {
+	fbcell = ConvertCell(areq, *acell);
+	if (fbcell == NULL) {
+	    return NULL;
+	}
+	afs_PutCell(*acell, READ_LOCK);
+	*acell = fbcell;
+    }
+    cellnum = (*acell)->cellNum;
+    hosts = (*acell)->cellHosts;
+    port = (*acell)->vlport;
+
+    for (i = 0; i < AFS_MAXCELLHOSTS; i++) {
+	if ((ts = hosts[i]) == NULL)
+	    break;
+	tconn = afs_ConnByHost(ts, port, cellnum, areq, 0, locktype,
+			       replicated, rxconn);
+	if (tconn) {
+	    return tconn;
+	}
+    }
+    return NULL;
+
+}
 
 /**
  * Decrement reference count to this connection.
