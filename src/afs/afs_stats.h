@@ -491,6 +491,7 @@ struct afs_MeanStats {
     AFS_CS(afs_Conn)		/* afs_resource.c */ \
     AFS_CS(afs_ConnByHost)	/* afs_resource.c */ \
     AFS_CS(afs_ConnByMHosts)	/* afs_resource.c */ \
+    AFS_CS(afs_ConnByMCells)	/* afs_resource.c */ \
     AFS_CS(afs_Analyze)		/* afs_resource.c */ \
     AFS_CS(afs_PutConn)		/* afs_resource.c */ \
     AFS_CS(afs_ResetVolumeInfo)	/* afs_resource.c */ \

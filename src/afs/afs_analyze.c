@@ -383,6 +383,40 @@ afs_PrintServerErrors(struct vrequest *areq, struct VenusFid *afid)
     afs_warnuser("%s\n", term);
 }
 
+/**
+ * Check if we should retry on the fallback cell.
+ *
+ * @param[in]  afid   fid of the file involved in the action
+ * @param[in]  acell  cell where afid can be found
+ *
+ * @return 1 if we should retry; 0 otherwise.
+ */
+static int
+RetryOnFBCell(struct VenusFid *afid, struct cell *acell)
+{
+    int retry = 0;
+    struct cell *pcell = NULL;
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell == NULL || pcell->lcellp == NULL) {
+	goto done;
+    }
+
+    if ((afid && afid->Cell != pcell->cellNum) ||
+	(acell && acell->cellNum == pcell->lcellp->cellNum)) {
+	/*
+	 * Avoid loops. If the servers in the fallback cell is down, do not try
+	 * again on the primary cell.
+	 */
+	goto done;
+    }
+
+    retry = 1;
+    afs_PutCell(pcell, READ_LOCK);
+ done:
+    return retry;
+}
+
 /*!
  * \brief
  *	Analyze the outcome of an RPC operation, taking whatever support
@@ -575,6 +609,8 @@ afs_Analyze(struct afs_conn *aconn, struct rx_connection *rxconn,
 		    /* do not promote to shouldRetry if not already */
 		    if (afs_ClearStatus(afid, op, NULL) == 0)
 			shouldRetry = 0;
+		    if (afs_fallbackcell_enable)
+			shouldRetry = RetryOnFBCell(afid, cellp);
 		}
 	    }
 	}
