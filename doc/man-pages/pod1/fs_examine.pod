@@ -7,15 +7,15 @@ fs_examine - Shows data about the volume containing a directory or file
 =for html
 <div class="synopsis">
 
-B<fs examine> S<<< [B<-path> <I<dir/file path>>+] >>> [B<-help>]
+B<fs examine> S<<< [B<-path> <I<dir/file path>>+] >>> [B<-literal>] [B<-help>]
 
-B<fs exa> S<<< [B<-p> <I<dir/file path>>+] >>> [B<-h>]
+B<fs exa> S<<< [B<-p> <I<dir/file path>>+] >>> [B<-n>] [B<-h>]
 
-B<fs listvol> S<<< [B<-p> <I<dir/file path>>+] >>> [B<-h>]
+B<fs listvol> S<<< [B<-p> <I<dir/file path>>+] >>> [B<-n>] [B<-h>]
 
-B<fs listv> S<<< [B<-p> <I<dir/file path>>+] >>> [B<-h>]
+B<fs listv> S<<< [B<-p> <I<dir/file path>>+] >>> [B<-n>] [B<-h>]
 
-B<fs lv> S<<< [B<-p> <I<dir/file path>>+] >>> [B<-h>]
+B<fs lv> S<<< [B<-p> <I<dir/file path>>+] >>> [B<-n>] [B<-h>]
 
 =for html
 </div>
@@ -52,6 +52,11 @@ Names a file or directory that resides in the volume about which to
 produce output. Partial pathnames are interpreted relative to the current
 working directory, which is also the default value if this argument is
 omitted.
+
+=item B<-literal>
+
+Unix only: for a symlink or mount point, evaluates the specified object rather
+than the object it refers to.
 
 =item B<-help>
 

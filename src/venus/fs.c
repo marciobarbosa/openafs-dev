@@ -68,6 +68,7 @@ static int CleanAcl(struct Acl *, char *);
 static int SetVolCmd(struct cmd_syndesc *as, void *arock);
 static int GetCellName(char *, struct afsconf_cell *);
 static void Die(int, char *);
+static int GetLastComponent(const char *, char **, char **, int *);
 
 /*
  * Character to use between name and rights in printed representation for
@@ -1549,7 +1550,17 @@ ExamineCmd(struct cmd_syndesc *as, void *arock)
     char *name, *offmsg;
     int error = 0;
 
+    int symlink, follow;
+    char *parent_dir, *last_component;
+
+    follow = 1;
+    parent_dir = last_component = NULL;
+
     SetDotDefault(&as->parms[0].items);
+    if (as->parms[1].items) {
+	/* -literal */
+	follow = 0;
+    }
     for (ti = as->parms[0].items; ti; ti = ti->next) {
 	struct VenusFid vfid;
 
@@ -1567,9 +1578,40 @@ ExamineCmd(struct cmd_syndesc *as, void *arock)
 	name = (char *)status + sizeof(*status);
 	offmsg = name + strlen(name) + 1;
 
+	symlink = 0;
+	if (!follow) {
+	    /*
+	     * If ti->data is a symlink, GetLastComponent sets symlink to 1 and
+	     * last_component to the name of the target. Given that we want to
+	     * evaluate the symlink, call the regular VIOCGETFID pioctl if
+	     * symlink is set.
+	     */
+	    if (GetLastComponent(ti->data, &parent_dir,
+				 &last_component, &symlink) != 0) {
+		error = 1;
+		continue;
+	    }
+	}
+
 	blob.out_size = sizeof(struct VenusFid);
 	blob.out = (char *) &vfid;
-	if (0 == pioctl(ti->data, VIOCGETFID, &blob, 1)) {
+
+	if (follow || symlink) {
+	    code = pioctl(ti->data, VIOCGETFID, &blob, follow);
+	} else {
+	    blob.in = last_component;
+	    blob.in_size = strlen(last_component) + 1;
+	    code = pioctl(parent_dir, VIOC_GETLITERALFID, &blob, follow);
+	}
+	if (parent_dir) {
+	    free(parent_dir);
+	    parent_dir = NULL;
+	}
+	if (last_component) {
+	    free(last_component);
+	    last_component = NULL;
+	}
+	if (code == 0) {
 	    printf("File %s (%u.%u.%u) contained in volume %u\n",
 		   ti->data, vfid.Fid.Volume, vfid.Fid.Vnode, vfid.Fid.Unique,
 		   vfid.Fid.Volume);
@@ -3743,6 +3785,9 @@ main(int argc, char **argv)
 
     ts = cmd_CreateSyntax("examine", ExamineCmd, NULL, 0, "display file/volume status");
     cmd_AddParm(ts, "-path", CMD_LIST, CMD_OPTIONAL, "dir/file path");
+    cmd_AddParm(ts, "-literal", CMD_FLAG, CMD_OPTIONAL,
+		"Evaluates the specified object rather than the object it "
+		"refers to.");
     cmd_CreateAlias(ts, "lv");
     cmd_CreateAlias(ts, "listvol");
 
@@ -3941,6 +3986,9 @@ defect 3069
     ts = cmd_CreateSyntax("getfid", GetFidCmd, NULL, 0,
 			  "get fid for file(s)");
     cmd_AddParm(ts, "-path", CMD_LIST, CMD_OPTIONAL, "dir/file path");
+    cmd_AddParm(ts, "-literal", CMD_FLAG, CMD_OPTIONAL,
+		"Evaluates the specified object rather than the object it "
+		"refers to.");
 
     ts = cmd_CreateSyntax("discon", DisconCmd, NULL, 0,
 			  "disconnection mode");
@@ -4247,15 +4295,54 @@ GetFidCmd(struct cmd_syndesc *as, void *arock)
     int error = 0;
     char cell[MAXCELLCHARS];
 
+    int symlink, follow;
+    char *parent_dir, *last_component;
+
+    follow = 1;
+    parent_dir = last_component = NULL;
+
     SetDotDefault(&as->parms[0].items);
+    if (as->parms[1].items) {
+	/* -literal */
+	follow = 0;
+    }
     for (ti = as->parms[0].items; ti; ti = ti->next) {
         struct VenusFid vfid;
+
+	symlink = 0;
+	if (!follow) {
+	    /*
+	     * If ti->data is a symlink, GetLastComponent sets symlink to 1 and
+	     * last_component to the name of the target. Given that we want to
+	     * evaluate the symlink, call the regular VIOCGETFID pioctl if
+	     * symlink is set.
+	     */
+	    if (GetLastComponent(ti->data, &parent_dir,
+				 &last_component, &symlink) != 0) {
+		error = 1;
+		continue;
+	    }
+	}
 
         blob.out_size = sizeof(struct VenusFid);
         blob.out = (char *) &vfid;
         blob.in_size = 0;
 
-        code = pioctl(ti->data, VIOCGETFID, &blob, 1);
+	if (follow || symlink) {
+	    code = pioctl(ti->data, VIOCGETFID, &blob, follow);
+	} else {
+	    blob.in = last_component;
+	    blob.in_size = strlen(last_component) + 1;
+	    code = pioctl(parent_dir, VIOC_GETLITERALFID, &blob, follow);
+	}
+	if (parent_dir) {
+	    free(parent_dir);
+	    parent_dir = NULL;
+	}
+	if (last_component) {
+	    free(last_component);
+	    last_component = NULL;
+	}
         if (code) {
             Die(errno,ti->data);
             error = 1;
