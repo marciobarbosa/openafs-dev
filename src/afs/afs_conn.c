@@ -388,6 +388,63 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
 }				/*afs_Conn */
 
 /**
+ * Convert volume id to the value used in the fallback cell.
+ *
+ * @param[inout]  afid  fid of the file involved in the action
+ * @param[inout]  areq  request associated with this operation
+ *
+ * @note On success, caller must call afs_PutVolume().
+ *
+ * @return volume on success; NULL otherwise.
+ */
+struct volume *
+ConvertFID(struct VenusFid *afid, struct vrequest *areq)
+{
+    int code = -1;
+
+    int cellnum = -1;
+    struct cell *pcell = NULL;
+
+    char *volname = NULL;
+    size_t volname_len = 0;
+    struct volume *vol = NULL;
+
+    if (afid == NULL || areq == NULL) {
+	goto done;
+    }
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell == NULL || pcell->lcellp == NULL) {
+	goto done;
+    }
+
+    code = afs_VolNameCacheGet(afid->Fid.Volume, &volname, &volname_len);
+    if (code != 0) {
+	goto done;
+    }
+
+    cellnum = pcell->lcellp->cellNum;
+    vol = afs_GetVolumeByName(volname, cellnum, 1, areq, READ_LOCK);
+    if (vol == NULL) {
+	goto done;
+    }
+    afs_VolNameCacheMapIds(afid->Fid.Volume, vol->roVol);
+    afid->Fid.Volume = vol->roVol;
+    afid->Cell = cellnum;
+
+    areq->initd = 0;
+    afs_FinalizeReq(areq);
+ done:
+    if (pcell != NULL) {
+	afs_PutCell(pcell, READ_LOCK);
+    }
+    if (volname != NULL) {
+	afs_osi_Free(volname, volname_len);
+    }
+    return vol;
+}
+
+/**
  * Setup connection to the fileserver holding the given fid.
  *
  * @param afid[in]        fid
@@ -410,7 +467,13 @@ afs_FSConn(struct VenusFid *afid, struct vrequest *areq,
     memset(acallinfo, 0, sizeof(*acallinfo));
     acallinfo->fid = *afid;
 
-    tv = afs_GetVolume(afid, areq, READ_LOCK);
+    if (afs_fallbackcell_enable && areq && areq->networkError) {
+	/* Get fid's volume from the fallback cell. */
+	tv = ConvertFID(&acallinfo->fid, areq);
+    } else {
+	tv = afs_GetVolume(afid, areq, READ_LOCK);
+    }
+
     if (!tv) {
 	if (areq) {
 	    afs_FinalizeReq(areq);
@@ -430,13 +493,55 @@ afs_FSConn(struct VenusFid *afid, struct vrequest *areq,
 }
 
 /**
+ * Return the fallback cell associated with acell.
+ *
+ * @param[inout]  areq   request associated with this operation
+ * @param[inout]  acell  cell to be converted
+ *
+ * @note On success, caller must call afs_PutCell().
+ *
+ * @return cell on success; NULL otherwise.
+ */
+struct cell *
+ConvertCell(struct vrequest *areq, struct cell *acell)
+{
+    int cellnum;
+    struct cell *pcell = NULL;
+    struct cell *fbcell = NULL;
+
+    if (areq == NULL) {
+	goto done;
+    }
+
+    pcell = afs_GetPrimaryCell(READ_LOCK);
+    if (pcell == NULL || pcell->lcellp == NULL) {
+	goto done;
+    }
+
+    cellnum = pcell->lcellp->cellNum;
+    /* vlserver / ptserver op */
+    fbcell = afs_GetCell(cellnum, READ_LOCK);
+    if (fbcell == NULL) {
+	goto done;
+    }
+
+    areq->initd = 0;
+    afs_FinalizeReq(areq);
+ done:
+    if (pcell != NULL) {
+	afs_PutCell(pcell, READ_LOCK);
+    }
+    return fbcell;
+}
+
+/**
  * Create connection to one of the hosts from a given cell.
  *
- * @param[in]   acell       cell
- * @param[in]   areq        request
- * @param[in]   locktype    type of lock to be used
- * @param[in]   replicated  replicated connection
- * @param[out]  acallinfo   info associated with this call
+ * @param[inout]  acell       cell
+ * @param[in]     areq        request
+ * @param[in]     locktype    type of lock to be used
+ * @param[in]     replicated  replicated connection
+ * @param[out]    acallinfo   info associated with this call
  *
  * @return 0 on success; non-zero otherwise.
  */
@@ -449,9 +554,19 @@ afs_VLConn(struct cell **acell, struct vrequest *areq,
     afs_int32 i, cellnum;
     struct afs_conn *tconn;
     struct server *ts, **hosts;
+    struct cell *fbcell;
     unsigned short port;
 
     AFS_STATCNT(afs_VLConn);
+
+    if (afs_fallbackcell_enable && areq && areq->networkError) {
+	fbcell = ConvertCell(areq, *acell);
+	if (fbcell == NULL) {
+	    goto done;
+	}
+	afs_PutCell(*acell, READ_LOCK);
+	*acell = fbcell;
+    }
 
     memset(acallinfo, 0, sizeof(*acallinfo));
     cellnum = (*acell)->cellNum;
