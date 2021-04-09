@@ -1700,31 +1700,36 @@ afs_RemoteLookup(struct VenusFid *afid, struct vrequest *areq,
 		 struct AFSCallBack *CallBackp, struct server **serverp,
 		 struct AFSVolSync *tsyncp)
 {
-    afs_int32 code;
+    afs_int32 code, rcode;
     struct afs_conn *tc;
     struct rx_connection *rxconn;
     struct AFSFetchStatus OutDirStatus;
     XSTATS_DECLS;
+    struct afs_callinfo cinfo;
     if (!name)
 	name = "";		/* XXX */
     do {
-	tc = afs_Conn(afid, areq, SHARED_LOCK, &rxconn);
-	if (tc) {
+	rcode = afs_FSConn(afid, areq, SHARED_LOCK, &cinfo);
+	if (rcode == 0) {
+	    tc = cinfo.afsconn;
+	    rxconn = cinfo.rxconn;
 	    if (serverp)
 		*serverp = tc->parent->srvr->server;
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_XLOOKUP);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_Lookup(rxconn, (struct AFSFid *)&afid->Fid, name,
+		RXAFS_Lookup(rxconn, (struct AFSFid *)&cinfo.fid.Fid, name,
 			     (struct AFSFid *)&nfid->Fid, OutStatusp,
 			     &OutDirStatus, CallBackp, tsyncp);
 	    RX_AFS_GLOCK();
 	    XSTATS_END_TIME;
-	} else
+	} else {
 	    code = -1;
-    } while (afs_Analyze
-	     (tc, rxconn, code, afid, areq, AFS_STATS_FS_RPCIDX_XLOOKUP, SHARED_LOCK,
-	      NULL));
+	    tc = NULL;
+	    rxconn = NULL;
+	}
+    } while (afs_Analyze(tc, rxconn, code, &cinfo.fid, areq,
+			 AFS_STATS_FS_RPCIDX_XLOOKUP, SHARED_LOCK, NULL));
 
     return code;
 }
@@ -2459,24 +2464,28 @@ afs_int32
 afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
 		struct vrequest * areq, struct AFSFetchStatus * Outsp)
 {
-    int code;
+    int code, rcode;
     afs_uint32 start = 0;
     struct afs_conn *tc;
     struct AFSCallBack CallBack;
     struct AFSVolSync tsync;
     struct rx_connection *rxconn;
     XSTATS_DECLS;
+    struct afs_callinfo cinfo;
+
     do {
-	tc = afs_Conn(afid, areq, SHARED_LOCK, &rxconn);
+	rcode = afs_FSConn(afid, areq, SHARED_LOCK, &cinfo);
 	avc->dchint = NULL;	/* invalidate hints */
-	if (tc) {
+	if (rcode == 0) {
+	    tc = cinfo.afsconn;
+	    rxconn = cinfo.rxconn;
 	    avc->callback = tc->parent->srvr->server;
 	    start = osi_Time();
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHSTATUS);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_FetchStatus(rxconn, (struct AFSFid *)&afid->Fid, Outsp,
-				  &CallBack, &tsync);
+		RXAFS_FetchStatus(rxconn, (struct AFSFid *)&cinfo.fid.Fid,
+				  Outsp, &CallBack, &tsync);
 	    RX_AFS_GLOCK();
 
 	    XSTATS_END_TIME;
@@ -2485,11 +2494,13 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
 		code = afs_CheckFetchStatus(tc, Outsp);
 	    }
 
-	} else
+	} else {
 	    code = -1;
-    } while (afs_Analyze
-	     (tc, rxconn, code, afid, areq, AFS_STATS_FS_RPCIDX_FETCHSTATUS,
-	      SHARED_LOCK, NULL));
+	    tc = NULL;
+	    rxconn = NULL;
+	}
+    } while (afs_Analyze(tc, rxconn, code, &cinfo.fid, areq,
+			 AFS_STATS_FS_RPCIDX_FETCHSTATUS, SHARED_LOCK, NULL));
 
     if (!code) {
 	afs_UpdateStatus(avc, afid, areq, Outsp, &CallBack, start);

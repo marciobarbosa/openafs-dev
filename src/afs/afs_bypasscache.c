@@ -536,8 +536,9 @@ afs_PrefetchNoCache(struct vcache *avc,
     struct iovec *iovecp;
 #endif
     struct vrequest *areq;
-    afs_int32 code = 0;
+    afs_int32 code = 0, rcode;
     struct rx_connection *rxconn;
+    struct afs_callinfo cinfo;
 #ifdef AFS_64BIT_CLIENT
     afs_int32 length_hi, bytes, locked;
 #endif
@@ -559,14 +560,16 @@ afs_PrefetchNoCache(struct vcache *avc,
 
     tcallspec = osi_Alloc(sizeof(struct tlocal1));
     do {
-	tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK /* ignored */, &rxconn);
-	if (tc) {
+	rcode = afs_FSConn(&avc->f.fid, areq, SHARED_LOCK, &cinfo);
+	if (rcode == 0) {
+	    tc = cinfo.afsconn;
+	    rxconn = cinfo.rxconn;
 	    avc->callback = tc->parent->srvr->server;
 	    tcall = rx_NewCall(rxconn);
 #ifdef AFS_64BIT_CLIENT
 	    if (!afs_serverHasNo64Bit(tc)) {
 		code = StartRXAFS_FetchData64(tcall,
-					      (struct AFSFid *) &avc->f.fid.Fid,
+					      (struct AFSFid *) &cinfo.fid.Fid,
 					      auio->uio_offset,
 					      bparms->length);
 		if (code == 0) {
@@ -594,7 +597,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 		    if (!tcall)
 			tcall = rx_NewCall(rxconn);
 		    code = StartRXAFS_FetchData(tcall,
-					(struct AFSFid *) &avc->f.fid.Fid,
+					(struct AFSFid *) &cinfo.fid.Fid,
 					pos, bparms->length);
 		    COND_RE_GLOCK(locked);
 		}
@@ -602,7 +605,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 	    }
 #else
 	    code = StartRXAFS_FetchData(tcall,
-			                (struct AFSFid *) &avc->f.fid.Fid,
+					(struct AFSFid *) &cinfo.fid.Fid,
 					auio->uio_offset, bparms->length);
 #endif
 	    if (code == 0) {
@@ -612,7 +615,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 	    } else {
 		afs_warn("BYPASS: StartRXAFS_FetchData failed: %d\n", code);
 		unlock_and_release_pages(auio);
-		(void)afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+		(void)afs_Analyze(tc, rxconn, code, &cinfo.fid, areq,
 				  AFS_STATS_FS_RPCIDX_FETCHDATA,
 				  SHARED_LOCK, NULL);
 		goto done;
@@ -628,13 +631,15 @@ afs_PrefetchNoCache(struct vcache *avc,
 	} else {
 	    afs_warn("BYPASS: No connection.\n");
 	    code = -1;
+	    tc = NULL;
+	    rxconn = NULL;
 	    unlock_and_release_pages(auio);
 	    (void)afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
 			      AFS_STATS_FS_RPCIDX_FETCHDATA,
 			      SHARED_LOCK, NULL);
 	    goto done;
 	}
-    } while (afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+    } while (afs_Analyze(tc, rxconn, code, &cinfo.fid, areq,
 						 AFS_STATS_FS_RPCIDX_FETCHDATA,
 						 SHARED_LOCK,0));
 done:

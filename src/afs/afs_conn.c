@@ -259,20 +259,20 @@ afs_pickSecurityObject(struct afs_conn *conn, int *secLevel)
      return secObj;
 }
 
-
 /**
- * Try setting up a connection to the server containing the specified fid.
- * Gets the volume, checks if it's up and does the connection by server address.
+ * Check if the given volume is up and create connection by server address.
  *
- * @param afid
- * @param areq Request filled in by the caller.
- * @param locktype Type of lock that will be used.
+ * @param[in]   afid      fid
+ * @param[in]   areq      request filled in by the caller
+ * @param[in]   locktype  type of lock that will be used
+ * @param[out]  rxconn    rx connection
  *
- * @return The conn struct, or NULL.
+ * @return afs_conn struct on success; NULL otherwise.
  */
-struct afs_conn *
-afs_Conn(struct VenusFid *afid, struct vrequest *areq,
-	 afs_int32 locktype, struct rx_connection **rxconn)
+static struct afs_conn *
+afs_ConnCommon(struct volume *avol, struct VenusFid *afid,
+	       struct vrequest *areq, afs_int32 locktype,
+	       struct rx_connection **rxconn)
 {
     u_short fsport = AFS_FSPORT;
     struct volume *tv;
@@ -284,19 +284,7 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     struct srvAddr *sa1p;
     afs_int32 replicated = -1; /* a single RO will increment to 0 */
 
-    *rxconn = NULL;
-
-    AFS_STATCNT(afs_Conn);
-    /* Get fid's volume. */
-    tv = afs_GetVolume(afid, areq, READ_LOCK);
-    if (!tv) {
-	if (areq) {
-	    afs_FinalizeReq(areq);
-	    areq->volumeError = 1;
-	}
-	return NULL;
-    }
-
+    tv = avol;
     if (tv->serverHost[0] && tv->serverHost[0]->cell) {
 	fsport = tv->serverHost[0]->cell->fsport;
     } else {
@@ -362,8 +350,128 @@ afs_Conn(struct VenusFid *afid, struct vrequest *areq,
     }
 
     return tconn;
+}
+
+/**
+ * Try setting up a connection to the server containing the specified fid.
+ * Gets the volume, checks if it's up and does the connection by server address.
+ *
+ * @param afid
+ * @param areq Request filled in by the caller.
+ * @param locktype Type of lock that will be used.
+ *
+ * @return The conn struct, or NULL.
+ */
+struct afs_conn *
+afs_Conn(struct VenusFid *afid, struct vrequest *areq,
+	 afs_int32 locktype, struct rx_connection **rxconn)
+{
+    struct volume *tv;
+    struct afs_conn *tconn = NULL;
+
+    *rxconn = NULL;
+
+    AFS_STATCNT(afs_Conn);
+    /* Get fid's volume. */
+    tv = afs_GetVolume(afid, areq, READ_LOCK);
+    if (!tv) {
+	if (areq) {
+	    afs_FinalizeReq(areq);
+	    areq->volumeError = 1;
+	}
+	goto done;
+    }
+
+    tconn = afs_ConnCommon(tv, afid, areq, locktype, rxconn);
+ done:
+    return tconn;
 }				/*afs_Conn */
 
+/**
+ * Setup connection to the fileserver holding the given fid.
+ *
+ * @param afid[in]        fid
+ * @param areq[in]        request filled in by the caller
+ * @param locktype[in]    type of lock that will be used
+ * @param acallinfo[out]  info associated with this call (conn, fid, etc.)
+ *
+ * @return 0 on success; non-zero otherwise.
+ */
+int
+afs_FSConn(struct VenusFid *afid, struct vrequest *areq,
+	   afs_int32 locktype, struct afs_callinfo *acallinfo)
+{
+    int code = -1;
+    struct volume *tv;
+    struct afs_conn *tconn = NULL;
+
+    AFS_STATCNT(afs_FSConn);
+
+    memset(acallinfo, 0, sizeof(*acallinfo));
+    acallinfo->fid = *afid;
+
+    tv = afs_GetVolume(afid, areq, READ_LOCK);
+    if (!tv) {
+	if (areq) {
+	    afs_FinalizeReq(areq);
+	    areq->volumeError = 1;
+	}
+	goto done;
+    }
+
+    tconn =
+	afs_ConnCommon(tv, &acallinfo->fid, areq, locktype, &acallinfo->rxconn);
+    if (tconn != NULL) {
+	code = 0;
+	acallinfo->afsconn = tconn;
+    }
+ done:
+    return code;
+}
+
+/**
+ * Create connection to one of the hosts from a given cell.
+ *
+ * @param[in]   acell       cell
+ * @param[in]   areq        request
+ * @param[in]   locktype    type of lock to be used
+ * @param[in]   replicated  replicated connection
+ * @param[out]  acallinfo   info associated with this call
+ *
+ * @return 0 on success; non-zero otherwise.
+ */
+int
+afs_VLConn(struct cell **acell, struct vrequest *areq,
+	   afs_int32 locktype, afs_int32 replicated,
+	   struct afs_callinfo *acallinfo)
+{
+    int code = -1;
+    afs_int32 i, cellnum;
+    struct afs_conn *tconn;
+    struct server *ts, **hosts;
+    unsigned short port;
+
+    AFS_STATCNT(afs_VLConn);
+
+    memset(acallinfo, 0, sizeof(*acallinfo));
+    cellnum = (*acell)->cellNum;
+    hosts = (*acell)->cellHosts;
+    port = (*acell)->vlport;
+
+    for (i = 0; i < AFS_MAXCELLHOSTS; i++) {
+	if ((ts = hosts[i]) == NULL)
+	    break;
+	tconn = afs_ConnByHost(ts, port, cellnum, areq, 0, locktype,
+			       replicated, &acallinfo->rxconn);
+	if (tconn) {
+	    code = 0;
+	    acallinfo->afsconn = tconn;
+	    goto done;
+	}
+    }
+ done:
+    return code;
+}
 
 /**
  * Connects to a server by it's server address.

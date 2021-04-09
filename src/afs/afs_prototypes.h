@@ -193,7 +193,15 @@ extern void afs_PutConn(struct afs_conn *ac, struct rx_connection *rxconn,
 extern void afs_ReleaseConns(struct sa_conn_vector *tcv);
 extern void afs_ReleaseConnsUser(register struct unixuser *au);
 extern void ForceNewConnections(struct srvAddr *sap);
-
+extern int afs_FSConn(struct VenusFid *afid,
+		      struct vrequest *areq,
+		      afs_int32 locktype,
+		      struct afs_callinfo *acallinfo);
+extern int afs_VLConn(struct cell **acell,
+		      struct vrequest *areq,
+		      afs_int32 locktype,
+		      afs_int32 replicated,
+		      struct afs_callinfo *acallinfo);
 
 /* afs_daemons.c */
 extern afs_lock_t afs_xbrs;
@@ -505,8 +513,8 @@ extern int afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
                                 struct osi_file *fP,
 				afs_size_t abase, struct dcache *adc,
 				struct vcache *avc, afs_int32 size,
-				struct afs_FetchOutput *tsmall)
-				AFS_NONNULL((5));
+				struct afs_FetchOutput *tsmall,
+				struct VenusFid *afid) AFS_NONNULL((5));
 
 /* afs_memcache.c */
 extern int afs_InitMemCache(int blkCount, int blkSize, int flags);

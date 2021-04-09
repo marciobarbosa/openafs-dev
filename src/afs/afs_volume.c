@@ -831,7 +831,7 @@ static struct volume *
 afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
 		    struct vrequest *areq, afs_int32 locktype)
 {
-    afs_int32 code, type = 0;
+    afs_int32 code, rcode, type = 0;
     struct volume *tv, *tv1;
     struct vldbentry *tve;
     struct nvldbentry *ntve;
@@ -841,6 +841,7 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
     struct afs_conn *tconn;
     struct vrequest *treq = NULL;
     struct rx_connection *rxconn;
+    struct afs_callinfo cinfo;
 
     if (strlen(aname) > VL_MAXNAMELEN)	/* Invalid volume name */
 	return NULL;
@@ -868,10 +869,10 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
     utve = (struct uvldbentry *)tve;
 
     do {
-	tconn =
-	    afs_ConnByMHosts(tcell->cellHosts, tcell->vlport, tcell->cellNum,
-			     treq, SHARED_LOCK, 0, &rxconn);
-	if (tconn) {
+	rcode = afs_VLConn(&tcell, treq, SHARED_LOCK, 0, &cinfo);
+	if (rcode == 0) {
+	    tconn = cinfo.afsconn;
+	    rxconn = cinfo.rxconn;
 	    if (tconn->parent->srvr->server->flags & SNO_LHOSTS) {
 		type = 0;
 		RX_AFS_GUNLOCK();
@@ -906,8 +907,11 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
 		}
 		lastnvcode = code;
 	    }
-	} else
+	} else {
 	    code = -1;
+	    tconn = NULL;
+	    rxconn = NULL;
+	}
     } while (afs_Analyze(tconn, rxconn, code, NULL, treq, -1,	/* no op code for this */
 			 SHARED_LOCK, tcell));
 

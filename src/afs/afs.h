@@ -1640,4 +1640,10 @@ typedef struct afs_event {
 
 extern afs_event_t *afs_evhasht[AFS_EVHASHSIZE];	/* Hash table for events */
 
+struct afs_callinfo {
+    struct afs_conn *afsconn;
+    struct rx_connection *rxconn;
+    struct VenusFid fid;
+};
+
 #endif /* _AFS_H_ */

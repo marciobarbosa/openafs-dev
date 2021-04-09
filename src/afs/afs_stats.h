@@ -659,7 +659,9 @@ struct afs_MeanStats {
     AFS_CS(PPrefetchFromTape)   /* afs_pioctl.c */ \
     AFS_CS(PFlushAllVolumeData)	/* afs_pioctl.c */ \
     AFS_CS(afs_InitVolSlot)     /* afs_volume.c */ \
-    AFS_CS(afs_SetupVolSlot)    /* afs_volume.c */
+    AFS_CS(afs_SetupVolSlot)    /* afs_volume.c */ \
+    AFS_CS(afs_FSConn)		/* afs_conn.c */ \
+    AFS_CS(afs_VLConn)		/* afs_conn.c */
 
 struct afs_CMCallStats {
 #define AFS_CS(call) afs_int32 C_ ## call;
