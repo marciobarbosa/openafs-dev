@@ -41,6 +41,7 @@ afsconf_Open
 afsconf_ParseNetFiles
 afsconf_ParseNetRestrictFile
 afsconf_PickClientSecObj
+afsconf_PickLocalSecObj
 afsconf_PutTypedKeyList
 afsconf_ServerAuth
 afsconf_SetCellInfo

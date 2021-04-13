@@ -23,6 +23,7 @@
 
 #include <rx/rxkad.h>
 #include <rx/rx.h>
+#include <rx/rx_identity.h>
 
 #include <afs/pthread_glock.h>
 
@@ -99,6 +100,8 @@ afsconf_ServerAuth(void *arock,
 static afs_int32
 GenericAuth(struct afsconf_dir *adir,
 	    struct rx_securityClass **astr,
+	    char *aname,
+	    char *ainst,
 	    afs_int32 *aindex,
 	    rxkad_level enclevel)
 {
@@ -151,7 +154,7 @@ GenericAuth(struct afsconf_dir *adir,
 	memset(tbuffer, '\0', sizeof(tbuffer));
 	code =
 	    tkt_MakeTicket5(tbuffer, &ticketLen, *et, &kvno, keymat->val,
-			    keymat->len, AUTH_SUPERUSER, "", "", 0, 0x7fffffff,
+			    keymat->len, aname, ainst, "", 0, 0x7fffffff,
 			    &session, "afs", "");
 	afsconf_typedKey_put(&kobj);
     } else {
@@ -159,7 +162,7 @@ GenericAuth(struct afsconf_dir *adir,
 	ticketLen = sizeof(tbuffer);
 	memset(tbuffer, '\0', sizeof(tbuffer));
 	code =
-	    tkt_MakeTicket(tbuffer, &ticketLen, &key, AUTH_SUPERUSER, "", "", 0,
+	    tkt_MakeTicket(tbuffer, &ticketLen, &key, aname, ainst, "", 0,
 			   0xffffffff, &session, 0, "afs", "");
 	/* parms were buffer, ticketlen, key to seal ticket with, principal
 	 * name, instance and cell, start time, end time, session key to seal
@@ -189,7 +192,7 @@ afsconf_ClientAuth(void *arock, struct rx_securityClass ** astr,
     afs_int32 rc;
 
     LOCK_GLOBAL_MUTEX;
-    rc = GenericAuth(adir, astr, aindex, rxkad_clear);
+    rc = GenericAuth(adir, astr, AUTH_SUPERUSER, "", aindex, rxkad_clear);
     UNLOCK_GLOBAL_MUTEX;
     return rc;
 }
@@ -207,7 +210,7 @@ afsconf_ClientAuthSecure(void *arock,
     afs_int32 rc;
 
     LOCK_GLOBAL_MUTEX;
-    rc = GenericAuth(adir, astr, aindex, rxkad_crypt);
+    rc = GenericAuth(adir, astr, AUTH_SUPERUSER, "", aindex, rxkad_crypt);
     UNLOCK_GLOBAL_MUTEX;
     return rc;
 }
@@ -581,5 +584,117 @@ afsconf_PickClientSecObj(struct afsconf_dir *dir, afsconf_secflags flags,
     }
 
 out:
+    return code;
+}
+
+/*!
+ * Pick a local security class to use for an outgoing connection.
+ *
+ * @param[in]   dir      conf directory structure for this cell
+ * @param[in]   flags    properties of the local security class
+ * @param[in]   user     identity of the user (for now, kind must be RX_ID_KRB4)
+ * @param[out]  sc       selected security class
+ * @param[out]  scIndex  index of the selected security class
+ * @param[out]  expires  expiry time of the tokens used to construct the class
+ *
+ * @return 0 on success; com_err error code otherwise.
+ */
+afs_int32
+afsconf_PickLocalSecObj(struct afsconf_dir *dir, afsconf_secflags flags,
+			struct rx_identity *user, struct rx_securityClass **sc,
+			afs_int32 *scIndex, time_t *expires)
+{
+    int code = 0;
+    char *name, *inst;
+    char *buffer = NULL;
+
+    if (expires) {
+	*expires = 0;
+    }
+    *sc = NULL;
+    *scIndex = RX_SECIDX_NULL;
+
+    if (dir == NULL) {
+	code = AFSCONF_NOCELLDB;
+	goto out;
+    }
+    if ((flags & AFSCONF_SECOPTS_NOAUTH)) {
+	goto out;
+    }
+    if (!(flags & AFSCONF_SECOPTS_LOCALAUTH)) {
+	/* localauth-only */
+	code = AFSCONF_NO_SECURITY_CLASS;
+	goto out;
+    }
+    if ((flags & AFSCONF_SECOPTS_RXGK)) {
+	/* not supported yet */
+	code = AFSCONF_NO_SECURITY_CLASS;
+	goto out;
+    }
+    if (user == NULL || user->kind != RX_ID_KRB4) {
+	/* not supported yet */
+	code = AFSCONF_NO_SECURITY_CLASS;
+	goto out;
+    }
+
+    buffer = calloc(user->exportedName.len, sizeof(char));
+    if (buffer == NULL) {
+	code = AFSCONF_NO_SECURITY_CLASS;
+	goto out;
+    }
+
+    memcpy(buffer, user->exportedName.val, user->exportedName.len);
+    name = buffer;
+
+    /* separate primary name from instance */
+    inst = strchr(name, '.');
+    if (inst != NULL) {
+	*inst = '\0';
+	inst = inst + 1;
+    } else {
+	inst = "";
+    }
+
+    if ((flags & AFSCONF_SECOPTS_ALWAYSENCRYPT)) {
+	LOCK_GLOBAL_MUTEX;
+	code = GenericAuth(dir, sc, name, inst, scIndex, rxkad_crypt);
+	UNLOCK_GLOBAL_MUTEX;
+    } else {
+	LOCK_GLOBAL_MUTEX;
+	code = GenericAuth(dir, sc, name, inst, scIndex, rxkad_clear);
+	UNLOCK_GLOBAL_MUTEX;
+    }
+
+    if (code != 0) {
+	/* currently, never reached */
+	goto out;
+    }
+
+    if (!(flags & AFSCONF_SECOPTS_FALLBACK_NULL) &&
+	*scIndex == RX_SECIDX_NULL) {
+	/*
+	 * On failure, afsconf_ClientAuth()/afsconf_ClientAuthSecure() provide a
+	 * rxnull object, which is not always wanted.
+	 */
+	sc = NULL;
+	code = AFSCONF_NOTFOUND;
+	goto out;
+    }
+    if (expires) {
+	*expires = NEVERDATE;
+    }
+
+ out:
+    if (code == 0 && *sc == NULL) {
+	/* noauth */
+	*sc = rxnull_NewClientSecurityObject();
+	*scIndex = RX_SECIDX_NULL;
+	if (expires) {
+	    *expires = NEVERDATE;
+	}
+    }
+    if (buffer != NULL) {
+	free(buffer);
+    }
     return code;
 }
