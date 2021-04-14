@@ -68,6 +68,7 @@ static int CleanAcl(struct Acl *, char *);
 static int SetVolCmd(struct cmd_syndesc *as, void *arock);
 static int GetCellName(char *, struct afsconf_cell *);
 static void Die(int, char *);
+static int GetLastComponent(const char *, char **, char **, int *, int);
 
 /*
  * Character to use between name and rights in printed representation for
@@ -1549,7 +1550,14 @@ ExamineCmd(struct cmd_syndesc *as, void *arock)
     char *name, *offmsg;
     int error = 0;
 
+    int literal = 0;
+    char *parent_dir = NULL, *last_component = NULL;
+
     SetDotDefault(&as->parms[0].items);
+    if (as->parms[1].items) {
+	/* -literal */
+	literal = 1;
+    }
     for (ti = as->parms[0].items; ti; ti = ti->next) {
 	struct VenusFid vfid;
 
@@ -1567,9 +1575,33 @@ ExamineCmd(struct cmd_syndesc *as, void *arock)
 	name = (char *)status + sizeof(*status);
 	offmsg = name + strlen(name) + 1;
 
+	if (literal) {
+	    if (GetLastComponent(ti->data, &parent_dir,
+				 &last_component, NULL, literal) != 0) {
+		error = 1;
+		continue;
+	    }
+	}
+
 	blob.out_size = sizeof(struct VenusFid);
 	blob.out = (char *) &vfid;
-	if (0 == pioctl(ti->data, VIOCGETFID, &blob, 1)) {
+
+	if (literal) {
+	    blob.in = last_component;
+	    blob.in_size = strlen(last_component) + 1;
+	    code = pioctl(parent_dir, VIOC_GETLITERALFID, &blob, 0);
+	} else {
+	    code = pioctl(ti->data, VIOCGETFID, &blob, 1);
+	}
+	if (parent_dir) {
+	    free(parent_dir);
+	    parent_dir = NULL;
+	}
+	if (last_component) {
+	    free(last_component);
+	    last_component = NULL;
+	}
+	if (code == 0) {
 	    printf("File %s (%u.%u.%u) contained in volume %u\n",
 		   ti->data, vfid.Fid.Volume, vfid.Fid.Vnode, vfid.Fid.Unique,
 		   vfid.Fid.Volume);
@@ -1724,7 +1756,7 @@ QuotaCmd(struct cmd_syndesc *as, void *arock)
 
 static int
 GetLastComponent(const char *data, char **outdir, char **outbase,
-		 int *thru_symlink)
+		 int *thru_symlink, int literal)
 {
     char orig_name[MAXPATHLEN];	/*Original name, may be modified */
     char true_name[MAXPATHLEN];	/*``True'' dirname (e.g., symlink target) */
@@ -1751,10 +1783,10 @@ GetLastComponent(const char *data, char **outdir, char **outbase,
     }
 
     /*
-     * The lstat succeeded.  If the given file is a symlink, substitute
-     * the file name with the link name.
+     * The lstat succeeded.  If the -literal flag wasn't specified and the given
+     * file is a symlink, substitute the file name with the link name.
      */
-    if ((statbuff.st_mode & S_IFMT) == S_IFLNK) {
+    if (!literal && (statbuff.st_mode & S_IFMT) == S_IFLNK) {
 	if (thru_symlink)
 	     *thru_symlink = 1;
 
@@ -1842,7 +1874,7 @@ ListMountCmd(struct cmd_syndesc *as, void *arock)
 
     for (ti = as->parms[0].items; ti; ti = ti->next) {
 	if (GetLastComponent(ti->data, &parent_dir,
-			     &last_component, &thru_symlink) != 0) {
+			     &last_component, &thru_symlink, 0) != 0) {
 	    error = 1;
 	    continue;
 	}
@@ -3743,6 +3775,9 @@ main(int argc, char **argv)
 
     ts = cmd_CreateSyntax("examine", ExamineCmd, NULL, 0, "display file/volume status");
     cmd_AddParm(ts, "-path", CMD_LIST, CMD_OPTIONAL, "dir/file path");
+    cmd_AddParm(ts, "-literal", CMD_FLAG, CMD_OPTIONAL,
+		"Evaluates the specified object rather than the object it "
+		"refers to.");
     cmd_CreateAlias(ts, "lv");
     cmd_CreateAlias(ts, "listvol");
 
@@ -3941,6 +3976,9 @@ defect 3069
     ts = cmd_CreateSyntax("getfid", GetFidCmd, NULL, 0,
 			  "get fid for file(s)");
     cmd_AddParm(ts, "-path", CMD_LIST, CMD_OPTIONAL, "dir/file path");
+    cmd_AddParm(ts, "-literal", CMD_FLAG, CMD_OPTIONAL,
+		"Evaluates the specified object rather than the object it "
+		"refers to.");
 
     ts = cmd_CreateSyntax("discon", DisconCmd, NULL, 0,
 			  "disconnection mode");
@@ -4143,7 +4181,7 @@ FlushMountCmd(struct cmd_syndesc *as, void *arock)
 
     for (ti = as->parms[0].items; ti; ti = ti->next) {
 	if (GetLastComponent(ti->data, &parent_dir,
-			     &last_component, NULL) != 0) {
+			     &last_component, NULL, 0) != 0) {
 	    error = 1;
 	    continue;
 	}
@@ -4247,15 +4285,44 @@ GetFidCmd(struct cmd_syndesc *as, void *arock)
     int error = 0;
     char cell[MAXCELLCHARS];
 
+    int literal = 0;
+    char *parent_dir = NULL, *last_component = NULL;
+
     SetDotDefault(&as->parms[0].items);
+    if (as->parms[1].items) {
+	/* -literal */
+	literal = 1;
+    }
     for (ti = as->parms[0].items; ti; ti = ti->next) {
         struct VenusFid vfid;
+
+	if (literal) {
+	    if (GetLastComponent(ti->data, &parent_dir,
+				 &last_component, NULL, literal) != 0) {
+		error = 1;
+		continue;
+	    }
+	}
 
         blob.out_size = sizeof(struct VenusFid);
         blob.out = (char *) &vfid;
         blob.in_size = 0;
 
-        code = pioctl(ti->data, VIOCGETFID, &blob, 1);
+	if (literal) {
+	    blob.in = last_component;
+	    blob.in_size = strlen(last_component) + 1;
+	    code = pioctl(parent_dir, VIOC_GETLITERALFID, &blob, 0);
+	} else {
+	    code = pioctl(ti->data, VIOCGETFID, &blob, 1);
+	}
+	if (parent_dir) {
+	    free(parent_dir);
+	    parent_dir = NULL;
+	}
+	if (last_component) {
+	    free(last_component);
+	    last_component = NULL;
+	}
         if (code) {
             Die(errno,ti->data);
             error = 1;

@@ -93,6 +93,7 @@
 
 #define VIOC_STATISTICS         _VICEIOCTL(68)	/* arla: fetch statistics */
 #define VIOC_GETVCXSTATUS2      _VICEIOCTL(69)  /* vcache statistics */
+#define VIOC_GETLITERALFID      _VICEIOCTL(70)  /* Get FID from parent directory */
 
 /* Coordinated 'C' pioctl's */
 #define VIOC_NEWALIAS		_CVICEIOCTL(1)	/* create new cell alias */
