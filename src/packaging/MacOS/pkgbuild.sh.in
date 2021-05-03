@@ -165,8 +165,10 @@ elif [ x"$majorvers" = x19 ]; then
 
 elif [ x"$majorvers" = x20 ]; then
     RELNAME="BigSur"
+    # Big Sur version number is 11.0 (not 10.16). Still, set THISREL to 16 so we
+    # know that this version came after the ones listed above.
     THISREL=16
-    OSXMAJOR=0
+    OSVER=11
 
 elif [ x"$majorvers" = x ] ; then
     echo "Error running uname" >&2
@@ -348,8 +350,6 @@ if [ x"$PASS1" = x1 ]; then
 	# To be notarized by Apple, all files must be signed.
 	find "$PKGROOT" -type f -exec codesign --verbose --force \
 	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
-	find "$PLUGINS" -type f -exec codesign --verbose --force \
-	    --timestamp --sign "$APP_KEY" $CODESIGN_OPTS {} \;
 
 	# Sign each 'thing' that we have (commands, kexts, etc)
 	for obj in "$DPKGROOT"/Library/OpenAFS/Debug/afs.kext \
@@ -366,6 +366,7 @@ if [ x"$PASS1" = x1 ]; then
 	do
 	    codesign --verbose --force --timestamp --sign "$APP_KEY" $CODESIGN_OPTS "$obj"
 	done
+
 
 	# Check if our signatures for our kexts are valid. 'kextutil' will exit
 	# with an error and print out a message if something is wrong with the
@@ -512,16 +513,21 @@ if [ x"$PASS2" = x1 ]; then
 
     # generate Distribution.xml from Distribution.xml.in -- nonstandard substs
     if [ $majorvers -ge 20 ] ; then
-	sed -e "s/%%OSX_MAJOR_CUR%%/$OSXMAJOR/g" \
-	    -e "s/%%OSX_MAJOR_NEXT%%/$(( $OSXMAJOR + 1 ))/g" \
-	    -e "s/%%OSVER%%/11/g" \
+	# Unlike older versions, point releases for macOS Big Sur increment the
+	# second component of the release number (prior releases increment the
+	# third component of this number).
+	sed -e "s/%%OSX_MAJOR_CUR%%/0/g" \
+	    -e "s/%%OSX_MAJOR_NEXT%%/0/g" \
+	    -e "s/%%OSVER_CUR%%/$OSVER/g" \
+	    -e "s/%%OSVER_NEXT%%/$(( $OSVER + 1 ))/g" \
 	    -e "s,%%PRES_EXTRA%%,$PRES_EXTRA,g" \
 	    -e "s/%%OPENAFS_VERSION%%/@PACKAGE_VERSION@/g" \
 	    < Distribution.xml.in > Distribution.xml
     else
 	sed -e "s/%%OSX_MAJOR_CUR%%/$THISREL/g" \
 	    -e "s/%%OSX_MAJOR_NEXT%%/$(( $THISREL + 1 ))/g" \
-	    -e "s/%%OSVER%%/10/g" \
+	    -e "s/%%OSVER_CUR%%/10/g" \
+	    -e "s/%%OSVER_NEXT%%/10/g" \
 	    -e "s,%%PRES_EXTRA%%,$PRES_EXTRA,g" \
 	    -e "s/%%OPENAFS_VERSION%%/@PACKAGE_VERSION@/g" \
 	    < Distribution.xml.in > Distribution.xml
