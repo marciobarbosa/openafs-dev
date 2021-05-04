@@ -119,7 +119,7 @@ process.o	: process.default.s process.i386.s process.amd64.s process.c lwp.o
 		fi ; \
 		if [ -n "$${amd64}" ] ; then \
 			$(CC) -x assembler-with-cpp -c -arch x86_64 -I${TOP_INCDIR} -I${srcdir} ${srcdir}/process.amd64.s -o "$${amd64}" ; \
-			if [ -z "$${ppc}" -a -z "$${i386}" -a -z "$${armv6}" -a -z "$${armv7}" ] ; then \
+			if [ -z "$${ppc}" -a -z "$${i386}" -a -z "$${armv6}" -a -z "$${armv7} -a -z "$${arm64} ] ; then \
 				${MV} "$${amd64}" process.o ; \
 			fi ; \
 		fi ; \
