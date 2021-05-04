@@ -43,6 +43,7 @@
 #include "afs/prs_fs.h"
 #include "afs/dir.h"
 #include "afs/afs_dynroot.h"
+#include "roken.h"
 
 #define AFS_DYNROOT_CELLNAME	"dynroot"
 #define AFS_DYNROOT_VOLUME	1

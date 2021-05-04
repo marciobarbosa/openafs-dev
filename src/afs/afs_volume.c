@@ -39,6 +39,7 @@
 #include "afsincludes.h"	/* Afs-based standard headers */
 #include "afs/afs_stats.h"	/* afs statistics */
 #include "afs/afs_dynroot.h"
+#include "roken.h"
 
 #if	defined(AFS_SUN5_ENV)
 #include <inet/led.h>

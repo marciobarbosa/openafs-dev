@@ -29,6 +29,7 @@
 #include "afs/afs_bypasscache.h"
 #include "rx/rx_globals.h"
 #include "token.h"
+#include "roken.h"
 
 extern int afs_rmtsys_enable;
 struct VenusFid afs_rootFid;

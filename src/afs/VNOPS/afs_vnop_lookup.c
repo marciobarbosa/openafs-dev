@@ -25,7 +25,7 @@
 #include "afs/exporter.h"
 #include "afs/afs_osidnlc.h"
 #include "afs/afs_dynroot.h"
-
+#include "roken.h"
 extern struct vcache *afs_globalVp;
 
 afs_int32 afs_bkvolpref = 0;

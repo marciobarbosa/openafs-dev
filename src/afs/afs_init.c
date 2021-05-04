@@ -23,6 +23,7 @@
 #include "afsincludes.h"	/* Afs-based standard headers */
 #include "afs/afs_stats.h"	/* afs statistics */
 #include "rx/rxstat.h"
+#include "roken.h"
 #if defined(AFS_LINUX26_ENV) && defined(STRUCT_TASK_STRUCT_HAS_CRED)
 #include <linux/cred.h>
 #endif

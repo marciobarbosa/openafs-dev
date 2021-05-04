@@ -71,12 +71,14 @@ extern int DNew(struct dcache *adc, int page, struct DirBuffer *);
 
 #else /* KERNEL */
 
-# include <roken.h>
 # include "dir.h"
 #endif /* KERNEL */
 
 afs_int32 DErrno;
 
+#include <rx/rx.h>
+#include <afs/opr.h>
+#include <roken.h>
 /* Local static prototypes */
 static int FindBlobs(dir_file_t, int);
 static void AddPage(dir_file_t, int);
