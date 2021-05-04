@@ -19,6 +19,7 @@
 #include "afs/sysincludes.h"	/* Standard vendor system headers */
 #include "afsincludes.h"	/* Afs-based standard headers */
 #include "afs/afs_stats.h"	/* statistics gathering code */
+#include "roken.h"
 #include "afs/afs_cbqueue.h"
 #ifdef AFS_AIX_ENV
 #include <sys/adspace.h>	/* for vm_att(), vm_det() */
