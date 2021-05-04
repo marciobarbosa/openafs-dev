@@ -78,13 +78,14 @@ process.o	: process.default.s process.i386.s process.amd64.s process.c lwp.o
 		$(RM) -f process.o ; \
 		CURRENTBUILDARCH="${ARCHFLAGS}"; \
 		if [ -z "$${CURRENTBUILDARCH}" ] ; then \
-		    CURRENTBUILDARCH=`$(CC) -dM -E -xc /dev/null | grep 'ppc\|i386\|x86_64\|arm'`; \
+		    CURRENTBUILDARCH=`$(CC) -dM -E -xc /dev/null | grep 'ppc\|i386\|x86_64\|arm|arm64'`; \
 		fi; \
 		ppc=`echo $${CURRENTBUILDARCH} | grep -q ppc && echo process.ppc.o` ; \
 		i386=`echo $${CURRENTBUILDARCH} | grep -q i386 && echo process.i386.o` ; \
 		amd64=`echo $${CURRENTBUILDARCH} | grep -q x86_64 && echo process.amd64.o` ; \
 		armv6=`echo $${CURRENTBUILDARCH} | grep -q armv6 && echo process.armv6.o` ; \
 		armv7=`echo $${CURRENTBUILDARCH} | grep -q armv7 && echo process.armv7.o` ; \
+		arm64=`echo $${CURRENTBUILDARCH} | grep -q arm64 && echo process.arm64.o` ; \
 		if [ -z "$${ppc}" -a -z "$${i386}" -a -z "$${amd64}" -a -z "$${armv6}" -a -z "$${armv7}" ] ; then \
 			if [ `arch` = ppc ] ; then \
 				ppc=yes ; \
@@ -122,8 +123,11 @@ process.o	: process.default.s process.i386.s process.amd64.s process.c lwp.o
 				${MV} "$${amd64}" process.o ; \
 			fi ; \
 		fi ; \
+		if [ -n "$${arm64}" ] ; then \
+			$(CC) ${LWP_DBG} ${LWP_OPTMZ} -c -arch arm64 -I${TOP_INCDIR} -I${srcdir} -I. -I${TOP_OBJDIR}/src/config -I${TOP_INCDIR} ${srcdir}/process.c -o "$${arm64}" ; \
+		fi ; \
 		if [ ! -f process.o ] ; then \
-			lipo -create $${amd64} $${i386} $${ppc} $${armv6} $${armv7} -output process.o ;\
+			lipo -create $${amd64} $${i386} $${ppc} $${armv6} $${armv7} $${arm64} -output process.o ;\
 		fi ;; \
 	i386_*bsd*) \
 		cp ${srcdir}/process.i386.s process.S ; \

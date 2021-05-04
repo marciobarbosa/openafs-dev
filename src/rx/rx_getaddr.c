@@ -17,9 +17,7 @@
 # include <net/if.h>
 #  if defined(AFS_DARWIN_ENV) || defined(AFS_XBSD_ENV)
 #   include <sys/sysctl.h>
-#   ifndef AFS_ARM_DARWIN_ENV
-#    include <net/route.h>
-#   endif
+#   include <net/route.h>
 #   include <net/if_dl.h>
 #  endif
 
