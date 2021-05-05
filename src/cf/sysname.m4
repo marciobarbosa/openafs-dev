@@ -192,7 +192,7 @@ else
 			;;
                 arm-apple-darwin20.*)
                         AFS_SYSNAME="arm_darwin_200"
-                        OSXSDK="iphoneos4.0"
+			OSXSDK="macosx11.3"
                         ;;
 		x86_64-apple-darwin20.*)
 			AFS_SYSNAME="x86_darwin_200"
