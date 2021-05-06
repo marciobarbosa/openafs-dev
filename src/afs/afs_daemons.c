@@ -313,9 +313,11 @@ afs_CheckRootVolume(void)
 
     AFS_STATCNT(afs_CheckRootVolume);
     if (*afs_rootVolumeName == 0) {
-	strcpy(rootVolName, "root.afs");
+	osi_Assert(strlcpy(rootVolName, "root.afs",
+			   sizeof(rootVolName)) < sizeof(rootVolName));
     } else {
-	strcpy(rootVolName, afs_rootVolumeName);
+	osi_Assert(strlcpy(rootVolName, afs_rootVolumeName,
+			   sizeof(rootVolName)) < sizeof(rootVolName));
     }
 
     if (usingDynroot) {
@@ -334,7 +336,7 @@ afs_CheckRootVolume(void)
 	    int len = strlen(rootVolName);
 
 	    if ((len < 9) || strcmp(&rootVolName[len - 9], ".readonly")) {
-		strcpy(buf, rootVolName);
+		osi_Assert(strlcpy(buf, rootVolName, sizeof(buf)) < sizeof(buf));
 		afs_strcat(buf, ".readonly");
 		tvp = afs_GetVolumeByName(buf, localcell, 1, NULL, READ_LOCK);
 	    }
