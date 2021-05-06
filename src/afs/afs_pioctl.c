@@ -3837,7 +3837,7 @@ DECL_PIOCTL(PSetSysName)
 	    }
 	} else {
 	    foundname = num;
-	    strcpy(outname, sysnamelist[0]);
+	    osi_Assert(strlcpy(outname, sysnamelist[0], sizeof(outname)) < sizeof(outname));
 	}
 	afs_PutUser(au, READ_LOCK);
 	if (setsysname)
@@ -3847,7 +3847,7 @@ DECL_PIOCTL(PSetSysName)
 	if (!afs_sysname)
 	    osi_Panic("PSetSysName: !afs_sysname\n");
 	if (!setsysname) {	/* user just wants the info */
-	    strcpy(outname, afs_sysname);
+	    osi_Assert(strlcpy(outname, afs_sysname, sizeof(outname)) < sizeof(outname));
 	    foundname = afs_sysnamecount;
 	    sysnamelist = afs_sysnamelist;
 	} else {		/* Local guy; only root can change sysname */
@@ -3864,7 +3864,7 @@ DECL_PIOCTL(PSetSysName)
 
 	    if (strlen(inname) >= MAXSYSNAME-1)
 		return EINVAL;
-	    strcpy(afs_sysname, inname);
+	    osi_Assert(strlcpy(afs_sysname, inname, MAXSYSNAME) < MAXSYSNAME);
 
 	    if (setsysname > 1) {	/* ... or list */
 		for (count = 1; count < setsysname; ++count) {

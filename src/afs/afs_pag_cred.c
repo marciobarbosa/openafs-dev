@@ -54,7 +54,7 @@ afspag_GetCell(char *acell)
 	    tcell = 0;
 	    goto out;
 	}
-	strcpy(tcell->cellname, acell);
+	osi_Assert(strlcpy(tcell->cellname, acell, strlen(acell) + 1) < strlen(acell) + 1);
 	tcell->cellnum = ++lastcell;
 	tcell->next = cells;
 	cells = tcell;
@@ -395,7 +395,8 @@ SPAGCB_GetSysName(struct rx_call *a_call, afs_int32 a_uid,
 	    afs_osi_Alloc(strlen(afs_sysnamelist[i]) + 1);
 	if (!a_sysnames->SysNameList_val[i].sysname)
 	    goto out;
-	strcpy(a_sysnames->SysNameList_val[i].sysname, afs_sysnamelist[i]);
+	osi_Assert(strlcpy(a_sysnames->SysNameList_val[i].sysname, afs_sysnamelist[i],
+			   strlen(afs_sysnamelist[i]) + 1) < strlen(afs_sysnamelist[i]) + 1);
     }
 
     ReleaseReadLock(&afs_xpagsys);

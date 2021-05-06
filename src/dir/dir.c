@@ -134,7 +134,12 @@ afs_dir_Create(dir_file_t dir, char *entry, void *voidfid)
     ep->flag = FFIRST;
     ep->fid.vnode = htonl(vfid[1]);
     ep->fid.vunique = htonl(vfid[2]);
-    strcpy(ep->name, entry);
+
+    /*
+     * Note, the sizeof ep->name does not represent the maxium size of the name.
+     * FindBlobs has already ensured that the name can fit.
+     */
+    osi_Assert(strlcpy(ep->name, entry, strlen(entry) + 1) < strlen(entry) + 1);
 
     /* Now we just have to thread it on the hash table list. */
     if (DRead(dir, 0, &headerbuf) != 0) {
@@ -759,7 +764,7 @@ afs_dir_InverseLookup(void *dir, afs_uint32 vnode, afs_uint32 unique,
     if (strlen(entry->name) >= length)
 	code = E2BIG;
     else
-	strcpy(name, entry->name);
+	osi_Assert(strlcpy(name, entry->name, length) < length);
     DRelease(&entrybuf, 0);
     return code;
 }
