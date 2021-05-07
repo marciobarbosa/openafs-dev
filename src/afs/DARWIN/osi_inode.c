@@ -41,7 +41,7 @@ getinode(fs, dev, inode, vpp, perror)
     
     *vpp = 0;
     *perror = 0;
-    sprintf(volfspath, "/.vol/%d/%d", dev, inode);
+    snprintf(volfspath, sizeof(volfspath), "/.vol/%d/%d", dev, inode);
     code = vnode_open(volfspath, O_RDWR, 0, 0, &vp, afs_osi_ctxtp);
     if (code) {
 	*perror = BAD_IGET;

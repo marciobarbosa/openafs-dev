@@ -48,7 +48,7 @@ afs_AddMarinerName(char *aname, struct vcache *avc)
 	marinerPtr = 1;
     }
     tp = marinerNames[i];
-    strncpy(tp, aname, SMAR);
+    osi_Assert(strlcpy(tp, aname, SMAR) < SMAR);
     tp[SMAR - 1] = 0;
     marinerVCs[i] = avc;
     return 0;

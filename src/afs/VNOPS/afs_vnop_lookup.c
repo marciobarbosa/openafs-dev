@@ -568,7 +568,8 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	if ((tname > state->name + 4) && (AFS_EQ_ATSYS(tname - 4))) {
 	    state->offset = (tname - 4) - state->name;
 	    tname = osi_AllocLargeSpace(AFS_LRALLOCSIZ);
-	    strncpy(tname, state->name, state->offset);
+	    osi_Assert(strlcpy(tname, state->name, state->offset)
+		    < state->offset);
 	    state->name = tname;
 	    state->allocked = 1;
 	    num = 0;
