@@ -28,6 +28,7 @@
 #include "afs/afs_cbqueue.h"
 #include "afs/nfsclient.h"
 #include "afs/afs_osidnlc.h"
+#include "roken.h"
 
 extern afs_rwlock_t afs_xvcache;
 extern afs_rwlock_t afs_xcbhash;
@@ -280,7 +281,7 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     if (!tvc->linkData) {
 	tvc->linkData = afs_osi_Alloc(alen);
 	osi_Assert(tvc->linkData != NULL);
-	strncpy(tvc->linkData, atargetName, alen - 1);
+	osi_Assert(strlcpy(tvc->linkData, atargetName, alen - 1) < alen - 1);
 	tvc->linkData[alen - 1] = 0;
     }
     ReleaseWriteLock(&tvc->lock);

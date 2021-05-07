@@ -20,6 +20,7 @@
 #include "afs/afs_stats.h"	/* afs statistics */
 #include "afs/afs_osi.h"
 #include "hcrypto/md5.h"
+#include "roken.h"
 
 /* Local variables. */
 afs_rwlock_t afs_xcell;		/* Export for cmdebug peeking at locks */
@@ -143,7 +144,8 @@ afs_AFSDBHandler(char *acellName, int acellNameLen, afs_int32 * kernelMsg)
     }
 
     /* Return the lookup request to userspace */
-    strncpy(acellName, afsdb_req.cellname, acellNameLen);
+    osi_Assert(strlcpy(acellName, afsdb_req.cellname, acellNameLen)
+	    < acellNameLen);
     ReleaseReadLock(&afsdb_req_lock);
     return 0;
 }

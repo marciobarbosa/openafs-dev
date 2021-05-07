@@ -5083,7 +5083,8 @@ DECL_PIOCTL(PFsCmd)
 	if (vType(tvc) == VLNK) {
 	    ObtainWriteLock(&tvc->lock, 555);
 	    if (afs_HandleLink(tvc, areq) == 0)
-		strncpy((char *)&Outputs->chars, tvc->linkData, MAXCMDCHARS);
+		osi_Assert(strlcpy((char *)&Outputs->chars, tvc->linkData,
+			   MAXCMDCHARS) < MAXCMDCHARS);
 	    ReleaseWriteLock(&tvc->lock);
 	}
     }

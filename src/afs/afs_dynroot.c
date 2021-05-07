@@ -259,7 +259,7 @@ afs_dynroot_addDirEnt(struct DirHeader *dirHeader, int *curPageP,
     dirEntry->fid.vnode = htonl(vnode);
     dirEntry->fid.vunique = htonl(1);
     osi_Assert(strlcpy(dirEntry->name, name,
-		       sizeof(dirEntry->name)) < sizeof(dirEntry->name));
+		       strlen(name) + 1) < strlen(name) + 1);
 
     for (i = curChunk; i < curChunk + sizeOfEntry; i++) {
 	t1 = i / 8;
