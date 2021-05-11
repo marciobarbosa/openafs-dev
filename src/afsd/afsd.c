@@ -112,7 +112,7 @@
 #include <sys/fs_types.h>
 #endif
 
-#if defined(HAVE_SYS_MOUNT_H)
+#if defined(HAVE_SYS_MOUNT_H) && !defined(AFS_ARM_DARWIN_ENV)
 #include <sys/mount.h>
 #endif
 
@@ -163,7 +163,9 @@
 #include <CoreFoundation/CoreFoundation.h>
 
 static int event_pid;
+#ifndef AFS_ARM_DARWIN_ENV
 #define MACOS_EVENT_HANDLING 1
+#endif
 #endif /* AFS_DARWIN_ENV */
 
 #if AFS_HAVE_STATVFS || defined(HAVE_SYS_STATVFS_H)

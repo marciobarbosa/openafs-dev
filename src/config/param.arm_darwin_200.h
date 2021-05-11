@@ -160,6 +160,20 @@
 #define AFS_USERSPACE_IP_ADDR    1
 #define AFS_SOCKPROXY_ENV        1
 
+#ifndef IGNORE_STDS_H
+/* a dodge to avoid including this in lwp process.s */
+#define RTM_NEWADDR     0xc     /* address being added to iface */
+#define RTM_IFINFO      0xe     /* iface going up/down etc. */
+#define RTAX_NETMASK    2       /* netmask sockaddr present */
+#define RTAX_IFA        5       /* interface addr sockaddr present */
+#define RTAX_MAX        8       /* size of array to allocate */
+
+struct rt_addrinfo {
+    int     rti_addrs;
+    struct  sockaddr *rti_info[RTAX_MAX];
+};
+#endif
+
 #ifdef KERNEL
 #undef MACRO_BEGIN
 #undef MACRO_END

@@ -64,9 +64,9 @@ OBJ_amd64=$(shell echo "${ARCH_amd64}" | grep -q -w yes && echo "$@.amd64")
 OBJ_arm64=$(shell echo "${ARCH_arm64}" | grep -q -w yes && echo "$@.arm64")
 OBJ_arm64e=$(shell echo "${ARCH_arm64e}" | grep -q -w yes && echo "$@.arm64e")
 
-<all -ppc_darwin_70 -ppc_darwin_80 -x86_darwin_80 -ppc_darwin_90 -x86_darwin_90 -x86_darwin_160 -x86_darwin_170 -x86_darwin_180 -x86_darwin_190 -x86_darwin_200>
+<all -ppc_darwin_70 -ppc_darwin_80 -x86_darwin_80 -ppc_darwin_90 -x86_darwin_90 -x86_darwin_160 -x86_darwin_170 -x86_darwin_180 -x86_darwin_190 -x86_darwin_200 -arm_darwin_200>
 MODLD=$(CC) -static $(KOPTS_DBUG) -nostdlib $(ARCHFLAGS) -Xlinker -kext
-<ppc_darwin_70 ppc_darwin_80 x86_darwin_80 ppc_darwin_90 x86_darwin_90 x86_darwin_160 x86_darwin_170 x86_darwin_180 x86_darwin_190 x86_darwin_200>
+<ppc_darwin_70 ppc_darwin_80 x86_darwin_80 ppc_darwin_90 x86_darwin_90 x86_darwin_160 x86_darwin_170 x86_darwin_180 x86_darwin_190 x86_darwin_200 arm_darwin_200>
 MODLD=$(CC) -static $(KOPTS_DBUG) -nostdlib $(ARCHFLAGS)
 <all>
 
@@ -189,10 +189,10 @@ dest_libafs: $(LIBAFSNONFS) $(LIBAFSNONFSDSYM) ;
 ${LIBAFS}: $(AFSAOBJS) $(AFSNFSOBJS)
 	$(MODLD) -r -o ${LIBAFS} ${AFSAOBJS} ${AFSNFSOBJS} -lcc_kext
 
-<all -x86_darwin_160 -x86_darwin_170 -x86_darwin_180 -x86_darwin_190 -x86_darwin_200>
+<all -x86_darwin_160 -x86_darwin_170 -x86_darwin_180 -x86_darwin_190 -x86_darwin_200 -arm_darwin_200>
 ${LIBAFSNONFS}:  $(AFSAOBJS) $(AFSNONFSOBJS)
 	$(MODLD) -r -o ${LIBAFSNONFS} ${AFSAOBJS} ${AFSNONFSOBJS} -lcc_kext
-<x86_darwin_160 x86_darwin_170 x86_darwin_180 x86_darwin_190 x86_darwin_200>
+<x86_darwin_160 x86_darwin_170 x86_darwin_180 x86_darwin_190 x86_darwin_200 arm_darwin_200>
 ${LIBAFSNONFS}:  $(AFSAOBJS) $(AFSNONFSOBJS)
 	$(MODLD) -r -o ${LIBAFSNONFS} ${AFSAOBJS} ${AFSNONFSOBJS} -lcc_kext -Xlinker -kext
 

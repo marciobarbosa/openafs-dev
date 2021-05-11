@@ -92,7 +92,9 @@ typedef unsigned short etap_event_t;
 #ifdef AFS_LINUX22_ENV
 #include "linux/route.h"
 #else
+#ifndef AFS_ARM_DARWIN_ENV
 #include "net/route.h"
+#endif
 #endif
 #if defined(HAVE_IN_SYSTM_H) || !defined(AFS_LINUX22_ENV)
 #include "netinet/in_systm.h"
