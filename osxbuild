@@ -3,6 +3,6 @@
 make clean
 ./regen.sh
 ARCHFLAGS="-arch arm64" ./configure --enable-transarc-paths \
---with-krb5-conf=/usr/bin/krb5-config --enable-debug-kernel --libdir=/Library/OpenAFS/Tools/lib
+--with-krb5-conf=/usr/bin/krb5-config --enable-debug --enable-debug-kernel --libdir=/Library/OpenAFS/Tools/lib
 
 ARCHFLAGS="-arch arm64" make dest

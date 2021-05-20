@@ -12,7 +12,7 @@
 #define AFS_PPC_ENV		1
 #elif defined(__i386__) || defined(__amd64__)
 #define AFS_X86_ENV		1
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm64__) || defined(__arm64e__)
 #define AFS_ARM_ENV             1
 #define AFS_ARM_DARWIN_ENV      1
 #else
@@ -124,26 +124,7 @@
 #define SYS_NAME_ID		SYS_NAME_ID_amd64_darwin_200
 #define AFSLITTLE_ENDIAN	1
 
-#elif defined(__aarch64__)
-#define sys_x86_darwin_12	1
-#define sys_x86_darwin_13	1
-#define sys_x86_darwin_14	1
-#define sys_x86_darwin_60	1
-#define sys_x86_darwin_70	1
-#define sys_x86_darwin_80	1
-#define sys_x86_darwin_90	1
-#define sys_x86_darwin_100	1
-#define sys_amd64_darwin_100	1
-#define sys_amd64_darwin_110      1
-#define sys_amd64_darwin_120      1
-#define sys_amd64_darwin_130      1
-#define sys_amd64_darwin_140	  1
-#define sys_amd64_darwin_150	  1
-#define sys_amd64_darwin_160	  1
-#define sys_amd64_darwin_170	  1
-#define sys_amd64_darwin_180	  1
-#define sys_amd64_darwin_190	  1
-#define sys_amd64_darwin_200	  1
+#elif defined(__aarch64__) || defined(__arm64__) || defined(__arm64e__)
 #define sys_arm_darwin_200      1
 #define SYS_NAME		"arm_darwin_200"
 #define SYS_NAME_ID		SYS_NAME_ID_arm_darwin_200
@@ -218,7 +199,7 @@ struct rt_addrinfo {
 #define AFS_PPC_ENV		1
 #elif defined(__i386__) || defined(__amd64__)
 #define AFS_X86_ENV		1
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm64__) || defined(__arm64e__)
 #define AFS_ARM_ENV             1
 #define AFS_ARM_DARWIN_ENV      1
 #else
@@ -310,25 +291,7 @@ struct rt_addrinfo {
 #define SYS_NAME		"amd64_darwin_200"
 #define SYS_NAME_ID		SYS_NAME_ID_amd64_darwin_200
 #define AFSLITTLE_ENDIAN	1
-#elif defined(__aarch64__)
-#define sys_x86_darwin_12	1
-#define sys_x86_darwin_13	1
-#define sys_x86_darwin_14	1
-#define sys_x86_darwin_60	1
-#define sys_x86_darwin_70	1
-#define sys_x86_darwin_80	1
-#define sys_x86_darwin_100	1
-#define sys_amd64_darwin_100	1
-#define sys_amd64_darwin_110	1
-#define sys_amd64_darwin_120	1
-#define sys_amd64_darwin_130    1
-#define sys_amd64_darwin_140	1
-#define sys_amd64_darwin_150	1
-#define sys_amd64_darwin_160	1
-#define sys_amd64_darwin_170	1
-#define sys_amd64_darwin_180	1
-#define sys_amd64_darwin_190	1
-#define sys_amd64_darwin_200	1
+#elif defined(__aarch64__) || defined(__arm64__) || defined(__arm64e__)
 #define sys_arm_darwin_200      1
 #define SYS_NAME		"arm_darwin_200"
 #define SYS_NAME_ID		SYS_NAME_ID_arm_darwin_200

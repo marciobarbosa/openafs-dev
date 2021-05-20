@@ -31,7 +31,7 @@ struct afs_icl_set *afs_iclSetp = (struct afs_icl_set *)0;
 struct afs_icl_set *afs_iclLongTermSetp = (struct afs_icl_set *)0;
 
 /* Matches below where ICL_APPENDLONG is 2 INT32s */
-#if (defined(AFS_SGI61_ENV) && (_MIPS_SZLONG==64)) || (defined(AFS_AIX51_ENV) && defined(AFS_64BIT_KERNEL)) || defined(AFS_DARWIN_ENV) && defined(__amd64__)
+#if (defined(AFS_SGI61_ENV) && (_MIPS_SZLONG==64)) || (defined(AFS_AIX51_ENV) && defined(AFS_64BIT_KERNEL)) || defined(AFS_DARWIN_ENV)
 #define ICL_LONG 2
 #else
 #define ICL_LONG 1

@@ -86,7 +86,6 @@ process.o	: process.default.s process.i386.s process.amd64.s process.c lwp.o
 		armv6=`echo $${CURRENTBUILDARCH} | grep -q armv6 && echo process.armv6.o` ; \
 		armv7=`echo $${CURRENTBUILDARCH} | grep -q armv7 && echo process.armv7.o` ; \
 		arm64=`echo $${CURRENTBUILDARCH} | grep -q arm64 && echo process.arm64.o` ; \
-		arm64e=`echo $${CURRENTBUILDARCH} | grep -q arm64e && echo process.arm64e.o` ; \
 		if [ -z "$${ppc}" -a -z "$${i386}" -a -z "$${amd64}" -a -z "$${armv6}" -a -z "$${armv7}" -a -z "$${arm64}" -a -z "$${arm64e}" ] ; then \
 			if [ `arch` = ppc ] ; then \
 				ppc=yes ; \
