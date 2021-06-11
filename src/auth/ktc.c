@@ -61,6 +61,10 @@
 #include "token.h"
 #include "ktc.h"
 
+#if defined(UKERNEL)
+# include <afs_usrops.h>
+#endif
+
 #ifdef AFS_KERBEROS_ENV
 #include "cellconfig.h"
 static char lcell[MAXCELLCHARS];
@@ -119,7 +123,7 @@ static void ktc_LocalCell(void);
 #endif /* AFS_KERBEROS_ENV */
 
 #if defined(UKERNEL)
-#define PIOCTL(A,B,C,D) (errno = (call_syscall(AFSCALL_PIOCTL,A,B,C,D)), errno?-1:0)
+#define PIOCTL(A,B,C,D) (errno = (call_syscall(AFSCALL_PIOCTL,A,B,C,D,0)), errno?-1:0)
 #else
 #define PIOCTL pioctl
 #endif
