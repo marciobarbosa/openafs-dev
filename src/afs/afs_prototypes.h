@@ -699,6 +699,9 @@ extern int afs_osi_Write(struct osi_file *afile, afs_int32 offset,
 extern int afs_osi_MapStrategy(int (*aproc) (struct buf * bp),
 			       struct buf *bp);
 extern void shutdown_osifile(void);
+#if defined(AFS_HAVE_VXFS) || defined(AFS_DARWIN_ENV)
+extern void afs_InitDualFSCacheOps(struct vnode *vp);
+#endif
 
 
 /* ARCH/osi_groups.c */
@@ -721,6 +724,11 @@ extern int setpag(afs_proc_t *proc, struct ucred **cred, afs_uint32 pagvalue,
 #   endif /* AFS_FBSD_ENV */
 #  endif /* ! AFS_DFBSD_ENV */
 # endif /* AFS_XBSD_ENV */
+
+# if defined(AFS_DARWIN_ENV)
+extern int setpag(struct proc *proc, struct ucred **cred, afs_uint32 pagvalue,
+		  afs_uint32 *newpag, afs_uint32 change_parent);
+# endif
 #endif /* UKERNEL */
 
 #if defined(AFS_LINUX26_ENV) || defined(AFS_PAG_ONEGROUP_ENV)
