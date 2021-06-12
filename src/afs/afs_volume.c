@@ -694,6 +694,7 @@ afs_SetupVolume(afs_int32 volid, char *aname, void *ve, struct cell *tcell,
 
     int whichType;		/* which type of volume to look for */
     int i;
+    size_t len;
 
     if (!volid) {
 	int len;
@@ -734,7 +735,8 @@ afs_SetupVolume(afs_int32 volid, char *aname, void *ve, struct cell *tcell,
 	if (!tv->name) {
 	    tv->name = afs_osi_Alloc(strlen(aname) + 1);
 	    osi_Assert(tv->name != NULL);
-	    strcpy(tv->name, aname);
+	    len = strlen(aname) + 1;
+	    osi_Assert(strlcpy(tv->name, aname, len) < len);
 	}
     }
     for (i = 0; i < NMAXNSERVERS; i++) {
@@ -796,6 +798,7 @@ afs_NewDynrootVolume(struct VenusFid *fid)
     struct volume *tv;
     struct vldbentry *tve;
     char *bp, tbuf[CVBS];
+    size_t len;
 
     tcell = afs_GetCell(fid->Cell, READ_LOCK);
     if (!tcell)
@@ -807,7 +810,8 @@ afs_NewDynrootVolume(struct VenusFid *fid)
 
     bp = afs_cv2string(&tbuf[CVBS], fid->Fid.Volume);
     memset(tve, 0, sizeof(*tve));
-    strcpy(tve->name, "local-dynroot");
+    len = sizeof(tve->name);
+    osi_Assert(strlcpy(tve->name, "local-dynroot", len) < len);
     tve->volumeId[ROVOL] = fid->Fid.Volume;
     tve->flags = VLF_ROEXISTS;
 

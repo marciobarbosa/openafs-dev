@@ -14,6 +14,7 @@
 #include <afsconfig.h>
 #include <afs/param.h>
 
+#include <roken.h>
 
 #include "rx/rx_kcommon.h"
 #include "rx_atomic.h"
@@ -234,7 +235,7 @@ osi_AssertFailK(const char *expr, const char *file, int line)
 
 # define ADDBUF(BUF, STR)					\
 	if (strlen(BUF) + strlen((char *)(STR)) + 1 <= sizeof BUF) {	\
-		strcat(BUF, (char *)(STR));				\
+		strlcat(BUF, (char *)(STR), sizeof(BUF));				\
 	}
 
     buf[0] = '\0';
