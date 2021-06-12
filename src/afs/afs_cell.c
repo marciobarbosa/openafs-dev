@@ -79,6 +79,7 @@ afs_AFSDBHandler(char *acellName, int acellNameLen, afs_int32 * kernelMsg)
 {
     afs_int32 timeout, code;
     afs_int32 cellHosts[AFS_MAXCELLHOSTS];
+    size_t rlen;
 
     if (afsdb_handler_shutdown)
 	return -2;
@@ -143,7 +144,8 @@ afs_AFSDBHandler(char *acellName, int acellNameLen, afs_int32 * kernelMsg)
     }
 
     /* Return the lookup request to userspace */
-    strncpy(acellName, afsdb_req.cellname, acellNameLen);
+    rlen = strlcpy(acellName, afsdb_req.cellname, acellNameLen);
+    osi_Assert(rlen < acellNameLen);
     ReleaseReadLock(&afsdb_req_lock);
     return 0;
 }
