@@ -295,6 +295,7 @@ SRXAFSCB_GetLock(struct rx_call *a_call, afs_int32 a_index,
     struct ltable *tl;		/*Ptr to lock table entry */
     int nentries;		/*Num entries in table */
     int code;			/*Return code */
+    size_t len;
     XSTATS_DECLS;
 
     RX_AFS_GLOCK();
@@ -311,7 +312,8 @@ SRXAFSCB_GetLock(struct rx_call *a_call, afs_int32 a_index,
 	code = 1;
     } else if (a_index >= nentries) {
 	struct cell *tc = afs_GetCellByIndex(a_index-nentries, 0);
-	strcpy(a_result->name, tc->cellName);
+	len = sizeof(a_result->name);
+	osi_Assert(strlcpy(a_result->name, tc->cellName, len) < len);
 	a_result->lock.waitStates =
 	    ((struct afs_lock *)&(tc->lock))->wait_states;
 	a_result->lock.exclLocked =
@@ -338,7 +340,8 @@ SRXAFSCB_GetLock(struct rx_call *a_call, afs_int32 a_index,
 	 * Found it - copy out its contents.
 	 */
 	tl = &ltable[a_index];
-	strcpy(a_result->name, tl->name);
+	len = sizeof(a_result->name);
+	osi_Assert(strlcpy(a_result->name, tl->name, len) < len);
 	a_result->lock.waitStates =
 	    ((struct afs_lock *)(tl->addr))->wait_states;
 	a_result->lock.exclLocked =
