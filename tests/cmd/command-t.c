@@ -457,7 +457,7 @@ main(int argc, char **argv)
     memset(large, 'x', 1023);
     large[1023] = '\0';
     code = cmd_ParseLine(large, tv, &tc, 5);
-    is_int(CMD_TOOBIG, code, "cmd_ParseLine fails to parse large tokens");
+    is_int(0, code, "cmd_ParseLine supports large tokens");
     free(large);
     cmd_FreeArgv(tv);
 

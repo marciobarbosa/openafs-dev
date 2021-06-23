@@ -10,11 +10,11 @@ include @TOP_OBJDIR@/src/config/Makefile.config
 include @TOP_OBJDIR@/src/config/Makefile.pthread
 include @TOP_OBJDIR@/src/config/Makefile.libtool
 
-LT_objs=cmd_errors.lo cmd.lo config_file.lo AFS_component_version_number.lo
+LT_objs=cmd_errors.lo cmd_tokens.lo cmd.lo config_file.lo AFS_component_version_number.lo
 LT_deps=$(top_builddir)/src/comerr/liboafs_comerr.la
 LT_libs=
 
-LIB64OBJS=cmd_errors64.o cmd64.o
+LIB64OBJS=cmd_errors64.o cmd_tokens64.o cmd64.o
 
 all: ${TOP_LIBDIR}/libcmd.a ${TOP_LIBDIR}/libcmd_pic.a \
      ${TOP_INCDIR}/afs/cmd.h liboafs_cmd.la
@@ -43,6 +43,7 @@ cmd.h: cmd_errors.et cmd.p.h
 
 cmd.lo: cmd.h
 config_file.lo: cmd.h
+cmd_tokens.lo: cmd.h
 
 config_file.lo: $(TOP_SRCDIR)/external/heimdal/krb5/config_file.c krb5_locl.h
 	$(LT_CCRULE) $(TOP_SRCDIR)/external/heimdal/krb5/config_file.c
@@ -50,6 +51,10 @@ config_file.lo: $(TOP_SRCDIR)/external/heimdal/krb5/config_file.c krb5_locl.h
 cmd_errors64.o: cmd_errors.c
 	${CC} $(COMMON_CFLAGS) $(CPPFLAGS) ${XCFLAGS64} \
 		-c -o cmd_errors64.o cmd_errors.c
+
+cmd_tokens64.o: cmd_tokens.c
+	${CC} $(COMMON_CFLAGS) $(CPPFLAGS) ${XCFLAGS64} \
+		-c -o cmd_tokens64.o cmd_tokens.c
 
 cmd64.o: cmd.c cmd.h
 	${CC} $(COMMON_CFLAGS) $(CPPFLAGS) ${XCFLAGS64} \

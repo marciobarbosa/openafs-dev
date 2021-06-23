@@ -1140,145 +1140,102 @@ cmd_FreeOptions(struct cmd_syndesc **ts)
     }
 }
 
-/* free token list returned by parseLine */
-static int
-FreeTokens(struct cmd_token *alist)
-{
-    struct cmd_token *nlist;
-    for (; alist; alist = nlist) {
-	nlist = alist->next;
-	free(alist->key);
-	free(alist);
-    }
-    return 0;
-}
-
-/* free an argv list returned by parseline */
+/**
+ * Free an argv list returned by cmd_ParseLine().
+ *
+ * @param  argv  argument strings allocated by cmd_ParseLine()
+ * @return 0 on success
+ */
 int
 cmd_FreeArgv(char **argv)
 {
-    char *tp;
-    for (tp = *argv; tp; argv++, tp = *argv)
-	free(tp);
-    return 0;
-}
-
-/* copy back the arg list to the argv array, freeing the cmd_tokens as you go;
- * the actual data is still malloc'd, and will be freed when the caller calls
- * cmd_FreeArgv later on
- */
-#define INITSTR ""
-static int
-CopyBackArgs(struct cmd_token *alist, char **argv,
-	     afs_int32 * an, afs_int32 amaxn)
-{
-    struct cmd_token *next;
-    afs_int32 count;
-
-    count = 0;
-    if (amaxn <= 1)
-	return CMD_TOOMANY;
-    *argv = strdup(INITSTR);
-    assert(*argv);
-    amaxn--;
-    argv++;
-    count++;
-    while (alist) {
-	if (amaxn <= 1)
-	    return CMD_TOOMANY;	/* argv is too small for his many parms. */
-	*argv = alist->key;
-	next = alist->next;
-	free(alist);
-	alist = next;
-	amaxn--;
-	argv++;
-	count++;
+    for (; *argv != NULL; argv++) {
+	free(*argv);
+	*argv = NULL;
     }
-    *argv = NULL;		/* use last slot for terminating null */
-    /* don't count terminating null */
-    *an = count;
     return 0;
 }
 
-static int
-quote(int x)
+#define INITSTR ""
+struct parse_line_tokens
 {
-    if (x == '"' || x == 39 /* single quote */ )
-	return 1;
-    else
-	return 0;
+    int amaxn;
+    int argc;
+    char **argv;
+};
+
+/**
+ * Add a token to the argv array.
+ *
+ * @param[in]  token  token parsed by cmd_Tokenize()
+ * @param[out] rock   context
+ * @return 0 on success
+ *   @retval CMD_TOOMANY  argv is too small
+ */
+static int
+add_token(char *token, void *rock)
+{
+    struct parse_line_tokens *t = rock;
+
+    if (t->argc + 1 >= t->amaxn)
+	return CMD_TOOMANY;	/* argv is too small for this many parms. */
+
+    t->argv[t->argc++] = token; /* Save the current token. */
+    t->argv[t->argc] = NULL;    /* Terminate as we go. */
+    return 0;
 }
 
-static int
-space(int x)
-{
-    if (x == 0 || x == ' ' || x == '\t' || x == '\n')
-	return 1;
-    else
-	return 0;
-}
-
+/**
+ * Parse a command line like argument string into an argv array
+ *
+ * Parse the input string into an argv array of string pointers.  argv[0] will
+ * be set to an emtpy string, as a placeholder for the program name.
+ *
+ * The caller is responsible to free the allocated strings with cmd_FreeArge() if
+ * cmd_ParseLine() returns successfully (return code 0).
+ *
+ * @param[in]  aline  input string
+ * @param[out] argv   an array of string pointers
+ * @param[out] an     the number of arguments placed in argv, including argv[0]
+ * @param[in]  amaxn  the number of elements available in argv
+ *
+ * @return 0 on success
+ *   @retval ENOMEM              out of memory
+ *   @retval CMD_TOOMANY         argv is too small
+ *   @retval CMD_NOCLOSINGQUOTE  missing closing quote in text
+ *   @retval CMD_NOESCAPEDCHAR   bad escape sequence in text
+ */
 int
 cmd_ParseLine(char *aline, char **argv, afs_int32 * an, afs_int32 amaxn)
 {
-    char tbuffer[256];
-    char *tptr = 0;
-    int inToken, inQuote;
-    struct cmd_token *first, *last;
-    struct cmd_token *ttok;
-    int tc;
+    int code;
+    struct parse_line_tokens tokens;
 
-    inToken = 0;		/* not copying token chars at start */
-    first = NULL;
-    last = NULL;
-    inQuote = 0;		/* not in a quoted string */
-    while (1) {
-	tc = *aline++;
-	if (tc == 0 || (!inQuote && space(tc))) {	/* terminating null gets us in here, too */
-	    if (inToken) {
-		inToken = 0;	/* end of this token */
-		if (!tptr)
-		    return -1;	/* should never get here */
-		else
-		    *tptr++ = 0;
-		ttok = malloc(sizeof(struct cmd_token));
-		assert(ttok);
-		ttok->next = NULL;
-		ttok->key = strdup(tbuffer);
-		assert(ttok->key);
-		if (last) {
-		    last->next = ttok;
-		    last = ttok;
-		} else
-		    last = ttok;
-		if (!first)
-		    first = ttok;
-	    }
-	} else {
-	    /* an alpha character */
-	    if (!inToken) {
-		tptr = tbuffer;
-		inToken = 1;
-	    }
-	    if (tptr - tbuffer >= sizeof(tbuffer)) {
-		FreeTokens(first);
-		return CMD_TOOBIG;	/* token too long */
-	    }
-	    if (quote(tc)) {
-		/* hit a quote, toggle inQuote flag but don't insert character */
-		inQuote = !inQuote;
-	    } else {
-		/* insert character */
-		*tptr++ = tc;
-	    }
-	}
-	if (tc == 0) {
-	    /* last token flushed 'cause space(0) --> true */
-	    if (last)
-		last->next = NULL;
-	    return CopyBackArgs(first, argv, an, amaxn);
-	}
+    /*
+     * We need at least two elements, one for the program name placeholder,
+     * and one for the NULL terminator.
+     */
+    if (amaxn < 2)
+	return CMD_TOOMANY;
+
+    tokens.amaxn = amaxn;
+    tokens.argc = 1;
+    tokens.argv = argv;
+    tokens.argv[0] = strdup(INITSTR);  /* Program name placeholder. */
+    if (tokens.argv[0] == NULL) {
+	*an = 0;
+	return ENOMEM;
     }
+    tokens.argv[1] = NULL;             /* Terminate as we go. */
+
+    code = cmd_Tokenize(aline, add_token, &tokens);
+    if (code != 0) {
+	*an = 0;
+	cmd_FreeArgv(tokens.argv);
+	return code;
+    }
+    *an = tokens.argc;
+    return 0;
 }
 
 /* Read a string in from our configuration file. This checks in

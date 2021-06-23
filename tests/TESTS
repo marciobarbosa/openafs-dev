@@ -7,6 +7,7 @@ auth/authcon
 auth/realms
 auth/writeoldkey
 cmd/command
+cmd/tokens
 opr/cache
 opr/dict
 opr/fmt

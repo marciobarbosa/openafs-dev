@@ -82,6 +82,11 @@ extern int cmd_Dispatch(int argc, char **argv);
 extern int cmd_FreeArgv(char **argv);
 extern int cmd_ParseLine(char *aline, char **argv, afs_int32 * an,
 			 afs_int32 amaxn);
+extern int cmd_Tokenize(const char *text, int (*emit)(char *token, void *rock),
+			 void *rock);
+extern int cmd_Split(const char *text, int *pc, char ***pv);
+extern void cmd_FreeSplit(char ***pargv);
+extern int cmd_Join(int argc, char **argv, char **text);
 extern void cmd_DisablePositionalCommands(void);
 extern void cmd_DisableAbbreviations(void);
 extern void PrintSyntax(struct cmd_syndesc *as);

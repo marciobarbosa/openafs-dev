@@ -23,6 +23,7 @@ LIBFILE = $(DESTDIR)\lib\afs\afscmd.lib
 
 LIBOBJS =\
 	$(OUT)\cmd_errors.obj \
+	$(OUT)\cmd_tokens.obj \
 	$(OUT)\cmd.obj \
 	$(OUT)\AFS_component_version_number.obj
 
