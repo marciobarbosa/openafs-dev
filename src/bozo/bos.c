@@ -1089,7 +1089,7 @@ DoSalvage(struct rx_connection * aconn, char * aparm1, char * aparm2,
     afs_int32 code;
     char *parms[6];
     char buffer;
-    char tbuffer[BOZO_BSSIZE];
+    char *command;
     struct bozo_status istatus;
     struct rx_call *tcall;
     char *tp;
@@ -1099,6 +1099,19 @@ DoSalvage(struct rx_connection * aconn, char * aparm1, char * aparm2,
     afs_int32 partNumber;
     char *notifier = NONOTIFIER;
     int count;
+    int argc = 0;
+    char *argv[128];
+
+    memset(argv, 0, sizeof(argv));
+
+#define add_arg(arg) \
+    do { \
+	if (argc + 1 >= sizeof(argv)/sizeof(*argv)) { \
+	    fprintf(stderr, "bos: internal error composing salvager command.\n"); \
+	    return E2BIG; \
+	} \
+	argv[argc++] = (arg); \
+    } while(0);
 
     /* if a partition was specified, canonicalize the name, since
      * the salvager has a stupid partition ID parser */
@@ -1146,44 +1159,20 @@ DoSalvage(struct rx_connection * aconn, char * aparm1, char * aparm2,
 	    /* for DAFS, we call the salvagserver binary with special options.
 	     * in this mode, it simply uses SALVSYNC to tell the currently
 	     * running salvageserver to offline and salvage the volume in question */
-	    strncpy(tbuffer, AFSDIR_CANONICAL_SERVER_SALSRV_FILEPATH, BOZO_BSSIZE);
-
-	    if ((strlen(tbuffer) + 9 + strlen(partName) + 1 + strlen(aparm2) +
-		 1) > BOZO_BSSIZE) {
-		fprintf(stderr, "bos: command line too big\n");
-		code = E2BIG;
-		goto done;
-	    }
-
-	    strcat(tbuffer, " -client ");
-	    strcat(tbuffer, partName);
-	    strcat(tbuffer, " ");
-	    strcat(tbuffer, aparm2);
+	    add_arg(AFSDIR_CANONICAL_SERVER_SALSRV_FILEPATH);
+	    add_arg("-client");
+	    add_arg(partName);
+	    add_arg(aparm2);
 	} else {
-	    strncpy(tbuffer, AFSDIR_CANONICAL_SERVER_SALVAGER_FILEPATH, BOZO_BSSIZE);
-
-	    if ((strlen(tbuffer) + 1 + strlen(partName) + 1 + strlen(aparm2) +
-		 1) > BOZO_BSSIZE) {
-		fprintf(stderr, "bos: command line too big\n");
-		code = E2BIG;
-		goto done;
-	    }
-
-	    strcat(tbuffer, " ");
-	    strcat(tbuffer, partName);
-	    strcat(tbuffer, " ");
-	    strcat(tbuffer, aparm2);
+	    add_arg(AFSDIR_CANONICAL_SERVER_SALVAGER_FILEPATH);
+	    add_arg(partName);
+	    add_arg(aparm2);
 	}
     } else {
 	/* partition salvage */
-	strncpy(tbuffer, AFSDIR_CANONICAL_SERVER_SALVAGER_FILEPATH, BOZO_BSSIZE);
-	if ((strlen(tbuffer) + 4 + strlen(partName) + 1) > BOZO_BSSIZE) {
-	    fprintf(stderr, "bos: command line too big\n");
-	    code = E2BIG;
-	    goto done;
-	}
-	strcat(tbuffer, " -force ");
-	strcat(tbuffer, partName);
+	add_arg(AFSDIR_CANONICAL_SERVER_SALVAGER_FILEPATH);
+	add_arg("-force");
+	add_arg(partName);
     }
 
     /* For DAFS, specifying a single volume does not result in a standard
@@ -1194,48 +1183,35 @@ DoSalvage(struct rx_connection * aconn, char * aparm1, char * aparm2,
     if (!dafs || (*aparm2 == 0)) {
 	/* add the parallel option if given */
 	if (parallel != NULL) {
-	    if ((strlen(tbuffer) + 11 + strlen(parallel) + 1) > BOZO_BSSIZE) {
-		fprintf(stderr, "bos: command line too big\n");
-		code = E2BIG;
-		goto done;
-	    }
-	    strcat(tbuffer, " -parallel ");
-	    strcat(tbuffer, parallel);
+	    add_arg("-parallel");
+	    add_arg(parallel);
 	}
 
 	/* add the tmpdir option if given */
 	if (atmpDir != NULL) {
-	    if ((strlen(tbuffer) + 9 + strlen(atmpDir) + 1) > BOZO_BSSIZE) {
-		fprintf(stderr, "bos: command line too big\n");
-		code = E2BIG;
-		goto done;
-	    }
-	    strcat(tbuffer, " -tmpdir ");
-	    strcat(tbuffer, atmpDir);
+	    add_arg("-tmpdir");
+	    add_arg(atmpDir);
 	}
 
 	/* add the orphans option if given */
 	if (orphans != NULL) {
-	    if ((strlen(tbuffer) + 10 + strlen(orphans) + 1) > BOZO_BSSIZE) {
-		fprintf(stderr, "bos: command line too big\n");
-		code = E2BIG;
-		goto done;
-	    }
-	    strcat(tbuffer, " -orphans ");
-	    strcat(tbuffer, orphans);
+	    add_arg("-orphans");
+	    add_arg(orphans);
 	}
+
 	/* add the salvagedirs option if given */
 	if (dodirs) {
-	    if (strlen(tbuffer) + 14 > BOZO_BSSIZE) {
-		fprintf(stderr, "bos: command line too big\n");
-		code = E2BIG;
-		goto done;
-	    }
-	    strcat(tbuffer, " -salvagedirs");
+	    add_arg("-salvagedirs");
 	}
     }
 
-    parms[0] = tbuffer;
+    code = cmd_Join(argc, argv, &command);
+    if (code != 0) {
+	fprintf(stderr, "bos: failed to format command; code=%d\n", code);
+	return code;
+    }
+
+    parms[0] = command;
     parms[1] = "now";		/* when to do it */
     code =
 	BOZO_CreateBnode(aconn, "cron", "salvage-tmp", parms[0], parms[1],
@@ -1288,9 +1264,11 @@ DoSalvage(struct rx_connection * aconn, char * aparm1, char * aparm2,
     }
 
   done:
+    free(command);
     if (closeIt && outFile)
 	fclose(outFile);
     return code;
+#undef add_arg
 }
 
 static int
