@@ -66,7 +66,7 @@ static int DumpVnode(struct iod *iodp, struct VnodeDiskObject *v,
 static int ReadDumpHeader(struct iod *iodp, struct DumpHeader *hp);
 static int ReadVnodes(struct iod *iodp, Volume * vp, afs_foff_t * Lbuf,
                       afs_int32 s1, afs_foff_t * Sbuf, afs_int32 s2,
-                      afs_int32 delo);
+		      afs_int32 delo, afs_uint32 *nVnodes);
 static afs_fsize_t volser_WriteFile(int vn, struct iod *iodp,
 				    FdHandle_t * handleP, int tag,
 				    Error * status);
@@ -1221,6 +1221,7 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
     int tag;
     VolumeDiskData saved_header;
     afs_uint32 uptime, crtime;
+    afs_uint32 nVnodes, nFiles;
 
     iod_Init(iodp, call);
 
@@ -1263,7 +1264,7 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
 
     tdelo = delo;
     while (1) {
-	if (ReadVnodes(iodp, vp, b1, s1, b2, s2, tdelo)) {
+	if (ReadVnodes(iodp, vp, b1, s1, b2, s2, tdelo, &nVnodes)) {
 	    Log("1 Volser: RestoreVolume: Error reading vnodes (id: %u); aborted\n",
 		V_id(vp));
 	    error = VOLSERREAD_DUMPERROR;
@@ -1302,6 +1303,15 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
 	    error = VOLSERREAD_DUMPERROR;
 	    goto clean;
 	}
+    }
+
+    /* don't include the root directory */
+    nFiles = nVnodes - 1;
+    if (vol.filecount != nFiles) {
+	Log("1 Volser: RestoreVolume: The filecount of volume %s (%u) is %d "
+	    "but %u files were found. Fixing this field...\n",
+	    V_name(vp), V_id(vp), vol.filecount, nFiles);
+	vol.filecount = nFiles;
     }
 
   clean:
@@ -1348,9 +1358,23 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
     return error;
 }
 
+/**
+ * Read vnodes from the dump file.
+ *
+ * @param[in]     iodp     iod struct
+ * @param[in]     vp       volume pointer
+ * @param[inout]  Lbuf     {large_vnode_idx}->{offset} hash table
+ * @param[in]     s1       number of entries in Lbuf
+ * @param[inout]  Sbuf     {small_vnode_idx}->{offset} hash table
+ * @param[in]     s2       number of entries in Sbuf
+ * @param[in]     delo     status code returned by ProcessIndex
+ * @param[out]    nVnodes  number of vnodes successfully read
+ *
+ * @return 0 on success; VOLSERREAD_DUMPERROR otherwise.
+ */
 static int
 ReadVnodes(struct iod *iodp, Volume * vp, afs_foff_t * Lbuf, afs_int32 s1,
-           afs_foff_t * Sbuf, afs_int32 s2, afs_int32 delo)
+	   afs_foff_t * Sbuf, afs_int32 s2, afs_int32 delo, afs_uint32 *nVnodes)
 {
     afs_int32 vnodeNumber;
     char buf[SIZEOF_LARGEDISKVNODE];
@@ -1365,6 +1389,10 @@ ReadVnodes(struct iod *iodp, Volume * vp, afs_foff_t * Lbuf, afs_int32 s1,
     Inode nearInode AFS_UNUSED;
     afs_int32 critical = 0;
     int nbytes;
+
+    if (nVnodes != NULL) {
+	*nVnodes = 0;
+    }
 
     tag = iod_getc(iodp);
     V_pref(vp, nearInode);
@@ -1542,6 +1570,9 @@ ReadVnodes(struct iod *iodp, Volume * vp, afs_foff_t * Lbuf, afs_int32 s1,
 		return VOLSERREAD_DUMPERROR;
 	    }
 	    FDH_CLOSE(fdP);
+	}
+	if (nVnodes != NULL) {
+	    *nVnodes += 1;
 	}
     }
     iod_ungetc(iodp, tag);
