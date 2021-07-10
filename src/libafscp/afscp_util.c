@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ubik.h>
 #include <rx/rx_null.h>
 #include <rx/rxkad.h>
+#include <rx/rx_identity.h>
 #ifdef HAVE_KERBEROS
 # define KERBEROS_APPLE_DEPRECATED(x)
 # include <krb5.h>
@@ -64,8 +65,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 static int insecure = 0;
 static int try_anonymous = 0;
-static char authas_name[256];
-static char authas_inst[256];
+static char authas_name[512];
 
 int
 afscp_Insecure(void)
@@ -96,24 +96,20 @@ afscp_AnonymousAuth(int state)
 int
 afscp_LocalAuthAs(const char *aname)
 {
-    const char *ainst = strchr(aname, '.');
-    size_t namelen, instlen;
+    size_t namelen;
 
-    if (ainst) {
-	namelen = ainst - aname;
-	ainst++;
-	instlen = strlen(ainst);
-    } else {
-	namelen = strlen(aname);
-	ainst = "";
-	instlen = 0;
-    }
-
-    if (namelen+1 > sizeof(authas_name) || instlen+1 > sizeof(authas_inst)) {
+    if (aname == NULL) {
 	return EINVAL;
     }
+
+    namelen = strlen(aname);
+    if (namelen + 1 > sizeof(authas_name)) {
+	return EINVAL;
+    }
+
+    memset(authas_name, 0, sizeof(authas_name));
     strncpy(authas_name, aname, namelen);
-    strncpy(authas_inst, ainst, instlen);
+
     return 0;
 }
 
@@ -150,17 +146,13 @@ _GetNullSecurityObject(struct afscp_cell *cell)
 }
 
 static int
-_GetLocalSecurityObject(struct afscp_cell *cell,
-                        char *aname, char *ainst)
+_GetLocalSecurityObject(struct afscp_cell *cell, char *aname)
 {
-    int code = 0;
-    char tbuffer[256];
-    struct ktc_encryptionKey key, session;
+    int code = 0, scindex, flags;
     struct rx_securityClass *tc;
-    afs_int32 kvno;
-    afs_int32 ticketLen;
-    rxkad_level lev;
-    struct afsconf_dir *tdir;
+
+    struct afsconf_dir *tdir = NULL;
+    struct rx_identity *user = NULL;
 
     tdir = afsconf_Open(AFSDIR_SERVER_ETC_DIRPATH);
     if (!tdir) {
@@ -168,45 +160,30 @@ _GetLocalSecurityObject(struct afscp_cell *cell,
 	goto done;
     }
 
-    code = afsconf_GetLatestKey(tdir, &kvno, &key);
-    if (code) {
+    flags = AFSCONF_SECOPTS_LOCALAUTH;
+    if (!insecure) {
+	flags |= AFSCONF_SECOPTS_ALWAYSENCRYPT;
+    }
+
+    user = rx_identity_new(RX_ID_KRB4, aname, aname, strlen(aname));
+    if (user == NULL) {
+	code = ENOMEM;
 	goto done;
     }
 
-    DES_init_random_number_generator((DES_cblock *)&key);
-    code = DES_new_random_key((DES_cblock *)&session);
-    if (code) {
-	goto done;
-    }
-
-    ticketLen = sizeof(tbuffer);
-    memset(tbuffer, 0, sizeof(tbuffer));
-    code = tkt_MakeTicket(tbuffer, &ticketLen, &key, aname, ainst, "", 0,
-                          0xffffffff, &session, 0, "afs", "");
-    if (code) {
-	goto done;
-    }
-
-    if (insecure) {
-	lev = rxkad_clear;
-    } else {
-	lev = rxkad_crypt;
-    }
-
-    tc = (struct rx_securityClass *)
-        rxkad_NewClientSecurityObject(lev, &session, kvno, ticketLen,
-	                              tbuffer);
-    if (!tc) {
-	code = RXKADBADKEY;
+    code = afsconf_PickLocalSecObj(tdir, flags, user, &tc, &scindex, NULL);
+    if (code != 0) {
 	goto done;
     }
 
     cell->security = tc;
-    cell->scindex = 2;
-
+    cell->scindex = scindex;
  done:
     if (tdir) {
 	afsconf_Close(tdir);
+    }
+    if (user) {
+	rx_identity_free(&user);
     }
     return code;
 }
@@ -233,7 +210,7 @@ _GetSecurityObject(struct afscp_cell *cell)
     }
 
     if (authas_name[0]) {
-	code = _GetLocalSecurityObject(cell, authas_name, authas_inst);
+	code = _GetLocalSecurityObject(cell, authas_name);
 	if (code == 0) {
 	    return 0;
 	}
@@ -273,7 +250,6 @@ _GetSecurityObject(struct afscp_cell *cell)
     code = krb5_cc_default(context, &cc);
 
     memset(&match, 0, sizeof(match));
-    Z_enctype(Z_credskey(&match)) = ENCTYPE_DES_CBC_CRC;
 
     if (code == 0)
 	code = krb5_cc_get_principal(context, cc, &match.client);
@@ -310,7 +286,18 @@ _GetSecurityObject(struct afscp_cell *cell)
 	l = rxkad_clear;
     else
 	l = rxkad_crypt;
-    memcpy(&k.data, Z_keydata(Z_credskey(cred)), 8);
+
+    if (tkt_DeriveDesKey(Z_enctype(Z_credskey(cred)),
+			 Z_keydata(Z_credskey(cred)),
+			 Z_keylen(Z_credskey(cred)),
+			 &k) != 0) {
+	krb5_free_creds(context, cred);
+	krb5_free_cred_contents(context, &match);
+	krb5_cc_close(context, cc);
+	krb5_free_context(context);
+	goto try_anon;
+    }
+
     sc = (struct rx_securityClass *)rxkad_NewClientSecurityObject
 	(l, &k, RXKAD_TKT_TYPE_KERBEROS_V5,
 	 cred->ticket.length, cred->ticket.data);
