@@ -139,21 +139,28 @@ internal_client_init_dir(const char *confDir, char *cellName, int secFlags,
 	return EIO;
     }
 
-    if (cellName == NULL)
-	cellName = dir->cellName;
+    /* -localauth is reserved for local cells */
+    if ((secFlags & AFSCONF_SECOPTS_LOCALAUTH)) {
+	if (dir->cellName != NULL)
+	    cellName = dir->cellName;
+	else {
+	    code = AFSCONF_NOCELLNAME;
+	    goto done;
+	}
+    }
 
     code = afsconf_GetCellInfo(dir, cellName, serviceid, &info);
     if (code) {
 	fprintf(stderr, "%s: can't find cell %s's hosts in %s\n",
-		progname?progname:"<unknown>", cellName, dir->cellservDB);
-	afsconf_Close(dir);
-	return code;
+		progname, cellName ? cellName : "<unknown>", dir->cellservDB);
+	goto done;
     }
 
     code = internal_client_init(dir, &info, secFlags, uclientp, secproc,
 			        maxservers, serviceid, deadtime, server,
 				port, usrvid);
 
+ done:
     afsconf_Close(dir);
 
     return code;
