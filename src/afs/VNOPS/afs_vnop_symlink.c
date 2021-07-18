@@ -21,6 +21,7 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#include "roken.h"
 
 #include "afs/sysincludes.h"	/* Standard vendor system headers */
 #include "afsincludes.h"	/* Afs-based standard headers */

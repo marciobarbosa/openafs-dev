@@ -10,6 +10,7 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#include "roken.h"
 
 #include "afs/sysincludes.h"	/* Standard vendor system headers */
 #include "afsincludes.h"	/* Afs-based standard headers */
@@ -24,7 +25,6 @@
 #include "netinet/in_var.h"
 #endif
 #endif /* !defined(UKERNEL) */
-
 
 struct afs_icl_set *afs_iclSetp = (struct afs_icl_set *)0;
 struct afs_icl_set *afs_iclLongTermSetp = (struct afs_icl_set *)0;

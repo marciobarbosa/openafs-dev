@@ -10,6 +10,7 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#include "roken.h"
 
 #include "afs/sysincludes.h"	/* Standard vendor system headers */
 #include "afsincludes.h"	/* Afs-based standard headers */
@@ -17,7 +18,6 @@
 #include "afs/unified_afs.h"
 #include "rx/rx_globals.h"
 #include "pagcb.h"
-
 
 struct afspag_cell {
     struct afspag_cell *next;

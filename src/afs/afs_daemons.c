@@ -10,6 +10,7 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#include "roken.h"
 
 #ifdef AFS_AIX51_ENV
 #define __FULL_PROTO

@@ -11,6 +11,9 @@
 #include <afs/param.h>
 
 #ifdef KERNEL
+
+#include "roken.h"
+
 # if !defined(UKERNEL)
 #  include "h/types.h"
 #  if !defined(AFS_LINUX26_ENV)

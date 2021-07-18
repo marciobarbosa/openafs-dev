@@ -11,6 +11,7 @@
 #include <afs/param.h>
 
 #ifdef KERNEL
+#include "roken.h"
 # if defined(UKERNEL)
 #  include "afs/sysincludes.h"
 #  include "afsincludes.h"
@@ -2110,7 +2111,8 @@ rxi_ReceiveVersionPacket(struct rx_packet *ap, osi_socket asocket,
 	rxi_EncodePacketHeader(ap);
 	memset(buf, 0, sizeof(buf));
 	len = sizeof(buf);
-	osi_Assert(strlcpy(buf, cml_version_number + 4, len) < len);
+	/* marcio */
+	strlcpy(buf, cml_version_number + 4, len);
 	rx_packetwrite(ap, 0, 65, buf);
 	tl = ap->length;
 	ap->length = 65;

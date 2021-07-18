@@ -14,6 +14,7 @@
 #include <afsconfig.h>
 #include <afs/param.h>
 
+#include "roken.h"
 
 #include "rx/rx_kcommon.h"
 #include "rx_atomic.h"

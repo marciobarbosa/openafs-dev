@@ -10,6 +10,7 @@
 #include <afsconfig.h>
 #include "afs/param.h"
 
+#include "roken.h"
 
 #include "afs/sysincludes.h"	/* Standard vendor system headers */
 #include "afsincludes.h"	/* Afs-based standard headers */
@@ -22,7 +23,6 @@
 #endif /* !defined(UKERNEL) */
 #include "rmtsys.h"
 #include "pagcb.h"
-
 
 afs_int32 afs_termState = 0;
 afs_int32 afs_gcpags = AFS_GCPAGS;
