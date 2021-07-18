@@ -25,6 +25,7 @@ TOP_SRC_RXKAD = ${TOP_SRCDIR}/rxkad
 
 COMMON_INCLUDE = -I. -I.. -I../nfs \
 	-I$(TOP_SRCDIR)/crypto/hcrypto/kernel \
+	-I$(TOP_SRCDIR)/external/heimdal/roken \
 	-I${TOP_SRCDIR} \
 	-I${TOP_SRCDIR}/afs \
 	-I${TOP_SRCDIR}/afs/${MKAFS_OSTYPE} \
@@ -191,6 +192,7 @@ AFSAOBJS = \
 	crypto-context.o \
 	crypto-copy.o	\
 	crypto-ct.o	\
+	strlcpy.o	\
 	crypto-evp.o	\
 	crypto-data.o 	\
 	crypto-keyblock.o \
@@ -646,6 +648,9 @@ CFLAGS-crypto-context.o = $(RFC3961_INCLUDES)
 crypto-ct.o: $(TOP_SRCDIR)/external/heimdal/roken/ct.c
 	$(CRULE_OPT) $(TOP_SRCDIR)/external/heimdal/roken/ct.c
 CFLAGS-crypto-ct.o = $(RFC3961_INCLUDES)
+
+strlcpy.o: $(TOP_SRCDIR)/external/heimdal/roken/strlcpy.c
+	$(CRULE_OPT) $(TOP_SRCDIR)/external/heimdal/roken/strlcpy.c
 
 # Files which are specific to particular architectures/targets
 # but have common build rules. Place here instead of duplicating
