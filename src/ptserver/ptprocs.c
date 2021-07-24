@@ -996,7 +996,8 @@ UpdateEntry(struct rx_call *call, afs_int32 aid, char *name,
     }
 
     if (uentry == NULL ||
-	    (uentry->Mask & (PRUPDATE_NAMEHASH | PRUPDATE_IDHASH)) == 0)
+	    (uentry->Mask &
+	    (PRUPDATE_NAMEHASH | PRUPDATE_IDHASH | PRUPDATE_CREATOR)) == 0)
 	return PRBADARG;
 
     code = WritePreamble(&tt);
@@ -1042,6 +1043,22 @@ UpdateEntry(struct rx_call *call, afs_int32 aid, char *name,
 	code = AddToIDHash(tt, id, loc);
 	if (code)
 	    ABORT_WITH(tt, code);
+    }
+
+    if (uentry->Mask & PRUPDATE_CREATOR) {
+	int tloc;
+
+	/* the new creator must exist */
+	tloc = FindByID(tt, uentry->creator);
+	if (!tloc) {
+	    ABORT_WITH(tt, PRNOENT);
+	}
+	tentry.creator = uentry->creator;
+
+	code = pr_WriteEntry(tt, 0, loc, &tentry);
+	if (code) {
+	    ABORT_WITH(tt, code);
+	}
     }
 
     code = ubik_EndTrans(tt);
