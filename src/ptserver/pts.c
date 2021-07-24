@@ -887,9 +887,16 @@ SetFields(struct cmd_syndesc *as, void *arock)
     namelist names;
     int i;
     afs_int32 mask, flags=0, ngroups, nusers;
+    afs_int32 cid = 0;
 
     if (GetNameOrId(as, &ids, &names))
 	return PRBADARG;
+
+    if (as->parms[3].items && (as->parms[1].items || as->parms[2].items)) {
+	/* combining -creator with other flags results in non-atomic updates */
+	fprintf(stderr, "Do not combine -creator with other options\n");
+	return PRBADARG;
+    }
 
     mask = 0;
     nusers = 0;
@@ -943,13 +950,26 @@ SetFields(struct cmd_syndesc *as, void *arock)
 	}
 	mask |= PR_SF_NGROUPS;
     }
+    if (as->parms[3].items) {	/* -creator */
+	code = util_GetInt32(as->parms[3].items->data, &cid);
+	if (code) {
+	    afs_com_err(whoami, code, "because creator was: '%s'",
+		    as->parms[3].items->data);
+	    return code;
+	}
+	if (cid == 0) {
+	    fprintf(stderr, "0 isn't a valid user id; aborting\n");
+	    return EINVAL;
+	}
+	mask |= PRUPDATE_CREATOR;
+    }
 
     for (i = 0; i < ids.idlist_len; i++) {
 	afs_int32 id = ids.idlist_val[i];
 	char *name = names.namelist_val[i];
 	if (id == ANONYMOUSID)
 	    continue;
-	code = pr_SetFieldsEntry(id, mask, flags, ngroups, nusers);
+	code = pr_SetFieldsEntry(id, mask, flags, ngroups, nusers, cid);
 	if (code) {
 	    afs_com_err(whoami, code, "; unable to set fields for %s (id: %d)",
 		    name, id);
@@ -1164,6 +1184,7 @@ main(int argc, char **argv)
     cmd_AddParm(ts, "-access", CMD_SINGLE, CMD_OPTIONAL, "set privacy flags");
     cmd_AddParm(ts, "-groupquota", CMD_SINGLE, CMD_OPTIONAL,
 		"set limit on group creation");
+    cmd_AddParm(ts, "-creator", CMD_SINGLE, CMD_OPTIONAL, "change creator id");
     add_std_args(ts);
 
     ts = cmd_CreateSyntax("listowned", ListOwned, NULL, 0,

@@ -96,6 +96,7 @@ const	PRUPDATE_ID	=	0x0002;
 const	PRUPDATE_FLAGS	=	0x0004;
 const	PRUPDATE_NAMEHASH=	0x0008;
 const	PRUPDATE_IDHASH =	0x0010;
+const	PRUPDATE_CREATOR =	0x0020;
 
 /* These bits are used when calling SetFieldsEntry. */
 %#define PR_SF_ALLBITS   0xff		/* set all access bits */
