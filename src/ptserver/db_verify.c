@@ -43,6 +43,7 @@
 #include <ubik.h>
 #include <afs/cmd.h>
 #include <afs/com_err.h>
+#include <afs/opr.h>
 
 #include "ptint.h"
 #include "pterror.h"
@@ -55,6 +56,11 @@ int fd;
 const char *pr_dbaseName;
 char *whoami = "db_verify";
 #define UBIK_HEADERSIZE 64
+
+/* list of users found in the database */
+static struct opr_cache *ucache;
+/* list of groups found in the database */
+static struct opr_cache *gcache;
 
 afs_int32
 printheader(struct prheader *h)
@@ -800,6 +806,7 @@ WalkChains(char map[],		/* one byte per db entry */
     struct prentry e;
     afs_int32 id;
     int type;
+    char buf;
 
     /* check all entries found in hash table walks */
     for (ei = 0; ei < misc->nEntries; ei++)
@@ -846,6 +853,7 @@ WalkChains(char map[],		/* one byte per db entry */
 		if (code)
 		    return code;
 		misc->ngroups++;
+		opr_cache_put(gcache, &id, sizeof(id), &buf, sizeof(buf));
 		break;
 	    case PRUSER:
 		if (id <= 0) {
@@ -881,6 +889,7 @@ WalkChains(char map[],		/* one byte per db entry */
 		} else {
 		    misc->nforeigns++;	/* A foreign user */
 		}
+		opr_cache_put(ucache, &id, sizeof(id), &buf, sizeof(buf));
 		break;
 	    case PRFREE:
 	    case PRCONT:
@@ -902,6 +911,26 @@ WalkChains(char map[],		/* one byte per db entry */
 	}
 
     return 0;
+}
+
+static int
+CreatorExists(afs_int32 cid)
+{
+    int code, exists = 1;
+    char buf;
+    size_t buf_len;
+
+    if (cid < 0) {
+	/* group */
+	code = opr_cache_get(gcache, &cid, sizeof(cid), &buf, &buf_len);
+    } else {
+	/* user */
+	code = opr_cache_get(ucache, &cid, sizeof(cid), &buf, &buf_len);
+    }
+    if (code == ENOENT) {
+	exists = 0;
+    }
+    return exists;
 }
 
 afs_int32
@@ -964,6 +993,10 @@ GC(char map[], struct misc_data *misc)
 		    if (PrintEntryError(misc, na, &e, 4))
 			return PRDBBAD;
 		}
+	    }
+	    if (!CreatorExists(ntohl(e.creator))) {
+		fprintf(stderr, "Creator of id %d wasn't found (creator: %d)\n",
+			id, ntohl(e.creator));
 	    }
 	}
     }
@@ -1253,6 +1286,7 @@ CheckPrDatabase(struct misc_data *misc)	/* info & statistics */
     afs_int32 eof;
     int n;
     char *map;			/* map of each entry in db */
+    struct opr_cache_opts opts;
 
     eof = ntohl(cheader.eofPtr);
     eof -= sizeof(cheader);
@@ -1262,13 +1296,25 @@ CheckPrDatabase(struct misc_data *misc)	/* info & statistics */
 	afs_com_err(whoami, code,
 		    "eof ptr no good: eof=%d, sizeof(prentry)=%" AFS_SIZET_FMT,
 		eof, sizeof(struct prentry));
-      abort:
 	return code;
     }
     if (misc->verbose)
 	printf("Database has %d entries\n", n);
     map = calloc(1, n);
     misc->nEntries = n;
+
+    memset(&opts, 0, sizeof(opts));
+    opts.n_buckets = n / 2;
+    opts.max_entries = n;
+
+    code = opr_cache_init(&opts, &ucache);
+    if (code != 0) {
+	goto abort;
+    }
+    code = opr_cache_init(&opts, &gcache);
+    if (code != 0) {
+	goto abort;
+    }
 
     if (misc->verbose) {
 	printf("\nChecking name hash table\n");
@@ -1381,7 +1427,9 @@ CheckPrDatabase(struct misc_data *misc)	/* info & statistics */
 	printf("%d users ; %d foreign users ; and %d groups\n", misc->nusers,
 	       misc->nforeigns, misc->ngroups);
     }
-
+ abort:
+    opr_cache_free(&ucache);
+    opr_cache_free(&gcache);
     free(map);
     return code;
 }
