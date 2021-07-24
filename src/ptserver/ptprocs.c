@@ -995,6 +995,10 @@ UpdateEntry(struct rx_call *call, afs_int32 aid, char *name,
 	    return PRPERM;
     }
 
+    if (uentry == NULL ||
+	    (uentry->Mask & (PRUPDATE_NAMEHASH | PRUPDATE_IDHASH)) == 0)
+	return PRBADARG;
+
     code = WritePreamble(&tt);
     if (code)
 	return code;
