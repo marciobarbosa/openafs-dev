@@ -56,7 +56,7 @@ extern int pr_ListMaxGroupId(afs_int32 *mid) AFS_NONNULL();
 extern int pr_SetMaxGroupId(afs_int32 mid);
 extern afs_int32 pr_SetFieldsEntry(afs_int32 id, afs_int32 mask,
 				   afs_int32 flags, afs_int32 ngroups,
-				   afs_int32 nusers);
+				   afs_int32 nusers, afs_int32 cid);
 extern int pr_ListSuperGroups(afs_int32 gid, namelist *lnames) AFS_NONNULL();
 extern int pr_IDListExpandedMembers(afs_int32 gid, namelist *lnames)
 				   AFS_NONNULL();

@@ -1079,13 +1079,21 @@ pr_SetMaxGroupId(afs_int32 mid)
 }
 
 afs_int32
-pr_SetFieldsEntry(afs_int32 id, afs_int32 mask, afs_int32 flags, afs_int32 ngroups, afs_int32 nusers)
+pr_SetFieldsEntry(afs_int32 id, afs_int32 mask, afs_int32 flags,
+		  afs_int32 ngroups, afs_int32 nusers, afs_int32 cid)
 {
     afs_int32 code;
+    struct PrUpdateEntry uentry;
 
-    code =
-	ubik_PR_SetFieldsEntry(pruclient, 0, id, mask, flags, ngroups,
-		  nusers, 0, 0);
+    if (cid != 0) {
+	memset(&uentry, 0, sizeof(uentry));
+	uentry.Mask = mask;
+	uentry.creator = cid;
+	code = ubik_PR_UpdateEntry(pruclient, 0, id, "_foo_", &uentry);
+    } else {
+	code = ubik_PR_SetFieldsEntry(pruclient, 0, id, mask, flags, ngroups,
+				      nusers, 0, 0);
+    }
     return code;
 }
 
