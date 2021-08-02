@@ -282,8 +282,7 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     if (!tvc->linkData) {
 	tvc->linkData = afs_osi_Alloc(alen);
 	osi_Assert(tvc->linkData != NULL);
-	osi_Assert(strlcpy(tvc->linkData, atargetName, alen - 1) < alen - 1);
-	tvc->linkData[alen - 1] = 0;
+	osi_Assert(strlcpy(tvc->linkData, atargetName, alen) <= alen);
     }
     ReleaseWriteLock(&tvc->lock);
     ReleaseWriteLock(&afs_xvcache);
