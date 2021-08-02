@@ -52,6 +52,7 @@
 # include "afs/afs_stats.h"
 # include "afs/afs_prototypes.h"
 # include "afs/discon.h"
+# include "roken/kernel/roken.h"
 # if defined(AFS_LINUX_ENV) || defined(AFS_DARWIN_ENV) || defined(AFS_FBSD_ENV)
 #  include "osi_machdep.h"
 # endif

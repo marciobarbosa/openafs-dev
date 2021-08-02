@@ -220,6 +220,8 @@ AFSNONFSOBJS = \
 AFSPAGOBJS = \
 	sha256-kernel.o \
 	rand-timer-kernel.o \
+	strlcpy.o \
+	strlcat.o \
 	md5.o		\
 	evp.o		\
 	evp-algs.o    	\
