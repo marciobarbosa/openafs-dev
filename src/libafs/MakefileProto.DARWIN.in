@@ -61,13 +61,14 @@ OBJ_amd64=$(shell echo "${ARCH_amd64}" | grep -q -w yes && echo "$@.amd64")
 <all -ppc_darwin_70 -ppc_darwin_80 -x86_darwin_80 -ppc_darwin_90 -x86_darwin_90>
 KLINKER=-Xlinker -kext
 <all>
+CC:=$(CC) $(KINCLUDES)
 MODLD=$(CC) -static $(KOPTS_DBUG) -nostdlib $(ARCHFLAGS)
 
 <all>
 
-CFLAGS_ppc=${KINCLUDES} -I. -I.. -I${TOP_OBJDIR}/src/config $(DEFINES) $(KDEFS) $(KOPTS_ppc) $(KOPTS_DBUG)
-CFLAGS_x86=${KINCLUDES} -I. -I.. -I${TOP_OBJDIR}/src/config $(DEFINES) $(KDEFS) $(KOPTS_x86) $(KOPTS_DBUG)
-CFLAGS_amd64=${KINCLUDES} -I. -I.. -I${TOP_OBJDIR}/src/config $(DEFINES) $(KDEFS) $(KOPTS_amd64) $(KOPTS_DBUG)
+CFLAGS_ppc=-I. -I.. -I${TOP_OBJDIR}/src/config $(DEFINES) $(KDEFS) $(KOPTS_ppc) $(KOPTS_DBUG)
+CFLAGS_x86=-I. -I.. -I${TOP_OBJDIR}/src/config $(DEFINES) $(KDEFS) $(KOPTS_x86) $(KOPTS_DBUG)
+CFLAGS_amd64=-I. -I.. -I${TOP_OBJDIR}/src/config $(DEFINES) $(KDEFS) $(KOPTS_amd64) $(KOPTS_DBUG)
 
 <all>
 # Name of directory to hold object files and libraries.
@@ -105,7 +106,7 @@ CRULE_OPT_amd64=$(CC) $(COMMON_INCLUDE) $(KERN_DBG) $(KERN_OPTMZ) $(CFLAGS_amd64
 CRULE_OPT=$(shell echo "${ARCH_ppc}" | grep -q -w yes && echo "${CRULE_OPT_ppc} && "; echo "${ARCH_x86}" | grep -q -w yes && echo "${CRULE_OPT_x86} && "; echo "${ARCH_amd64}" | grep -q -w yes && echo "${CRULE_OPT_amd64} && ";echo "lipo -create ${OBJ_ppc} ${OBJ_x86} ${OBJ_amd64} -output $@ && true")
 
 <ppc_darwin_70>
-CFLAGS=${KINCLUDES} -I. -I.. -I${TOP_OBJDIR}/src/config $(DEFINES) $(KDEFS) $(KOPTS)
+CFLAGS=-I. -I.. -I${TOP_OBJDIR}/src/config $(DEFINES) $(KDEFS) $(KOPTS)
 KOPTS=-static -fno-common -finline -fno-keep-inline-functions -force_cpusubtype_ALL -msoft-float -mlong-branch 
 
 <all>

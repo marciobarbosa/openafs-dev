@@ -58,5 +58,20 @@ extern afs_int32 udbClientInit(int noAuthFlag, int localauth, char *cellName);
 struct ktc_token;
 extern int vldbClientInit(int noAuthFlag, int localauth, char *cellName,
                           struct ubik_client **cstruct, time_t *expires);
+
+#define UBIK_CALL_CB_ARGS	struct rx_connection *, char *, char *, char *,\
+				char *, char *, char *, char *, char *, char *,\
+				char *, char *, char *, char *, char *, char *,\
+				char *
+
+extern afs_int32 ubik_Call_SingleServer(int (*aproc) (UBIK_CALL_CB_ARGS),
+					struct ubik_client *aclient,
+					afs_int32 aflags,
+					char *p1, char *p2, char *p3, char *p4,
+					char *p5, char *p6, char *p7, char *p8,
+					char *p9, char *p10, char *p11,
+					char *p12, char *p13, char *p14,
+					char *p15, char *p16);
+
 #endif
 
