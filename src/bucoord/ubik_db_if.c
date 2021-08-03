@@ -995,11 +995,12 @@ static struct ubikCallState uServer;
  */
 
 afs_int32
-ubik_Call_SingleServer(int (*aproc) (), struct ubik_client *aclient,
-		       afs_int32 aflags, char *p1, char *p2, char *p3,
-		       char *p4, char *p5, char *p6, char *p7, char *p8,
-		       char *p9, char *p10, char *p11, char *p12, char *p13,
-		       char *p14, char *p15, char *p16)
+ubik_Call_SingleServer(int (*aproc) (UBIK_CALL_CB_ARGS),
+		       struct ubik_client *aclient, afs_int32 aflags,
+		       char *p1, char *p2, char *p3, char *p4, char *p5,
+		       char *p6, char *p7, char *p8, char *p9, char *p10,
+		       char *p11, char *p12, char *p13, char *p14, char *p15,
+		       char *p16)
 {
     afs_int32 code;
     afs_int32 someCode;
