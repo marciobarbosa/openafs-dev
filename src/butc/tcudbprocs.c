@@ -458,7 +458,9 @@ writeDbDump(struct butm_tapeInfo *tapeInfoPtr, afs_uint32 taskId,
 	    code =
 		ubik_Call_SingleServer(BUDB_DumpDB, udbHandle.uh_client,
 				       UF_SINGLESERVER, firstcall,
-				       maxReadSize, &charList, &done);
+				       maxReadSize, &charList, &done,
+				       NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+				       NULL, NULL, NULL, NULL, NULL);
 	    if (code) {
 		ErrorLog(0, taskId, code, 0, "Can't read database\n");
 		ERROR_EXIT(code);
@@ -612,7 +614,9 @@ writeDbDump(struct butm_tapeInfo *tapeInfoPtr, afs_uint32 taskId,
     /* Let the KeepAlive process stop on its own */
     code =
 	ubik_Call_SingleServer(BUDB_DumpDB, udbHandle.uh_client,
-			       UF_END_SINGLESERVER, 0);
+			       UF_END_SINGLESERVER, 0,
+			       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+			       NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
     if (writeBlock)
 	free(writeBlock);
@@ -1131,7 +1135,9 @@ KeepAlive(void *unused)
 	charList.charListT_len = 0;
 	code =
 	    ubik_Call_SingleServer(BUDB_DumpDB, udbHandle.uh_client,
-				   UF_SINGLESERVER, 0, 0, &charList, &done);
+				   UF_SINGLESERVER, 0, 0, &charList, &done,
+				   NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+				   NULL, NULL, NULL, NULL, NULL);
 	if (code || done)
 	    break;
     }

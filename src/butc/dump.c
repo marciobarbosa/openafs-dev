@@ -2114,7 +2114,8 @@ DeleteDump(void *param)
 	rc = ubik_Call_SingleServer(BUDB_GetVolumes, udbHandle.uh_client,
 				    UF_SINGLESERVER, BUDB_MAJORVERSION,
 				    BUDB_OP_DUMPID, tapeName, dumpid, 0,
-				    index, &next, &dbTime, &vl);
+				    index, &next, &dbTime, &vl,
+				    NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 	if (rc) {
 	    if (rc == BUDB_ENDOFLIST)
 		break;
