@@ -184,8 +184,12 @@ enum xdr_op {
  * uses a register (rather than stack) based calling convention. The
  * normal va_args prototype results in the arguments being placed on the
  * stack, where they aren't accessible to the 'real' function.
+ *
+ * On apple-arm64, if you implement a function with fixed parameters, but
+ * redeclare it with variadic parameters, the mismatch causes unexpected
+ * behavior.
  */
-#if defined(AFS_I386_LINUX_ENV) && defined(KERNEL) && !defined(UKERNEL)
+#if ((defined(AFS_I386_LINUX_ENV) && defined(KERNEL)) || defined(AFS_ARM64_DARWIN_ENV)) && !defined(UKERNEL)
 typedef bool_t(*xdrproc_t) (void *, caddr_t, u_int);
 #else
 typedef bool_t(*xdrproc_t) (void *, ...);
