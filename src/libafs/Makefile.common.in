@@ -24,6 +24,7 @@ TOP_SRC_VNOPS = ${TOP_SRCDIR}/afs/VNOPS
 TOP_SRC_RXKAD = ${TOP_SRCDIR}/rxkad
 
 COMMON_INCLUDE = -I. -I.. -I../nfs \
+	-I$(TOP_SRCDIR)/roken/kernel \
 	-I$(TOP_SRCDIR)/crypto/hcrypto/kernel \
 	-I${TOP_SRCDIR} \
 	-I${TOP_SRCDIR}/afs \
@@ -74,6 +75,8 @@ depsrcs:
 AFSAOBJS = \
 	sha256-kernel.o \
 	rand-timer-kernel.o \
+	strlcpy.o \
+	strlcat.o \
 	afs_atomlist.o \
 	afs_lhash.o \
 	afs_analyze.o \
@@ -217,6 +220,8 @@ AFSNONFSOBJS = \
 AFSPAGOBJS = \
 	sha256-kernel.o \
 	rand-timer-kernel.o \
+	strlcpy.o \
+	strlcat.o \
 	md5.o		\
 	evp.o		\
 	evp-algs.o    	\
@@ -288,6 +293,10 @@ AFSPAGOBJS = \
 # These files are to be optimized
 base64.o: $(TOP_SRCDIR)/util/base64.c
 	$(CRULE_NOOPT) $(TOP_SRCDIR)/util/base64.c
+strlcpy.o: $(TOP_SRCDIR)/external/heimdal/roken/strlcpy.c
+	$(CRULE_OPT) $(TOP_SRCDIR)/external/heimdal/roken/strlcpy.c
+strlcat.o: $(TOP_SRCDIR)/external/heimdal/roken/strlcat.c
+	$(CRULE_OPT) $(TOP_SRCDIR)/external/heimdal/roken/strlcat.c
 afs_atomlist.o: $(TOP_SRCDIR)/util/afs_atomlist.c
 	$(CRULE_OPT) $(TOP_SRCDIR)/util/afs_atomlist.c
 afs_lhash.o: $(TOP_SRCDIR)/util/afs_lhash.c
