@@ -100,6 +100,7 @@ afs_dir_Create(dir_file_t dir, char *entry, void *voidfid)
     struct DirEntry *ep;
     struct DirHeader *dhp;
     int code;
+    size_t len, rlen;
 
     /* check name quality */
     if (*entry == 0)
@@ -129,7 +130,17 @@ afs_dir_Create(dir_file_t dir, char *entry, void *voidfid)
     ep->flag = FFIRST;
     ep->fid.vnode = htonl(vfid[1]);
     ep->fid.vunique = htonl(vfid[2]);
-    strcpy(ep->name, entry);
+
+    /*
+     * Note, the sizeof ep->name does not represent the maxium size of the name.
+     * FindBlobs has already ensured that the name can fit.
+     */
+    len = strlen(entry) + 1;
+    rlen = strlcpy(ep->name, entry, len);
+    if (rlen >= len) {
+	DRelease(&entrybuf, 1);
+	return ENAMETOOLONG;
+    }
 
     /* Now we just have to thread it on the hash table list. */
     if (DRead(dir, 0, &headerbuf) != 0) {
@@ -801,6 +812,7 @@ afs_dir_InverseLookup(void *dir, afs_uint32 vnode, afs_uint32 unique,
     struct DirBuffer entrybuf;
     struct DirEntry *entry;
     int code = 0;
+    size_t rlen;
 
     code = FindFid(dir, vnode, unique, &entrybuf);
     if (code) {
@@ -808,10 +820,10 @@ afs_dir_InverseLookup(void *dir, afs_uint32 vnode, afs_uint32 unique,
     }
     entry = (struct DirEntry *)entrybuf.data;
 
-    if (strlen(entry->name) >= length)
+    rlen = strlcpy(name, entry->name, length);
+    if (rlen >= length) {
 	code = E2BIG;
-    else
-	strcpy(name, entry->name);
+    }
     DRelease(&entrybuf, 0);
     return code;
 }
