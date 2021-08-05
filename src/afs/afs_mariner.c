@@ -48,7 +48,7 @@ afs_AddMarinerName(char *aname, struct vcache *avc)
 	marinerPtr = 1;
     }
     tp = marinerNames[i];
-    strncpy(tp, aname, SMAR);
+    osi_Assert(strlcpy(tp, aname, SMAR) < SMAR);
     tp[SMAR - 1] = 0;
     marinerVCs[i] = avc;
     return 0;
@@ -78,7 +78,7 @@ void
 afs_MarinerLog(char *astring, struct vcache *avc)
 {
     struct sockaddr_in taddr;
-    char *tp, *tp1, *buf;
+    char *tp, *buf;
     struct iovec dvec;
 
     AFS_STATCNT(afs_MarinerLog);
@@ -90,12 +90,14 @@ afs_MarinerLog(char *astring, struct vcache *avc)
 #endif
     tp = buf = osi_AllocSmallSpace(AFS_SMALLOCSIZ);
 
-    strcpy(tp, astring);
+    osi_Assert(strlcpy(tp, astring, AFS_SMALLOCSIZ) < AFS_SMALLOCSIZ);
     tp += strlen(astring);
     if (avc) {
+	char *tp1 = afs_GetMariner(avc);
+	size_t rem_len = AFS_SMALLOCSIZ - (tp - buf) - 1;
+	osi_Assert(rem_len > 0);
 	*tp++ = ' ';
-	tp1 = afs_GetMariner(avc);
-	strcpy(tp, tp1);
+	osi_Assert(strlcpy(tp, tp1, rem_len) < rem_len);
 	tp += strlen(tp1);
     }
     *tp++ = '\n';
