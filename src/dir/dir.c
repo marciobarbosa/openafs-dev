@@ -64,6 +64,8 @@ extern int DNew(struct dcache *adc, int page, struct DirBuffer *);
 #  include "h/string.h"
 # endif
 
+# include "roken/kernel/roken.h"
+
 #else /* KERNEL */
 
 # include <roken.h>
