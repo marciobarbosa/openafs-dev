@@ -2097,6 +2097,7 @@ rxi_ReceiveVersionPacket(struct rx_packet *ap, osi_socket asocket,
 			 afs_uint32 ahost, short aport, int istack)
 {
     afs_int32 tl;
+    size_t len;
 
     /*
      * Only respond to client-initiated version requests, and
@@ -2108,7 +2109,8 @@ rxi_ReceiveVersionPacket(struct rx_packet *ap, osi_socket asocket,
 	ap->header.flags = ap->header.flags & ~RX_CLIENT_INITIATED;
 	rxi_EncodePacketHeader(ap);
 	memset(buf, 0, sizeof(buf));
-	strncpy(buf, cml_version_number + 4, sizeof(buf) - 1);
+	len = sizeof(buf);
+	osi_Assert(strlcpy(buf, cml_version_number + 4, len) < len);
 	rx_packetwrite(ap, 0, 65, buf);
 	tl = ap->length;
 	ap->length = 65;
