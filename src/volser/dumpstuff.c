@@ -48,6 +48,8 @@
 #endif /* !AFS_NT40_ENV */
 
 struct RestoreInfo {
+    afs_int32 filecount;
+    afs_int32 diskused;
     /*
      * If del_vnodes[n] is nonzero, it means to delete vnode with index n, and
      * del_vnodes[n] is the offset in the vnode index for that vnode.
@@ -1111,6 +1113,12 @@ ProcessIndex(Volume * vp, VnodeClass class, struct RestoreInfo *rinfo, int del)
 		code = STREAM_READ(vnode, vcp->diskSize, 1, afile);
 		if (code == 1) {
 		    if (vnode->type != vNull && VNDISK_GET_INO(vnode)) {
+			afs_fsize_t vlen;
+
+			rinfo->filecount--;
+			VNDISK_GET_LEN(vlen, vnode);
+			rinfo->diskused -= nBlocks(vlen);
+
 			cnt1++;
 			if (DoLogging) {
 			    Log("RestoreVolume %"AFS_VOLID_FMT" "
@@ -1156,6 +1164,12 @@ ProcessIndex(Volume * vp, VnodeClass class, struct RestoreInfo *rinfo, int del)
 		    break;
 		}
 		if (vnode->type != vNull && VNDISK_GET_INO(vnode)) {
+		    afs_fsize_t vlen;
+
+		    rinfo->filecount++;
+		    VNDISK_GET_LEN(vlen, vnode);
+		    rinfo->diskused += nBlocks(vlen);
+
 		    Buf[(offset >> vcp->logSize) - 1] = offset;
 		}
 		offset += vcp->diskSize;
@@ -1267,6 +1281,14 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
 	    error = VOLSERREAD_DUMPERROR;
 	    goto clean;
 	}
+    }
+
+    if (rinfo.filecount != vol.filecount || rinfo.diskused != vol.diskused) {
+	Log("Restore %" AFS_VOLID_FMT ": filecount %d -> %d diskused %d -> %d\n",
+	    afs_printable_VolumeId_lu(V_id(vp)), vol.filecount, rinfo.filecount,
+	    vol.diskused, rinfo.diskused);
+	vol.filecount = rinfo.filecount;
+	vol.diskused = rinfo.diskused;
     }
 
   clean:
@@ -1473,10 +1495,16 @@ ReadVnodes(struct iod *iodp, Volume * vp, struct RestoreInfo *rinfo,
 	if (!delo && rinfo->del_vnodes[class]) {
 	    afs_foff_t *del = rinfo->del_vnodes[class];
 	    size_t last_idx = rinfo->del_vnodes_size[class];
+	    afs_fsize_t vlen;
 
 	    idx = (vnodeIndexOffset(vcp, vnodeNumber) >> vcp->logSize) - 1;
-	    if (idx < last_idx)
+	    if (idx < last_idx && del[idx] != 0)
 		del[idx] = 0;
+	    else {
+		rinfo->filecount++;
+		VNDISK_GET_LEN(vlen, vnode);
+		rinfo->diskused += nBlocks(vlen);
+	    }
 	}
 
 	if (haveStuff) {
@@ -1490,6 +1518,13 @@ ReadVnodes(struct iod *iodp, Volume * vp, struct RestoreInfo *rinfo,
 	    if (FDH_PREAD(fdP, &oldvnode, sizeof(oldvnode), vnodeIndexOffset(vcp, vnodeNumber)) ==
 		sizeof(oldvnode)) {
 		if (oldvnode.type != vNull && VNDISK_GET_INO(&oldvnode)) {
+		    afs_fsize_t vlen;
+
+		    VNDISK_GET_LEN(vlen, &oldvnode);
+		    rinfo->diskused -= nBlocks(vlen);
+		    VNDISK_GET_LEN(vlen, vnode);
+		    rinfo->diskused += nBlocks(vlen);
+
 		    IH_DEC(V_linkHandle(vp), VNDISK_GET_INO(&oldvnode),
 			   V_parentId(vp));
 		}
