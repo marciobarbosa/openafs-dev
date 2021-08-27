@@ -47,6 +47,15 @@
 #endif /* !O_LARGEFILE */
 #endif /* !AFS_NT40_ENV */
 
+struct RestoreInfo {
+    /*
+     * If del_vnodes[n] is nonzero, it means to delete vnode with index n, and
+     * del_vnodes[n] is the offset in the vnode index for that vnode.
+     */
+    afs_foff_t *del_vnodes[nVNODECLASSES];
+    size_t del_vnodes_size[nVNODECLASSES];
+};
+
 /*@printflike@*/ extern void Log(const char *format, ...);
 
 extern int DoLogging;
@@ -64,9 +73,8 @@ static int DumpVnodeIndex(struct iod *iodp, Volume * vp,
 static int DumpVnode(struct iod *iodp, struct VnodeDiskObject *v,
 		     VolumeId volid, int vnodeNumber, int dumpEverything);
 static int ReadDumpHeader(struct iod *iodp, struct DumpHeader *hp);
-static int ReadVnodes(struct iod *iodp, Volume * vp, afs_foff_t * Lbuf,
-                      afs_int32 s1, afs_foff_t * Sbuf, afs_int32 s2,
-                      afs_int32 delo);
+static int ReadVnodes(struct iod *iodp, Volume * vp, struct RestoreInfo *rinfo,
+		      afs_int32 delo);
 static afs_fsize_t volser_WriteFile(int vn, struct iod *iodp,
 				    FdHandle_t * handleP, int tag,
 				    Error * status);
@@ -1076,13 +1084,11 @@ DumpVnode(struct iod *iodp, struct VnodeDiskObject *v, VolumeId volid,
 
 
 int
-ProcessIndex(Volume * vp, VnodeClass class, afs_foff_t ** Bufp, int *sizep,
-	     int del)
+ProcessIndex(Volume * vp, VnodeClass class, struct RestoreInfo *rinfo, int del)
 {
     int i, nVnodes, code;
     afs_foff_t offset;
     afs_foff_t *Buf;
-    int cnt = 0;
     afs_sfsize_t size;
     StreamHandle_t *afile;
     FdHandle_t *fdP;
@@ -1098,10 +1104,9 @@ ProcessIndex(Volume * vp, VnodeClass class, afs_foff_t ** Bufp, int *sizep,
     afile = FDH_FDOPEN(fdP, "r+");
     if (del) {
 	int cnt1 = 0;
-	Buf = *Bufp;
-	for (i = 0; i < *sizep; i++) {
+	Buf = rinfo->del_vnodes[class];
+	for (i = 0; i < rinfo->del_vnodes_size[class]; i++) {
 	    if (Buf[i]) {
-		cnt++;
 		STREAM_ASEEK(afile, Buf[i]);
 		code = STREAM_READ(vnode, vcp->diskSize, 1, afile);
 		if (code == 1) {
@@ -1152,12 +1157,11 @@ ProcessIndex(Volume * vp, VnodeClass class, afs_foff_t ** Bufp, int *sizep,
 		}
 		if (vnode->type != vNull && VNDISK_GET_INO(vnode)) {
 		    Buf[(offset >> vcp->logSize) - 1] = offset;
-		    cnt++;
 		}
 		offset += vcp->diskSize;
 	    }
-	    *Bufp = Buf;
-	    *sizep = nVnodes;
+	    rinfo->del_vnodes[class] = Buf;
+	    rinfo->del_vnodes_size[class] = nVnodes;
 	}
     }
     STREAM_CLOSE(afile);
@@ -1176,13 +1180,14 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
     Volume *vp;
     struct iod iod;
     struct iod *iodp = &iod;
-    afs_foff_t *b1 = NULL, *b2 = NULL;
-    int s1 = 0, s2 = 0, delo = 0, tdelo;
+    int delo = 0, tdelo;
     int tag;
     VolumeDiskData saved_header;
     afs_uint32 uptime, crtime;
+    struct RestoreInfo rinfo;
 
     iod_Init(iodp, call);
+    memset(&rinfo, 0, sizeof(rinfo));
 
     vp = avp;
 
@@ -1205,9 +1210,9 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
     }
 
     if (!delo)
-	delo = ProcessIndex(vp, vLarge, &b1, &s1, 0);
+	delo = ProcessIndex(vp, vLarge, &rinfo, 0);
     if (!delo)
-	delo = ProcessIndex(vp, vSmall, &b2, &s2, 0);
+	delo = ProcessIndex(vp, vSmall, &rinfo, 0);
     if (delo < 0) {
 	Log("1 Volser: RestoreVolume: ProcessIndex failed; not restored\n");
 	error = VOLSERREAD_DUMPERROR;
@@ -1223,7 +1228,7 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
 
     tdelo = delo;
     while (1) {
-	if (ReadVnodes(iodp, vp, b1, s1, b2, s2, tdelo)) {
+	if (ReadVnodes(iodp, vp, &rinfo, tdelo)) {
 	    Log("1 Volser: RestoreVolume: Error reading vnodes (id: %u); aborted\n",
 		V_id(vp));
 	    error = VOLSERREAD_DUMPERROR;
@@ -1255,9 +1260,9 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
     }
 
     if (!delo) {
-	delo = ProcessIndex(vp, vLarge, &b1, &s1, 1);
+	delo = ProcessIndex(vp, vLarge, &rinfo, 1);
 	if (!delo)
-	    delo = ProcessIndex(vp, vSmall, &b2, &s2, 1);
+	    delo = ProcessIndex(vp, vSmall, &rinfo, 1);
 	if (delo < 0) {
 	    error = VOLSERREAD_DUMPERROR;
 	    goto clean;
@@ -1301,16 +1306,14 @@ RestoreVolume(struct rx_call *call, Volume * avp, struct restoreCookie *cookie)
     }
   out:
     /* Free the malloced space above */
-    if (b1)
-	free(b1);
-    if (b2)
-	free(b2);
+    free(rinfo.del_vnodes[vLarge]);
+    free(rinfo.del_vnodes[vSmall]);
     return error;
 }
 
 static int
-ReadVnodes(struct iod *iodp, Volume * vp, afs_foff_t * Lbuf, afs_int32 s1,
-           afs_foff_t * Sbuf, afs_int32 s2, afs_int32 delo)
+ReadVnodes(struct iod *iodp, Volume * vp, struct RestoreInfo *rinfo,
+	   afs_int32 delo)
 {
     afs_int32 vnodeNumber;
     char buf[SIZEOF_LARGEDISKVNODE];
@@ -1467,15 +1470,13 @@ ReadVnodes(struct iod *iodp, Volume * vp, afs_foff_t * Lbuf, afs_int32 s1,
 	vcp = &VnodeClassInfo[class];
 
 	/* Mark this vnode as in this dump - so we don't delete it later */
-	if (!delo) {
+	if (!delo && rinfo->del_vnodes[class]) {
+	    afs_foff_t *del = rinfo->del_vnodes[class];
+	    size_t last_idx = rinfo->del_vnodes_size[class];
+
 	    idx = (vnodeIndexOffset(vcp, vnodeNumber) >> vcp->logSize) - 1;
-	    if (class == vLarge) {
-		if (Lbuf && (idx < s1))
-		    Lbuf[idx] = 0;
-	    } else {
-		if (Sbuf && (idx < s2))
-		    Sbuf[idx] = 0;
-	    }
+	    if (idx < last_idx)
+		del[idx] = 0;
 	}
 
 	if (haveStuff) {
