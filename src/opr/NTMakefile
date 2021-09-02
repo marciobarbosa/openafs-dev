@@ -43,6 +43,7 @@ LIBOBJS = \
 	$(OUT)\proc.obj \
 	$(OUT)\rbtree.obj \
 	$(OUT)\uuid.obj \
+	$(OUT)\mem.obj \
 	$(OUT)\AFS_component_version_number.obj
 
 $(LIBOBJS): $(INCFILES)
