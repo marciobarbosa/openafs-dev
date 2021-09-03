@@ -32,8 +32,8 @@
 #include <afsconfig.h>
 #include <afs/param.h>
 
-#include <roken.h>
 #include <afs/opr.h>
+#include <hcrypto/rand.h>
 
 #include <opr/dict.h>
 #include <opr/queue.h>
@@ -42,6 +42,13 @@
 # include <opr/lock.h>
 #else
 # include <opr/lockstub.h>
+#endif
+
+#ifdef KERNEL
+# include <afs/sysincludes.h>
+# include <afsincludes.h>
+#else
+# include <roken.h>
 #endif
 
 #define MIN_BUCKETS (4)
@@ -85,10 +92,9 @@ free_entry_contents(struct cache_entry *entry)
 {
     opr_queue_Remove(&entry->link);
 
-    free(entry->key_buf);
-    free(entry->val_buf);
+    opr_Free(&entry->key_buf);
+    opr_Free(&entry->val_buf);
 
-    entry->key_buf = entry->val_buf = NULL;
     entry->key_len = entry->val_len = 0;
 }
 
@@ -120,7 +126,8 @@ evict_entry(struct opr_cache *cache, struct cache_entry **a_entry)
      * random hash bucket, and evict the least-recently-used entry in that
      * bucket. If the bucket we picked is empty, just use the next bucket.
      */
-    bucket = rand() % cache->dict->size;
+    RAND_bytes(&bucket, sizeof(bucket));
+    bucket = bucket % cache->dict->size;
 
     for (safety = 0; safety < cache->dict->size; safety++) {
 	struct opr_queue *chain;
@@ -175,7 +182,7 @@ alloc_entry(struct opr_cache *cache, void **a_key_buf, size_t key_len,
 	evict_entry(cache, &entry);
 
     } else {
-	entry = calloc(1, sizeof(*entry));
+	entry = opr_Calloc(1, sizeof(*entry));
 	if (entry == NULL) {
 	    return ENOMEM;
 	}
@@ -286,7 +293,7 @@ opr_cache_get(struct opr_cache *cache, void *key_buf, size_t key_len,
 static void*
 memdup(void *src, size_t len)
 {
-    void *buf = malloc(len);
+    void *buf = opr_Calloc(len, 1);
     if (buf == NULL) {
 	return NULL;
     }
@@ -338,7 +345,7 @@ opr_cache_put(struct opr_cache *cache, void *key_buf, size_t key_len,
 	goto done_locked;
     }
 
-    free(entry->val_buf);
+    opr_Free(&entry->val_buf);
     entry->val_buf = val_dup;
     entry->val_len = val_len;
     val_dup = NULL;
@@ -346,8 +353,8 @@ opr_cache_put(struct opr_cache *cache, void *key_buf, size_t key_len,
  done_locked:
     opr_mutex_exit(&cache->lock);
  done:
-    free(key_dup);
-    free(val_dup);
+    opr_Free(&key_dup);
+    opr_Free(&val_dup);
 }
 
 static_inline int
@@ -398,7 +405,7 @@ opr_cache_init(struct opr_cache_opts *opts, struct opr_cache **a_cache)
     opr_Assert(n_buckets >= MIN_BUCKETS);
     opr_Assert(n_buckets <= MAX_BUCKETS);
 
-    cache = calloc(1, sizeof(*cache));
+    cache = opr_Calloc(1, sizeof(*cache));
     if (cache == NULL) {
 	return ENOMEM;
     }
@@ -438,7 +445,7 @@ opr_cache_free(struct opr_cache **a_cache)
 		struct cache_entry *entry;
 		entry = opr_queue_Entry(cursor, struct cache_entry, link);
 		free_entry_contents(entry);
-		free(entry);
+		opr_Free(&entry);
 	    }
 	}
 	opr_dict_Free(&cache->dict);
@@ -446,5 +453,5 @@ opr_cache_free(struct opr_cache **a_cache)
 
     opr_mutex_destroy(&cache->lock);
 
-    free(cache);
+    opr_Free(&cache);
 }
