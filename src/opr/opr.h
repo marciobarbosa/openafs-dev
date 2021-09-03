@@ -26,14 +26,18 @@ extern void opr_AssertionFailed(const char *, int) AFS_NORETURN;
 #define __opr_Assert(ex) \
     do {if (!(ex)) opr_AssertionFailed(__FILE__, __LINE__);} while(0)
 
-#if defined(HAVE__PRAGMA_TAUTOLOGICAL_POINTER_COMPARE) && defined(__clang__)
-# define opr_Assert(ex) \
+#if defined(KERNEL) && !defined(UKERNEL)
+# define opr_Assert(ex) osi_Assert(ex)
+#else
+# if defined(HAVE__PRAGMA_TAUTOLOGICAL_POINTER_COMPARE) && defined(__clang__)
+#  define opr_Assert(ex) \
     _Pragma("clang diagnostic push") \
     _Pragma("clang diagnostic ignored \"-Wtautological-pointer-compare\"") \
     __opr_Assert(ex) \
     _Pragma("clang diagnostic pop")
-#else
-# define opr_Assert(ex) __opr_Assert(ex)
+# else
+#  define opr_Assert(ex) __opr_Assert(ex)
+# endif
 #endif
 
 /* opr_Verify is an assertion function which is guaranteed to always
@@ -101,5 +105,18 @@ extern int opr_cache_get(struct opr_cache *cache, void *key_buf,
 			 AFS_NONNULL((4,5));
 extern void opr_cache_put(struct opr_cache *cache, void *key_buf,
 			  size_t key_len, void *val_buf, size_t val_len);
+
+/* mem.c */
+extern void *opr_Calloc(size_t num, size_t size);
+extern void *opr_CallocAssert(size_t num, size_t size);
+extern void _opr_Free(void *ptr);
+
+#define opr_Free(ptr)		\
+    do {			\
+	if (ptr != NULL) {	\
+	    _opr_Free(*ptr);	\
+	    *ptr = NULL;	\
+	}			\
+    } while (0)
 
 #endif

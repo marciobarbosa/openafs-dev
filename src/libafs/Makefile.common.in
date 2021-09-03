@@ -159,6 +159,7 @@ AFSAOBJS = \
 	rx_multi.o	\
 	rx_stats.o	\
 	opr_rbtree.o	\
+	opr_mem.o	\
 	xdr_rx.o	\
 	xdr_mem.o	\
 	xdr_len.o	\
@@ -473,6 +474,9 @@ rx_stats.o: $(TOP_SRC_RX)/rx_stats.c
 opr_rbtree.o: $(TOP_SRC_OPR)/rbtree.c
 	$(CRULE_OPT) $(TOP_SRC_OPR)/rbtree.c
 CFLAGS-opr-rbtree.o = -I$(TOP_INCDIR)/opr
+opr_mem.o: $(TOP_SRC_OPR)/mem.c
+	$(CRULE_OPT) $(TOP_SRC_OPR)/mem.c
+CFLAGS-opr-mem.o = -I$(TOP_INCDIR)/opr
 xdr_rx.o: $(TOP_SRC_RX)/xdr_rx.c
 	$(CRULE_NOOPT) $(TOP_SRC_RX)/xdr_rx.c
 Kcallback.ss.o: $(TOP_OBJ_FSINT)/Kcallback.ss.c
