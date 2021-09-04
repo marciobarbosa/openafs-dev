@@ -3,6 +3,7 @@ opr_cache_free
 opr_cache_get
 opr_cache_init
 opr_cache_put
+opr_cache_del
 opr_dict_Free
 opr_dict_Init
 opr_fmt
