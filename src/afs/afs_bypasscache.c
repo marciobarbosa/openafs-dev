@@ -537,12 +537,12 @@ afs_PrefetchNoCache(struct vcache *avc,
 #endif
     struct vrequest *areq;
     afs_int32 code = 0;
-    struct rx_connection *rxconn;
+    struct rx_connection *rxconn = NULL;
 #ifdef AFS_64BIT_CLIENT
     afs_int32 length_hi, bytes, locked;
 #endif
 
-    struct afs_conn *tc;
+    struct afs_conn *tc = NULL;
     struct rx_call *tcall;
     struct tlocal1 {
 	struct AFSVolSync tsync;
@@ -550,6 +550,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 	struct AFSCallBack CallBack;
     };
     struct tlocal1 *tcallspec;
+    struct afs_callreq callreq;
 
     auio = bparms->auio;
     areq = bparms->areq;
@@ -559,8 +560,10 @@ afs_PrefetchNoCache(struct vcache *avc,
 
     tcallspec = osi_Alloc(sizeof(struct tlocal1));
     do {
-	tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK /* ignored */, &rxconn);
-	if (tc) {
+	code = afs_FSCall(avc, areq, SHARED_LOCK, &callreq);
+	if (code == 0) {
+	    tc = callreq.afsconn;
+	    rxconn = callreq.rxconn;
 	    avc->callback = tc->parent->srvr->server;
 	    tcall = rx_NewCall(rxconn);
 #ifdef AFS_64BIT_CLIENT
@@ -627,7 +630,6 @@ afs_PrefetchNoCache(struct vcache *avc,
 	    code = rx_EndCall(tcall, code);
 	} else {
 	    afs_warn("BYPASS: No connection.\n");
-	    code = -1;
 	    unlock_and_release_pages(auio);
 	    (void)afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
 			      AFS_STATS_FS_RPCIDX_FETCHDATA,

@@ -2514,15 +2514,18 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
 {
     int code;
     afs_uint32 start = 0;
-    struct afs_conn *tc;
+    struct afs_conn *tc = NULL;
     struct AFSCallBack CallBack;
     struct AFSVolSync tsync;
-    struct rx_connection *rxconn;
+    struct rx_connection *rxconn = NULL;
+    struct afs_callreq callreq;
     XSTATS_DECLS;
     do {
-	tc = afs_Conn(afid, areq, SHARED_LOCK, &rxconn);
+	code = afs_FSCall(avc, areq, SHARED_LOCK, &callreq);
 	avc->dchint = NULL;	/* invalidate hints */
-	if (tc) {
+	if (code == 0) {
+	    tc = callreq.afsconn;
+	    rxconn = callreq.rxconn;
 	    avc->callback = tc->parent->srvr->server;
 	    start = osi_Time();
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHSTATUS);
@@ -2538,8 +2541,7 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
 		code = afs_CheckFetchStatus(tc, Outsp);
 	    }
 
-	} else
-	    code = -1;
+	}
     } while (afs_Analyze
 	     (tc, rxconn, code, afid, areq, AFS_STATS_FS_RPCIDX_FETCHSTATUS,
 	      SHARED_LOCK, NULL));

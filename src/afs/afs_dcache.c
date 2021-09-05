@@ -1978,7 +1978,7 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
     struct afs_FetchOutput *tsmall = 0;
     struct dcache *tdc;
     struct osi_file *file;
-    struct afs_conn *tc;
+    struct afs_conn *tc = NULL;
     int downDCount = 0;
     struct server *newCallback = NULL;
     char setNewCallback;
@@ -1988,7 +1988,8 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
     int doAdjustSize = 0;
     int doReallyAdjustSize = 0;
     int overWriteWholeChunk = 0;
-    struct rx_connection *rxconn;
+    struct rx_connection *rxconn = NULL;
+    struct afs_callreq callreq;
 
 #ifndef AFS_NOSTATS
     struct afs_stats_AccessInfo *accP;	/*Ptr to access record in stats */
@@ -2627,8 +2628,10 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
 		 * tdc->lock(W)
 		 */
 
-		tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK, &rxconn);
-		if (tc) {
+		code = afs_FSCall(avc, areq, SHARED_LOCK, &callreq);
+		if (code == 0) {
+		    tc = callreq.afsconn;
+		    rxconn = callreq.rxconn;
 #ifndef AFS_NOSTATS
 		    numFetchLoops++;
 		    if (fromReplica)
@@ -2644,8 +2647,7 @@ afs_GetDCache(struct vcache *avc, afs_size_t abyte,
 		    i = osi_Time();
 		    code = afs_CacheFetchProc(tc, rxconn, file, Position, tdc,
 					       avc, size, tsmall);
-		} else
-		   code = -1;
+		}
 
 		if (code == 0) {
 		    /* callback could have been broken (or expired) in a race here,

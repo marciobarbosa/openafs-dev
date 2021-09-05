@@ -690,8 +690,9 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
     struct volume *volp = 0;	/* volume ptr */
     struct VenusFid dotdot = {0, {0, 0, 0}};
     int flagIndex = 0;		/* First file with bulk fetch flag set */
-    struct rx_connection *rxconn;
+    struct rx_connection *rxconn = NULL;
     int attempt_i;
+    struct afs_callreq callreq;
     XSTATS_DECLS;
     dotdot.Cell = 0;
     dotdot.Fid.Unique = 0;
@@ -957,8 +958,10 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 	/* start the timer; callback expirations are relative to this */
 	startTime = osi_Time();
 
-	tcp = afs_Conn(&adp->f.fid, areqp, SHARED_LOCK, &rxconn);
-	if (tcp) {
+	code = afs_FSCall(adp, areqp, SHARED_LOCK, &callreq);
+	if (code == 0) {
+	    tcp = callreq.afsconn;
+	    rxconn = callreq.rxconn;
 	    hostp = tcp->parent->srvr->server;
 
 	    for (i = 0; i < fidIndex; i++) {
@@ -1018,8 +1021,7 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 	    if (code == 0) {
 		code = afs_CheckBulkStatus(tcp, fidIndex, &statParm, &cbParm);
 	    }
-	} else
-	    code = -1;
+	}
 	/* make sure we give afs_Analyze a chance to retry,
 	 * but if the RPC succeeded we may have entries to merge.
 	 * if we wipe code with one entry's status we get bogus failures.

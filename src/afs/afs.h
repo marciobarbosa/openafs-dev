@@ -425,6 +425,11 @@ struct afs_conn {
     struct sa_conn_vector *parent; /* the con_vector which contains us */
 };
 
+struct afs_callreq {
+    struct afs_conn *afsconn;
+    struct rx_connection *rxconn;
+};
+
 /* An sa_conn_vector replaces the erstwhile list of conn
    structures maintained by the cache manager.  The sa_conn_vector
    contains a C array of connections which, if non-zero, represent

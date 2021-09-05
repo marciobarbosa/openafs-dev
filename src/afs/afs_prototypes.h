@@ -200,6 +200,9 @@ extern void afs_ReleaseConns(struct sa_conn_vector *tcv);
 extern void afs_ReleaseConnsUser(register struct unixuser *au);
 extern void ForceNewConnections(struct srvAddr *sap);
 
+extern int afs_FSCall(struct vcache *avc, struct vrequest *areq,
+		      afs_int32 locktype, struct afs_callreq *acallreq);
+
 
 /* afs_daemons.c */
 extern afs_lock_t afs_xbrs;

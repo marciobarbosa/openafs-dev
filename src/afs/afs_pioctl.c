@@ -1580,9 +1580,10 @@ DECL_PIOCTL(PGetAcl)
     struct AFSVolSync tsync;
     struct AFSFetchStatus OutStatus;
     afs_int32 code;
-    struct afs_conn *tconn;
+    struct afs_conn *tconn = NULL;
     struct AFSFid Fid;
-    struct rx_connection *rxconn;
+    struct rx_connection *rxconn = NULL;
+    struct afs_callreq callreq;
     XSTATS_DECLS;
 
     AFS_STATCNT(PGetAcl);
@@ -1605,16 +1606,17 @@ DECL_PIOCTL(PGetAcl)
     }
     acl.AFSOpaque_val = aout->ptr;
     do {
-	tconn = afs_Conn(&avc->f.fid, areq, SHARED_LOCK, &rxconn);
-	if (tconn) {
+	code = afs_FSCall(avc, areq, SHARED_LOCK, &callreq);
+	if (code == 0) {
+	    tconn = callreq.afsconn;
+	    rxconn = callreq.rxconn;
 	    acl.AFSOpaque_val[0] = '\0';
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHACL);
 	    RX_AFS_GUNLOCK();
 	    code = RXAFS_FetchACL(rxconn, &Fid, &acl, &OutStatus, &tsync);
 	    RX_AFS_GLOCK();
 	    XSTATS_END_TIME;
-	} else
-	    code = -1;
+	}
     } while (afs_Analyze
 	     (tconn, rxconn, code, &avc->f.fid, areq, AFS_STATS_FS_RPCIDX_FETCHACL,
 	      SHARED_LOCK, NULL));
@@ -2000,11 +2002,12 @@ DECL_PIOCTL(PGetVolumeStatus)
     char volName[32];
     char *offLineMsg = afs_osi_Alloc(256);
     char *motd = afs_osi_Alloc(256);
-    struct afs_conn *tc;
+    struct afs_conn *tc = NULL;
     afs_int32 code = 0;
     struct AFSFetchVolumeStatus volstat;
     char *Name;
-    struct rx_connection *rxconn;
+    struct rx_connection *rxconn = NULL;
+    struct afs_callreq callreq;
     XSTATS_DECLS;
 
     osi_Assert(offLineMsg != NULL);
@@ -2016,8 +2019,10 @@ DECL_PIOCTL(PGetVolumeStatus)
     }
     Name = volName;
     do {
-	tc = afs_Conn(&avc->f.fid, areq, SHARED_LOCK, &rxconn);
-	if (tc) {
+	code = afs_FSCall(avc, areq, SHARED_LOCK, &callreq);
+	if (code == 0) {
+	    tc = callreq.afsconn;
+	    rxconn = callreq.rxconn;
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_GETVOLUMESTATUS);
 	    RX_AFS_GUNLOCK();
 	    code =
@@ -2025,8 +2030,7 @@ DECL_PIOCTL(PGetVolumeStatus)
 				      &Name, &offLineMsg, &motd);
 	    RX_AFS_GLOCK();
 	    XSTATS_END_TIME;
-	} else
-	    code = -1;
+	}
     } while (afs_Analyze
 	     (tc, rxconn, code, &avc->f.fid, areq, AFS_STATS_FS_RPCIDX_GETVOLUMESTATUS,
 	      SHARED_LOCK, NULL));
