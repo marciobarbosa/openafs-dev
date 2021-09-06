@@ -202,6 +202,9 @@ extern void ForceNewConnections(struct srvAddr *sap);
 
 extern int afs_FSCall(struct vcache *avc, struct vrequest *areq,
 		      afs_int32 locktype, struct afs_callreq *acallreq);
+extern int afs_VLCall(struct cell *acell, struct vrequest *areq,
+		      afs_int32 locktype, afs_int32 replicated,
+		      struct afs_callreq *acallreq);
 
 
 /* afs_daemons.c */

@@ -432,6 +432,52 @@ afs_FSCall(struct vcache *avc, struct vrequest *areq,
 
 
 /**
+ * Setup a call to one of the hosts from a given cell.
+ *
+ * @param[in]   acell       cell
+ * @param[in]   areq        request
+ * @param[in]   locktype    type of lock to be used
+ * @param[in]   replicated  replicated connection
+ * @param[out]  acallreq    info associated with this call
+ *
+ * @return 0 on success; non-zero otherwise.
+ */
+int
+afs_VLCall(struct cell *acell, struct vrequest *areq,
+	   afs_int32 locktype, afs_int32 replicated,
+	   struct afs_callreq *acallreq)
+{
+    int code = -1, host_i, cellnum;
+    struct server *ts, **hosts;
+    unsigned short port;
+    struct afs_conn *tconn;
+    struct rx_connection *rxconn;
+
+    AFS_STATCNT(afs_VLCall);
+
+    memset(acallreq, 0, sizeof(*acallreq));
+    cellnum = acell->cellNum;
+    hosts = acell->cellHosts;
+    port = acell->vlport;
+
+    for (host_i = 0; host_i < AFS_MAXCELLHOSTS; host_i++) {
+	if ((ts = hosts[host_i]) == NULL)
+	    break;
+	tconn = afs_ConnByHost(ts, port, cellnum, areq, 0, locktype,
+			       replicated, &rxconn);
+	if (tconn) {
+	    code = 0;
+	    acallreq->afsconn = tconn;
+	    acallreq->rxconn = rxconn;
+	    goto done;
+	}
+    }
+ done:
+    return code;
+}
+
+
+/**
  * Connects to a server by it's server address.
  *
  * @param sap Server address.
