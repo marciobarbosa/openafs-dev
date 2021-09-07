@@ -48,6 +48,8 @@
 #endif /* !AFS_NT40_ENV */
 
 struct RestoreInfo {
+    afs_int32 filecount;
+    afs_int32 diskused;
     /*
      * If del_vnodes[class][n] is nonzero, it means to delete vnode with index
      * n, and del_vnodes[class][n] is the offset in the vnode index for that
@@ -1112,6 +1114,12 @@ ProcessIndex(Volume * vp, VnodeClass class, struct RestoreInfo *rinfo, int del)
 		code = STREAM_READ(vnode, vcp->diskSize, 1, afile);
 		if (code == 1) {
 		    if (vnode->type != vNull && VNDISK_GET_INO(vnode)) {
+			afs_fsize_t vlen;
+
+			rinfo->filecount--;
+			VNDISK_GET_LEN(vlen, vnode);
+			rinfo->diskused -= nBlocks(vlen);
+
 			cnt1++;
 			if (DoLogging) {
 			    Log("RestoreVolume %"AFS_VOLID_FMT" "
@@ -1157,6 +1165,12 @@ ProcessIndex(Volume * vp, VnodeClass class, struct RestoreInfo *rinfo, int del)
 		    break;
 		}
 		if (vnode->type != vNull && VNDISK_GET_INO(vnode)) {
+		    afs_fsize_t vlen;
+
+		    rinfo->filecount++;
+		    VNDISK_GET_LEN(vlen, vnode);
+		    rinfo->diskused += nBlocks(vlen);
+
 		    Buf[(offset >> vcp->logSize) - 1] = offset;
 		}
 		offset += vcp->diskSize;
@@ -1269,6 +1283,14 @@ RestoreVolume(struct rx_call *call, Volume * avp, int incremental,
 	    error = VOLSERREAD_DUMPERROR;
 	    goto clean;
 	}
+    }
+
+    if (rinfo.filecount != vol.filecount || rinfo.diskused != vol.diskused) {
+	Log("Restore %" AFS_VOLID_FMT ": filecount %d -> %d diskused %d -> %d\n",
+	    afs_printable_VolumeId_lu(V_id(vp)), vol.filecount, rinfo.filecount,
+	    vol.diskused, rinfo.diskused);
+	vol.filecount = rinfo.filecount;
+	vol.diskused = rinfo.diskused;
     }
 
   clean:
@@ -1457,6 +1479,8 @@ ReadVnodes(struct iod *iodp, Volume * vp, int incremental,
 			V_needsSalvaged(vp) = 1;
 			return VOLSERREAD_DUMPERROR;
 		    }
+		    rinfo->filecount++;
+		    rinfo->diskused += nBlocks(vnodeLength);
 		    break;
 		}
             case 0x7e:
@@ -1492,6 +1516,12 @@ ReadVnodes(struct iod *iodp, Volume * vp, int incremental,
 	    if (FDH_PREAD(fdP, &oldvnode, sizeof(oldvnode), vnodeIndexOffset(vcp, vnodeNumber)) ==
 		sizeof(oldvnode)) {
 		if (oldvnode.type != vNull && VNDISK_GET_INO(&oldvnode)) {
+		    afs_fsize_t vlen;
+
+		    VNDISK_GET_LEN(vlen, &oldvnode);
+		    rinfo->diskused -= nBlocks(vlen);
+		    rinfo->filecount--;
+
 		    IH_DEC(V_linkHandle(vp), VNDISK_GET_INO(&oldvnode),
 			   V_parentId(vp));
 		}
