@@ -1816,8 +1816,10 @@ afs_GetVCacheStale(struct vcache *parent, struct VenusFid *afid,
  *		 Typically this is the parent vcache for the fid, but some
  *		 callers use a different vcache (e.g. VerifyVCache2 passes in
  *		 the same vcache, and dir ops pass in a child of 'afid'). When
- *		 getting the vcache for the root dir for a volume, 'parent'
- *		 will be NULL.
+ *		 getting the vcache for the root dir for a volume
+ *		 (AFS_MVSTAT_ROOT), 'parent' will be NULL only if the vcache
+ *		 associated with the mount point (AFS_MVSTAT_MTPT) isn't
+ *		 available.
  * \param afid File ID.
  * \param areq Ptr to associated vrequest structure, specifying the
  *  user whose authentication tokens will be used.
