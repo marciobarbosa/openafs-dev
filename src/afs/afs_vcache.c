@@ -2531,8 +2531,8 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHSTATUS);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_FetchStatus(rxconn, (struct AFSFid *)&afid->Fid, Outsp,
-				  &CallBack, &tsync);
+		RXAFS_FetchStatus(rxconn, (struct AFSFid *)&callreq.fid.Fid,
+				  Outsp, &CallBack, &tsync);
 	    RX_AFS_GLOCK();
 
 	    XSTATS_END_TIME;
@@ -2543,8 +2543,8 @@ afs_FetchStatus(struct vcache * avc, struct VenusFid * afid,
 
 	}
     } while (afs_Analyze
-	     (tc, rxconn, code, afid, areq, AFS_STATS_FS_RPCIDX_FETCHSTATUS,
-	      SHARED_LOCK, NULL));
+	     (tc, rxconn, code, &callreq.fid, areq,
+	      AFS_STATS_FS_RPCIDX_FETCHSTATUS, SHARED_LOCK, NULL));
 
     if (!code) {
 	afs_UpdateStatus(avc, afid, areq, Outsp, &CallBack, start);

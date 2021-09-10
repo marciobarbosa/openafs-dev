@@ -569,7 +569,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 #ifdef AFS_64BIT_CLIENT
 	    if (!afs_serverHasNo64Bit(tc)) {
 		code = StartRXAFS_FetchData64(tcall,
-					      (struct AFSFid *) &avc->f.fid.Fid,
+					      (struct AFSFid *)&callreq.fid.Fid,
 					      auio->uio_offset,
 					      bparms->length);
 		if (code == 0) {
@@ -597,7 +597,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 		    if (!tcall)
 			tcall = rx_NewCall(rxconn);
 		    code = StartRXAFS_FetchData(tcall,
-					(struct AFSFid *) &avc->f.fid.Fid,
+					(struct AFSFid *)&callreq.fid.Fid,
 					pos, bparms->length);
 		    COND_RE_GLOCK(locked);
 		}
@@ -605,7 +605,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 	    }
 #else
 	    code = StartRXAFS_FetchData(tcall,
-			                (struct AFSFid *) &avc->f.fid.Fid,
+			                (struct AFSFid *)&callreq.fid.Fid,
 					auio->uio_offset, bparms->length);
 #endif
 	    if (code == 0) {
@@ -615,7 +615,7 @@ afs_PrefetchNoCache(struct vcache *avc,
 	    } else {
 		afs_warn("BYPASS: StartRXAFS_FetchData failed: %d\n", code);
 		unlock_and_release_pages(auio);
-		(void)afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+		(void)afs_Analyze(tc, rxconn, code, &callreq.fid, areq,
 				  AFS_STATS_FS_RPCIDX_FETCHDATA,
 				  SHARED_LOCK, NULL);
 		goto done;
@@ -631,12 +631,12 @@ afs_PrefetchNoCache(struct vcache *avc,
 	} else {
 	    afs_warn("BYPASS: No connection.\n");
 	    unlock_and_release_pages(auio);
-	    (void)afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+	    (void)afs_Analyze(tc, rxconn, code, &callreq.fid, areq,
 			      AFS_STATS_FS_RPCIDX_FETCHDATA,
 			      SHARED_LOCK, NULL);
 	    goto done;
 	}
-    } while (afs_Analyze(tc, rxconn, code, &avc->f.fid, areq,
+    } while (afs_Analyze(tc, rxconn, code, &callreq.fid, areq,
 						 AFS_STATS_FS_RPCIDX_FETCHDATA,
 						 SHARED_LOCK,0));
 done:

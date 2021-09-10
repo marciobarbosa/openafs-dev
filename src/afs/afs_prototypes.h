@@ -497,8 +497,8 @@ extern int afs_CacheStoreVCache(struct dcache **dcList, struct vcache *avc,
 extern int afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
                                 struct osi_file *fP,
 				afs_size_t abase, struct dcache *adc,
-				struct vcache *avc, afs_int32 size,
-				struct afs_FetchOutput *tsmall)
+				struct vcache *avc, struct VenusFid *afid,
+				afs_int32 size, struct afs_FetchOutput *tsmall)
 				AFS_NONNULL((5));
 
 /* afs_memcache.c */

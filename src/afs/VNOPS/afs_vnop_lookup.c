@@ -991,6 +991,10 @@ afs_DoBulkStat(struct vcache *adp, long dirCookie, struct vrequest *areqp)
 
 		afs_PutVCache(tvcp);
 		tvcp = NULL;
+
+		if (callreq.fid.Fid.Volume != adp->f.fid.Fid.Volume) {
+		    fidParm.AFSCBFids_val[i].Volume = callreq.fid.Fid.Volume;
+		}
 	    }
 
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_BULKSTATUS);

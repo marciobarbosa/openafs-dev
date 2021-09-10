@@ -428,6 +428,7 @@ struct afs_conn {
 struct afs_callreq {
     struct afs_conn *afsconn;
     struct rx_connection *rxconn;
+    struct VenusFid fid;
 };
 
 /* An sa_conn_vector replaces the erstwhile list of conn

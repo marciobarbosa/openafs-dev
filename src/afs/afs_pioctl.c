@@ -1610,6 +1610,7 @@ DECL_PIOCTL(PGetAcl)
 	if (code == 0) {
 	    tconn = callreq.afsconn;
 	    rxconn = callreq.rxconn;
+	    Fid.Volume = callreq.fid.Fid.Volume;
 	    acl.AFSOpaque_val[0] = '\0';
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_FETCHACL);
 	    RX_AFS_GUNLOCK();
@@ -2026,13 +2027,13 @@ DECL_PIOCTL(PGetVolumeStatus)
 	    XSTATS_START_TIME(AFS_STATS_FS_RPCIDX_GETVOLUMESTATUS);
 	    RX_AFS_GUNLOCK();
 	    code =
-		RXAFS_GetVolumeStatus(rxconn, avc->f.fid.Fid.Volume, &volstat,
+		RXAFS_GetVolumeStatus(rxconn, callreq.fid.Fid.Volume, &volstat,
 				      &Name, &offLineMsg, &motd);
 	    RX_AFS_GLOCK();
 	    XSTATS_END_TIME;
 	}
     } while (afs_Analyze
-	     (tc, rxconn, code, &avc->f.fid, areq, AFS_STATS_FS_RPCIDX_GETVOLUMESTATUS,
+	     (tc, rxconn, code, &callreq.fid, areq, AFS_STATS_FS_RPCIDX_GETVOLUMESTATUS,
 	      SHARED_LOCK, NULL));
 
     if (code)

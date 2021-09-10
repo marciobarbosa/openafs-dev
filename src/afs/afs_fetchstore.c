@@ -884,7 +884,7 @@ struct fetchOps rxfs_fetchMemOps = {
 
 afs_int32
 rxfs_fetchInit(struct afs_conn *tc, struct rx_connection *rxconn,
-               struct vcache *avc, afs_offs_t base,
+               struct vcache *avc, struct VenusFid *afid, afs_offs_t base,
 	       afs_uint32 size, afs_int32 *alength, struct dcache *adc,
 	       struct osi_file *fP, struct fetchOps **ops, void **rock)
 {
@@ -911,7 +911,7 @@ rxfs_fetchInit(struct afs_conn *tc, struct rx_connection *rxconn,
 	    afs_uint64 llbytes = size;
 	    RX_AFS_GUNLOCK();
 	    code = StartRXAFS_FetchData64(v->call,
-					  (struct AFSFid *) &avc->f.fid.Fid,
+					  (struct AFSFid *) &afid->Fid,
 					  base, llbytes);
 	    if (code != 0) {
 		RX_AFS_GLOCK();
@@ -941,7 +941,7 @@ rxfs_fetchInit(struct afs_conn *tc, struct rx_connection *rxconn,
 		    v->call = rx_NewCall(rxconn);
 		code =
 		    StartRXAFS_FetchData(
-		    		v->call, (struct AFSFid*)&avc->f.fid.Fid,
+		    		v->call, (struct AFSFid*)&afid->Fid,
 				pos, size);
 		RX_AFS_GLOCK();
 	    }
@@ -1007,7 +1007,7 @@ rxfs_fetchInit(struct afs_conn *tc, struct rx_connection *rxconn,
 	    *alength = length;
 #else /* AFS_64BIT_CLIENT */
 	RX_AFS_GUNLOCK();
-	code = StartRXAFS_FetchData(v->call, (struct AFSFid *)&avc->f.fid.Fid,
+	code = StartRXAFS_FetchData(v->call, (struct AFSFid *)&afid->Fid,
 				     base, size);
 	RX_AFS_GLOCK();
 	if (code == 0) {
@@ -1095,6 +1095,7 @@ rxfs_fetchInit(struct afs_conn *tc, struct rx_connection *rxconn,
  * \param base Base offset to fetch.
  * \param adc Ptr to the dcache entry for the file, write-locked.
  * \param avc Ptr to the vcache entry for the file.
+ * \param afid Ptr to the fid of this file.
  * \param size Amount of data that should be fetched.
  * \param tsmall Ptr to the afs_FetchOutput structure.
  *
@@ -1103,7 +1104,8 @@ rxfs_fetchInit(struct afs_conn *tc, struct rx_connection *rxconn,
 int
 afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
                    struct osi_file *fP, afs_size_t base,
-		   struct dcache *adc, struct vcache *avc, afs_int32 size,
+		   struct dcache *adc, struct vcache *avc,
+		   struct VenusFid *afid, afs_int32 size,
 		   struct afs_FetchOutput *tsmall)
 {
     afs_int32 code;
@@ -1130,8 +1132,8 @@ afs_CacheFetchProc(struct afs_conn *tc, struct rx_connection *rxconn,
      * avc->lock(W) if !setLocks || slowPass
      * adc->lock(W)
      */
-    code = rxfs_fetchInit(
-		tc, rxconn, avc, base, size, &length, adc, fP, &ops, &rock);
+    code = rxfs_fetchInit(tc, rxconn, avc, afid, base, size, &length, adc, fP,
+			  &ops, &rock);
 
 #ifndef AFS_NOSTATS
     osi_GetTime(&xferStartTime);

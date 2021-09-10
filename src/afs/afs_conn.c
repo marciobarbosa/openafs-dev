@@ -425,6 +425,7 @@ afs_FSCall(struct vcache *avc, struct vrequest *areq,
     if (tconn != NULL) {
 	code = 0;
 	acallreq->afsconn = tconn;
+	acallreq->fid = fid;
     }
  done:
     return code;
