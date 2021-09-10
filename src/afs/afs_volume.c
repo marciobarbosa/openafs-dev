@@ -871,6 +871,10 @@ afs_NewVolumeByName(char *aname, afs_int32 acell, int agood,
     do {
 	code = afs_VLCall(tcell, treq, SHARED_LOCK, 0, &callreq);
 	if (code == 0) {
+	    if (tcell != callreq.cell) {
+		afs_PutCell(tcell, READ_LOCK);
+		tcell = callreq.cell;
+	    }
 	    tconn = callreq.afsconn;
 	    rxconn = callreq.rxconn;
 	    if (tconn->parent->srvr->server->flags & SNO_LHOSTS) {

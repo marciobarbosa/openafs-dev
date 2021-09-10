@@ -470,6 +470,7 @@ afs_VLCall(struct cell *acell, struct vrequest *areq,
 	    code = 0;
 	    acallreq->afsconn = tconn;
 	    acallreq->rxconn = rxconn;
+	    acallreq->cell = acell;
 	    goto done;
 	}
     }
