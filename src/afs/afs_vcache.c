@@ -229,6 +229,14 @@ afs_FlushVCache(struct vcache *avc, int *slept)
 	afs_osi_Free(avc->linkData, strlen(avc->linkData) + 1);
 	avc->linkData = NULL;
     }
+    if (avc->vol) {
+	avc->vol->refcount--;
+	if (avc->vol->refcount == 0) {
+	    afs_osi_Free(avc->vol->volname, strlen(avc->vol->volname) + 1);
+	    afs_osi_Free(avc->vol, sizeof(*avc->vol));
+	    avc->vol = NULL;
+	}
+    }
 #if defined(AFS_XBSD_ENV) || defined(AFS_DARWIN_ENV)
     /* OK, there are no internal vrefCounts, so there shouldn't
      * be any more refs here. */
@@ -1136,6 +1144,32 @@ afs_NewVCache_int(struct vcache *parent, struct VenusFid *afid,
     if (tvc->f.states & CVInit)
 #endif
     afs_PostPopulateVCache(tvc, afid, seq);
+
+    if (parent != NULL) {
+	if (tvc->mvstat == AFS_MVSTAT_ROOT) {
+	    char *cpos, *volname;
+
+	    osi_Assert(parent->mvstat == AFS_MVSTAT_MTPT);
+	    osi_Assert(parent->linkData != NULL);
+
+	    volname = parent->linkData + 1;
+	    cpos = afs_strchr(volname, ':');
+	    if (cpos != NULL) {
+		volname = cpos + 1;
+	    }
+
+	    tvc->vol = afs_osi_Alloc(sizeof(*tvc->vol));
+	    osi_Assert(tvc->vol != NULL);
+
+	    tvc->vol->volname = afs_strdup(volname);
+	    osi_Assert(tvc->vol->volname != NULL);
+	    tvc->vol->refcount = 1;
+	} else {
+	    osi_Assert(parent->vol != NULL);
+	    tvc->vol = parent->vol;
+	    tvc->vol->refcount++;
+	}
+    }
 
     return tvc;
 }				/*afs_NewVCache */

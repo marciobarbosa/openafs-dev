@@ -859,6 +859,11 @@ struct multiPage_range {
 };
 #endif
 
+struct afs_vcache_vol {
+    char *volname;
+    afs_uint32 refcount;
+};
+
 /* INVARIANTs: (vlruq.next != NULL) == (vlruq.prev != NULL)
  *             nextfree => !vlruq.next && ! vlruq.prev
  * !(avc->nextfree) && !avc->vlruq.next => (FreeVCList == avc->nextfree)
@@ -1001,6 +1006,7 @@ struct vcache {
     spinlock_t pagewriter_lock;
     struct list_head pagewriters;	/* threads that are writing vm pages */
 #endif
+    struct afs_vcache_vol *vol;	/* name of the volume holding the vnode */
 };
 
 #ifdef AFS_LINUX_ENV
