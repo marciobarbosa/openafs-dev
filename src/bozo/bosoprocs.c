@@ -124,9 +124,9 @@ SBOZO_Exec(struct rx_call *acall, char *acmd)
     /* should copy output to acall, but don't yet cause its hard */
     /*  hard... NOT!  Nnow _at least_ return the exit status */
     code = system(acmd);
-    osi_auditU(acall, BOS_ExecEvent, code, AUD_STR, acmd, AUD_END);
 
   fail:
+    osi_auditU(acall, BOS_ExecEvent, code, AUD_STR, acmd, AUD_END);
     return code;
 }
 
@@ -181,19 +181,19 @@ SBOZO_UnInstall(struct rx_call *acall, char *aname)
 
     if (!afsconf_SuperUser(bozo_confdir, acall, caller)) {
 	code = BZACCESS;
-	osi_auditU(acall, BOS_UnInstallEvent, code, AUD_STR, aname, AUD_END);
-	return code;
+	goto out;
     }
     if (bozo_isrestricted) {
 	code = BZACCESS;
-	osi_auditU(acall, BOS_UnInstallEvent, code, AUD_STR, aname, AUD_END);
-	return code;
+	goto out;
     }
 
     /* construct local path from canonical (wire-format) path */
     if (ConstructLocalBinPath(aname, &filepath)) {
-	return BZNOENT;
+	code = BZNOENT;
+	goto out;
     }
+    aname = filepath;
 
     if (DoLogging)
 	bozo_Log("%s is executing UnInstall '%s'\n", caller, filepath);
@@ -224,7 +224,7 @@ SBOZO_UnInstall(struct rx_call *acall, char *aname)
 	code = errno;
 
 out:
-    osi_auditU(acall, BOS_UnInstallEvent, code, AUD_STR, filepath, AUD_END);
+    osi_auditU(acall, BOS_UnInstallEvent, code, AUD_STR, aname, AUD_END);
     free(fpBak);
     free(fpOld);
     free(filepath);
@@ -296,15 +296,22 @@ SBOZO_Install(struct rx_call *acall, char *aname, afs_int32 asize, afs_int32 mod
     char *filepath = NULL, *fpNew = NULL, *tbuffer = NULL;
     char caller[MAXKTCNAMELEN];
 
-    if (!afsconf_SuperUser(bozo_confdir, acall, caller))
-	return BZACCESS;
-    if (bozo_isrestricted)
-	return BZACCESS;
+    if (!afsconf_SuperUser(bozo_confdir, acall, caller)) {
+	ret = BZACCESS;
+	goto out;
+    }
+    if (bozo_isrestricted) {
+	ret = BZACCESS;
+	goto out;
+    }
 
     /* construct local path from canonical (wire-format) path */
     if (ConstructLocalBinPath(aname, &filepath)) {
-	return BZNOENT;
+	ret = BZNOENT;
+	goto out;
     }
+    aname = filepath;
+
     if (asprintf(&fpNew, "%s.NEW", filepath) < 0) {
 	ret = ENOMEM;
 	fpNew = NULL;
@@ -369,7 +376,6 @@ SBOZO_Install(struct rx_call *acall, char *aname, afs_int32 asize, afs_int32 mod
 	chmod(filepath, mode);
 
     if (code < 0) {
-	osi_auditU(acall, BOS_InstallEvent, code, AUD_STR, filepath, AUD_END);
 	ret = errno;
 	goto out;
     }
@@ -377,6 +383,7 @@ SBOZO_Install(struct rx_call *acall, char *aname, afs_int32 asize, afs_int32 mod
 out:
     if (fd >= 0)
 	close(fd);
+    osi_auditU(acall, BOS_InstallEvent, ret, AUD_STR, aname, AUD_END);
     free(filepath);
     free(fpNew);
     free(tbuffer);
@@ -1467,7 +1474,8 @@ SBOZO_GetLog(struct rx_call *acall, char *aname)
 
     /* construct local path from canonical (wire-format) path */
     if (ConstructLocalLogPath(aname, &logpath)) {
-	return BZNOENT;
+	code = BZNOENT;
+	goto fail;
     }
     if (DoLogging)
 	bozo_Log("%s is executing GetLog '%s'\n", caller, logpath);
@@ -1475,7 +1483,8 @@ SBOZO_GetLog(struct rx_call *acall, char *aname)
     free(logpath);
 
     if (!tfile) {
-	return BZNOENT;
+	code = BZNOENT;
+	goto fail;
     }
 
     while (1) {
@@ -1497,8 +1506,10 @@ SBOZO_GetLog(struct rx_call *acall, char *aname)
 
     /* write out the end delimeter */
     buffer = 0;
-    if (rx_Write(acall, &buffer, 1) != 1)
-	return BZNET;
+    if (rx_Write(acall, &buffer, 1) != 1) {
+	code = BZNET;
+	goto fail;
+    }
     code = 0;
 
   fail:
