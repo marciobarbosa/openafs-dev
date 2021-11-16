@@ -813,6 +813,10 @@ extern Volume *VAttachVolumeByName(Error * ec, char *partition, char *name,
 				   int mode);
 extern Volume *VAttachVolumeByName_r(Error * ec, char *partition, char *name,
 				     int mode);
+extern Volume *VFakeAttachVolumeByName(struct DiskPartition64 *dp,
+				       char *volname,
+				       struct VolumeHeader *header);
+extern void VFakeDetachVolume(Volume **vp);
 extern void VShutdown(void);
 extern void VSetTranquil(void);
 extern void VUpdateVolume(Error * ec, Volume * vp);

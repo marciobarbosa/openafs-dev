@@ -58,8 +58,6 @@ static int enable_padding; /* Pad errors with NUL bytes */
 /* Forward Declarations */
 static void HandleVolume(struct DiskPartition64 *partP, char *name,
 			 char *filename, int fromtime);
-static Volume *AttachVolume(struct DiskPartition64 *dp, char *volname,
-			    struct VolumeHeader *header);
 static void DoMyVolDump(Volume * vp, struct DiskPartition64 *dp,
 			char *dumpfile, int fromtime);
 
@@ -68,67 +66,6 @@ static void DoMyVolDump(Volume * vp, struct DiskPartition64 *dp,
 #endif
 
 char name[VMAXPATHLEN];
-
-
-static int
-ReadHdr1(IHandle_t * ih, char *to, int size, u_int magic, u_int version)
-{
-    int code;
-
-    code = IH_IREAD(ih, 0, to, size);
-    if (code != size)
-	return -1;
-
-    return 0;
-}
-
-
-static Volume *
-AttachVolume(struct DiskPartition64 * dp, char *volname,
-	     struct VolumeHeader * header)
-{
-    Volume *vp;
-    afs_int32 ec = 0;
-
-    vp = (Volume *) calloc(1, sizeof(Volume));
-    vp->specialStatus = 0;
-    vp->device = dp->device;
-    vp->partition = dp;
-    IH_INIT(vp->vnodeIndex[vLarge].handle, dp->device, header->parent,
-	    header->largeVnodeIndex);
-    IH_INIT(vp->vnodeIndex[vSmall].handle, dp->device, header->parent,
-	    header->smallVnodeIndex);
-    IH_INIT(vp->diskDataHandle, dp->device, header->parent,
-	    header->volumeInfo);
-    IH_INIT(V_linkHandle(vp), dp->device, header->parent, header->linkTable);
-    vp->cacheCheck = 0;		/* XXXX */
-    vp->shuttingDown = 0;
-    vp->goingOffline = 0;
-    vp->nUsers = 1;
-    vp->header = calloc(1, sizeof(*vp->header));
-    ec = ReadHdr1(V_diskDataHandle(vp), (char *)&V_disk(vp),
-		  sizeof(V_disk(vp)), VOLUMEINFOMAGIC, VOLUMEINFOVERSION);
-    if (!ec) {
-	struct IndexFileHeader iHead;
-	ec = ReadHdr1(vp->vnodeIndex[vSmall].handle, (char *)&iHead,
-		      sizeof(iHead), SMALLINDEXMAGIC, SMALLINDEXVERSION);
-    }
-    if (!ec) {
-	struct IndexFileHeader iHead;
-	ec = ReadHdr1(vp->vnodeIndex[vLarge].handle, (char *)&iHead,
-		      sizeof(iHead), LARGEINDEXMAGIC, LARGEINDEXVERSION);
-    }
-#ifdef AFS_NAMEI_ENV
-    if (!ec) {
-	struct versionStamp stamp;
-	ec = ReadHdr1(V_linkHandle(vp), (char *)&stamp, sizeof(stamp),
-		      LINKTABLEMAGIC, LINKTABLEVERSION);
-    }
-#endif
-    if (ec)
-	return (Volume *) 0;
-    return vp;
-}
 
 
 static int
@@ -242,15 +179,14 @@ HandleVolume(struct DiskPartition64 *dp, char *name, char *filename, int fromtim
     DiskToVolumeHeader(&header, &diskHeader);
 
     close(fd);
-    vp = AttachVolume(dp, name, &header);
+    vp = VFakeAttachVolumeByName(dp, name, &header);
     if (!vp) {
 	fprintf(stderr, "Error attaching volume header %s\n", name);
 	exit(1);
     }
 
     DoMyVolDump(vp, dp, filename, fromtime);
-
-    free(vp);
+    VFakeDetachVolume(&vp);
 }
 
 
