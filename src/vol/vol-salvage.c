@@ -979,23 +979,21 @@ SalvageFileSys1(struct DiskPartition64 *partP, VolumeId singleVolumeNumber)
     OS_CLOSE(inodeFile);		/* SalvageVolumeGroup was the last which needed it. */
 }
 
-void
-DeleteExtraVolumeHeaderFile(struct SalvInfo *salvinfo, struct VolumeSummary *vsp)
+static void
+DeleteVolHeader(struct SalvInfo *salvinfo, struct VolumeSummary *vsp)
 {
-    char path[VMAXPATHLEN + 10];
-    char filename[VMAXPATHLEN];
-
     if (vsp->deleted) {
 	return;
     }
 
-    VolumeExternalName_r(vsp->header.id, filename, sizeof(filename));
-    sprintf(path, "%s" OS_DIRSEP "%s", salvinfo->fileSysPath, filename);
-
-    LogMaybe("The volume header file %s is not associated with any actual data "
-	     "(%sdeleted)\n", path, (Testing ? "would have been " : ""));
     if (!Testing) {
 	afs_int32 code;
+	char path[VMAXPATHLEN + 10];
+	char filename[VMAXPATHLEN];
+
+	VolumeExternalName_r(vsp->header.id, filename, sizeof(filename));
+	sprintf(path, "%s" OS_DIRSEP "%s", salvinfo->fileSysPath, filename);
+
 	code = VDestroyVolumeDiskHeader(salvinfo->fileSysPartition, vsp->header.id,
 					vsp->header.parent, salvinfo->useFSYNC);
 	if (code) {
@@ -1015,6 +1013,25 @@ DeleteExtraVolumeHeaderFile(struct SalvInfo *salvinfo, struct VolumeSummary *vsp
 	}
 	vsp->deleted = 1;
     }
+}
+
+void
+DeleteExtraVolumeHeaderFile(struct SalvInfo *salvinfo, struct VolumeSummary *vsp)
+{
+    char path[VMAXPATHLEN + 10];
+    char filename[VMAXPATHLEN];
+
+    if (vsp->deleted) {
+	return;
+    }
+
+    VolumeExternalName_r(vsp->header.id, filename, sizeof(filename));
+    sprintf(path, "%s" OS_DIRSEP "%s", salvinfo->fileSysPath, filename);
+
+    LogMaybe("The volume header file %s is not associated with any actual data (%sdeleted)\n",
+	    path, (Testing ? "would have been " : ""));
+
+    DeleteVolHeader(salvinfo, vsp);
 }
 
 int
@@ -4416,32 +4433,7 @@ MaybeZapVolume(struct SalvInfo *salvinfo, struct InodeSummary *isp,
 			 afs_printable_VolumeId_lu(isp->volumeId));
 		LogMaybe("it will be deleted instead.  It should be recloned.\n");
 	    }
-	    if (!Testing) {
-		afs_int32 code;
-		char path[VMAXPATHLEN + 10];
-		char filename[VMAXPATHLEN];
-		VolumeExternalName_r(isp->volumeId, filename, sizeof(filename));
-		sprintf(path, "%s" OS_DIRSEP "%s", salvinfo->fileSysPath, filename);
-
-		code = VDestroyVolumeDiskHeader(salvinfo->fileSysPartition, isp->volumeId,
-						isp->RWvolumeId, salvinfo->useFSYNC);
-		if (code) {
-		    Log("Error %ld destroying volume disk header for volume %" AFS_VOLID_FMT "\n",
-		        afs_printable_int32_ld(code),
-		        afs_printable_VolumeId_lu(isp->volumeId));
-		}
-
-		/* make sure we actually delete the header file; ENOENT
-		 * is fine, since VDestroyVolumeDiskHeader probably already
-		 * unlinked it */
-		if (unlink(path) && errno != ENOENT) {
-		    Log("Unable to unlink %s (errno = %d)\n", path, errno);
-		}
-		if (salvinfo->useFSYNC) {
-		    AskDelete(salvinfo, isp->volumeId);
-		}
-		isp->volSummary->deleted = 1;
-	    }
+	    DeleteVolHeader(salvinfo, isp->volSummary);
 	}
     } else if (!check) {
 	Log("%s salvage was unsuccessful: read-write volume %" AFS_VOLID_FMT "\n", message,
