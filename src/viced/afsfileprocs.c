@@ -1919,7 +1919,8 @@ Alloc_NewVnode(Vnode * parentptr, DirHandle * dir, Volume * volptr,
 	IH_CREATE(V_linkHandle(volptr), V_device(volptr),
 		  VPartitionPath(V_partition(volptr)), nearInode,
 		  V_id(volptr), (*targetptr)->vnodeNumber,
-		  (*targetptr)->disk.uniquifier, 1);
+		  (*targetptr)->disk.uniquifier,
+		  (*targetptr)->disk.dataVersion);
 
     /* error in creating inode */
     if (!VALID_INO(inode)) {

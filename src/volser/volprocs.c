@@ -301,6 +301,7 @@ ViceCreateRoot(Volume *vp)
     FdHandle_t *fdP;
     afs_fsize_t length;
     ssize_t nBytes;
+    FileVersion dv = 0;
 
     vnode = calloc(1, SIZEOF_LARGEDISKVNODE);
     if (!vnode)
@@ -310,7 +311,7 @@ ViceCreateRoot(Volume *vp)
     inodeNumber =
 	IH_CREATE(V_linkHandle(vp), V_device(vp),
 		  VPartitionPath(V_partition(vp)), nearInode, V_parentId(vp),
-		  1, 1, 0);
+		  1, 1, dv);
     if (!VALID_INO(inodeNumber)) {
 	Log("ViceCreateRoot: IH_CREATE: %s\n", afs_error_message(errno));
 	free(vnode);
@@ -351,7 +352,7 @@ ViceCreateRoot(Volume *vp)
     VNDISK_SET_LEN(vnode, length);
     vnode->uniquifier = 1;
     V_uniquifier(vp) = vnode->uniquifier + 1;
-    vnode->dataVersion = 1;
+    vnode->dataVersion = dv;
     VNDISK_SET_INO(vnode, inodeNumber);
     vnode->unixModifyTime = vnode->serverModifyTime = V_creationDate(vp);
     vnode->author = 0;

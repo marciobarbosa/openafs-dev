@@ -3651,6 +3651,7 @@ CreateReadme(struct SalvInfo *salvinfo, VolumeDiskData *volHeader,
     struct VnodeEssence *vep;
     afs_fsize_t length;
     time_t now = time(NULL);
+    FileVersion dv = 1;
 
     /* Try to make the note brief, but informative. Only administrators should
      * be able to read this file at first, so we can hopefully assume they
@@ -3678,7 +3679,7 @@ CreateReadme(struct SalvInfo *salvinfo, VolumeDiskData *volHeader,
     /* create the inode and write the contents */
     readmeinode = IH_CREATE(alinkH, salvinfo->fileSysDevice,
                             salvinfo->fileSysPath, 0, vid,
-                            afid->Vnode, afid->Unique, 1);
+                            afid->Vnode, afid->Unique, dv);
     if (!VALID_INO(readmeinode)) {
 	Log("CreateReadme: readme IH_CREATE failed\n");
 	goto error;
@@ -3707,7 +3708,7 @@ CreateReadme(struct SalvInfo *salvinfo, VolumeDiskData *volHeader,
     rvnode->linkCount = 1;
     VNDISK_SET_LEN(rvnode, length);
     rvnode->uniquifier = afid->Unique;
-    rvnode->dataVersion = 1;
+    rvnode->dataVersion = dv;
     VNDISK_SET_INO(rvnode, readmeinode);
     rvnode->unixModifyTime = rvnode->serverModifyTime = now;
     rvnode->author = 0;

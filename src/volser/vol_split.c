@@ -554,7 +554,7 @@ createMountpoint(Volume *vol, Volume *newvol, struct VnodeDiskObject *parent,
     vnode.modeBits = 0644;
     vnode.unixModifyTime = now.tv_sec;
     vnode.serverModifyTime = now.tv_sec;
-    vnode.dataVersion = 1;
+    vnode.dataVersion = 0;
     vnode.linkCount = 1;
     vnode.parent = vN;
 
@@ -564,7 +564,7 @@ createMountpoint(Volume *vol, Volume *newvol, struct VnodeDiskObject *parent,
 #endif
     newino = IH_CREATE(V_linkHandle(vol), V_device(vol),
 		VPartitionPath(V_partition(vol)), nearInode,
-                V_parentId(vol), newvN, vnode.uniquifier, 1);
+                V_parentId(vol), newvN, vnode.uniquifier, vnode.dataVersion);
 
     IH_INIT(h, V_device(vol), V_parentId(vol), newino);
     fdP2 = IH_OPEN(h);
