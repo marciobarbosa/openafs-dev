@@ -2836,22 +2836,29 @@ SalvageIndex(struct SalvInfo *salvinfo, Inode ino, VnodeClass class, int RW,
 #endif /* AFS_SGI_EXMAG */
 #endif /* AFS_3DISPARES */
 			    vnodeChanged = 1;
-			} else {
+			} else if (!vnodeIsDirectory(vnodeNumber) &&
+				   !(vd == 0 && id == 1)) {
+			    /*
+			     * The fileserver used to incorrectly initialize the
+			     * dv for a new file to 1 in the inode (OGM) dv, and
+			     * to 0 in the vnode dv. Skip this case specifically
+			     * to avoid needlessly "fixing" these files, since
+			     * they aren't broken.
+			     */
+
 			    /* don't bother checking for vd > id any more, since
 			     * partial file transfers always result in this state,
 			     * and you can't do much else anyway (you've already
 			     * found the best data you can) */
 #ifdef	AFS_3DISPARES
-			    if (!vnodeIsDirectory(vnodeNumber)
-				&& ((vd < id && (id - vd) < 1887437)
-				    || ((vd > id && (vd - id) > 1887437)))) {
+			    if ((vd < id && (id - vd) < 1887437) ||
+				((vd > id && (vd - id) > 1887437))) {
 #else
 #if defined(AFS_SGI_EXMAG)
-			    if (!vnodeIsDirectory(vnodeNumber)
-				&& ((vd < id && (id - vd) < 15099494)
-				    || ((vd > id && (vd - id) > 15099494)))) {
+			    if ((vd < id && (id - vd) < 15099494) ||
+				((vd > id && (vd - id) > 15099494))) {
 #else
-			    if (!vnodeIsDirectory(vnodeNumber) && vd < id) {
+			    if (vd < id) {
 #endif /* AFS_SGI_EXMAG */
 #endif
 				if (!Showmode)
