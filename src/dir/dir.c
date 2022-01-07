@@ -64,6 +64,10 @@ extern int DNew(struct dcache *adc, int page, struct DirBuffer *);
 #  include "h/string.h"
 # endif
 
+# ifdef UKERNEL
+#  include "roken/libuafs/roken.h"
+# endif
+
 #else /* KERNEL */
 
 # include <roken.h>
