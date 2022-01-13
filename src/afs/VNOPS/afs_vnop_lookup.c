@@ -506,7 +506,7 @@ afs_getsysname(struct vrequest *areq, struct vcache *adp,
     if (!afs_nfsexporter) {
 	rlen = strlcpy(bufp, (*sysnamelist)[0], bufsize);
 	if (rlen >= bufsize) {
-	    code = ENAMETOOLONG;
+	    code = -1;
 	    goto done;
 	}
     } else {
@@ -514,20 +514,20 @@ afs_getsysname(struct vrequest *areq, struct vcache *adp,
 	if (au->exporter) {
 	    error = EXP_SYSNAME(au->exporter, (char *)0, sysnamelist, num, 0);
 	    if (error) {
-		osi_Assert(strlcpy(bufp, "@sys", bufsize) < bufsize);
+		strlcpy(bufp, "@sys", bufsize);
 		code = -1;
 		goto done;
 	    } else {
 		rlen = strlcpy(bufp, (*sysnamelist)[0], bufsize);
 		if (rlen >= bufsize) {
-		    code = ENAMETOOLONG;
+		    code = -1;
 		    goto done;
 		}
 	    }
 	} else {
 	    rlen = strlcpy(bufp, afs_sysname, bufsize);
 	    if (rlen >= bufsize) {
-		code = ENAMETOOLONG;
+		code = -1;
 		goto done;
 	    }
 	}
