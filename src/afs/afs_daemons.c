@@ -337,11 +337,10 @@ afs_CheckRootVolume(void)
 
 	    if ((len < 9) || strcmp(&rootVolName[len - 9], ".readonly")) {
 		len = sizeof(buf);
-		rlen = strlcpy(buf, rootVolName, len);
+		rlen = snprintf(buf, len, "%s.readonly", rootVolName);
 		if (rlen >= len) {
 		    return ENAMETOOLONG;
 		}
-		afs_strcat(buf, ".readonly");
 		tvp = afs_GetVolumeByName(buf, localcell, 1, NULL, READ_LOCK);
 	    }
 	}

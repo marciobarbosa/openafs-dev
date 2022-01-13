@@ -731,8 +731,8 @@ afs_icl_CreateLogWithFlags(char *name, afs_int32 logSize, afs_uint32 flags,
     memset((caddr_t) logp, 0, sizeof(*logp));
 
     logp->refCount = 1;
-    logp->name = osi_AllocSmallSpace(strlen(name) + 1);
-    osi_Assert(strlcpy(logp->name, name, strlen(name) + 1) < strlen(name) + 1);
+    logp->name = strdup(name);
+    osi_Assert(logp->name != NULL);
     LOCK_INIT(&logp->lock, "logp lock");
     logp->logSize = logSize;
     logp->datap = NULL;		/* don't allocate it until we need it */
@@ -1100,8 +1100,8 @@ afs_icl_CreateSetWithFlags(char *name, struct afs_icl_log *baseLogp,
      * the afs_icl_lock is still held, and thus the obtain can't block.
      */
     ObtainWriteLock(&setp->lock, 199);
-    setp->name = osi_AllocSmallSpace(strlen(name) + 1);
-    osi_Assert(strlcpy(setp->name, name, strlen(name) + 1) < strlen(name) + 1);
+    setp->name = strdup(name);
+    osi_Assert(setp->name != NULL);
     setp->nevents = ICL_DEFAULTEVENTS;
     setp->eventFlags = afs_osi_Alloc(ICL_DEFAULTEVENTS);
     osi_Assert(setp->eventFlags != NULL);
