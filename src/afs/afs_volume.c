@@ -694,7 +694,6 @@ afs_SetupVolume(afs_int32 volid, char *aname, void *ve, struct cell *tcell,
 
     int whichType;		/* which type of volume to look for */
     int i;
-    size_t len;
 
     if (!volid) {
 	int len;
@@ -733,10 +732,8 @@ afs_SetupVolume(afs_int32 volid, char *aname, void *ve, struct cell *tcell,
 	LockAndInstallVolumeEntry(tv, ove, tcell->cellNum);
     if (agood) {
 	if (!tv->name) {
-	    tv->name = afs_osi_Alloc(strlen(aname) + 1);
+	    tv->name = afs_strdup(aname);
 	    osi_Assert(tv->name != NULL);
-	    len = strlen(aname) + 1;
-	    osi_Assert(strlcpy(tv->name, aname, len) < len);
 	}
     }
     for (i = 0; i < NMAXNSERVERS; i++) {

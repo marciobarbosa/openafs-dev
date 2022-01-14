@@ -74,7 +74,6 @@ afs_mount(struct mount *mp, char *path, caddr_t data, struct nameidata *ndp, CTX
     /* ndp contains the mounted-from device.  Just ignore it.
      * we also don't care about our proc struct. */
     size_t size;
-    size_t len, rlen;
     int error;
 #ifdef AFS_DARWIN80_ENV
     struct vfsioattr ioattr;
@@ -114,9 +113,7 @@ afs_mount(struct mount *mp, char *path, caddr_t data, struct nameidata *ndp, CTX
     memset(mnt_stat->f_mntfromname, 0, MNAMELEN);
 
     if (data == 0) {
-	len = sizeof(mnt_stat->f_mntfromname);
-	rlen = strlcpy(mnt_stat->f_mntfromname, "AFS", len);
-	if (rlen >= len) {
+	if (strlcpy(mnt_stat->f_mntfromname, "AFS", MNAMELEN) >= MNAMELEN) {
 	    AFS_GUNLOCK();
 	    return ENAMETOOLONG;
 	}
@@ -131,9 +128,7 @@ afs_mount(struct mount *mp, char *path, caddr_t data, struct nameidata *ndp, CTX
 	memset(volName + size, 0, MNAMELEN - size);
 
 	if (volName[0] == 0) {
-	    len = sizeof(mnt_stat->f_mntfromname);
-	    rlen = strlcpy(mnt_stat->f_mntfromname, "AFS", len);
-	    if (rlen >= len) {
+	    if (strlcpy(mnt_stat->f_mntfromname, "AFS", MNAMELEN) >= MNAMELEN) {
 		AFS_GUNLOCK();
 		return ENAMETOOLONG;
 	    }

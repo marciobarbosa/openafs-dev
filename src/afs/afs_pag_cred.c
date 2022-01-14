@@ -36,7 +36,6 @@ struct afspag_cell *
 afspag_GetCell(char *acell)
 {
     struct afspag_cell *tcell;
-    size_t len, rlen;
 
     ObtainWriteLock(&afs_xpagcell, 820);
 
@@ -49,18 +48,10 @@ afspag_GetCell(char *acell)
 	tcell = afs_osi_Alloc(sizeof(struct afspag_cell));
 	if (!tcell)
 	    goto out;
-	len = strlen(acell) + 1;
-	tcell->cellname = afs_osi_Alloc(len);
+	tcell->cellname = afs_strdup(acell);
 	if (!tcell->cellname) {
 	    afs_osi_Free(tcell, sizeof(struct afspag_cell));
 	    tcell = 0;
-	    goto out;
-	}
-	rlen = strlcpy(tcell->cellname, acell, len);
-	if (rlen >= len) {
-	    afs_osi_Free(tcell->cellname, len);
-	    afs_osi_Free(tcell, sizeof(struct afspag_cell));
-	    tcell = NULL;
 	    goto out;
 	}
 	tcell->cellnum = ++lastcell;
@@ -383,7 +374,6 @@ SPAGCB_GetSysName(struct rx_call *a_call, afs_int32 a_uid,
 		  SysNameList *a_sysnames)
 {
     int i = 0;
-    size_t len;
 
     RX_AFS_GLOCK();
 
@@ -397,13 +387,9 @@ SPAGCB_GetSysName(struct rx_call *a_call, afs_int32 a_uid,
 	goto out;
 
     for (i = 0; i < afs_sysnamecount; i++) {
-	a_sysnames->SysNameList_val[i].sysname =
-	    afs_osi_Alloc(strlen(afs_sysnamelist[i]) + 1);
+	a_sysnames->SysNameList_val[i].sysname = afs_strdup(afs_sysnamelist[i]);
 	if (!a_sysnames->SysNameList_val[i].sysname)
 	    goto out;
-	len = strlen(afs_sysnamelist[i]) + 1;
-	osi_Assert(strlcpy(a_sysnames->SysNameList_val[i].sysname,
-			   afs_sysnamelist[i], len) < len);
     }
 
     ReleaseReadLock(&afs_xpagsys);

@@ -78,7 +78,7 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     struct VenusFid newFid;
     struct dcache *tdc;
     afs_size_t offset, len;
-    afs_int32 alen, truncate = 0;
+    afs_int32 alen;
     struct server *hostp = 0;
     struct vcache *tvc;
     struct AFSStoreStatus InStatus;
@@ -148,7 +148,6 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     alen = strlen(atargetName);	/* we want it to include the null */
     if ( (*atargetName == '#' || *atargetName == '%') && alen > 1 && atargetName[alen-1] == '.') {
 	InStatus.UnixModeBits = 0644;	/* mt pt: null from "." at end */
-	truncate = 1;
 	if (alen == 1)
 	    alen++;		/* Empty string */
     } else {
@@ -281,18 +280,10 @@ afs_symlink(OSI_VC_DECL(adp), char *aname, struct vattr *attrs,
     }
 
     if (!tvc->linkData) {
-	size_t rlen;
-
 	tvc->linkData = afs_osi_Alloc(alen);
 	osi_Assert(tvc->linkData != NULL);
-
-	rlen = strlcpy(tvc->linkData, atargetName, alen);
-	if (truncate) {
-	    /* intentionally replace '.' by '\0' */
-	    osi_Assert(rlen <= alen);
-	} else {
-	    osi_Assert(rlen < alen);
-	}
+	memcpy(tvc->linkData, atargetName, alen - 1);
+	tvc->linkData[alen - 1] = 0;
     }
     ReleaseWriteLock(&tvc->lock);
     ReleaseWriteLock(&afs_xvcache);
