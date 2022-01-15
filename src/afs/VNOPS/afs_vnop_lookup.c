@@ -566,8 +566,8 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	   struct sysname_info *state)
 {
     int num = afs_sysnamecount;
-    char **sysnamelist[MAXNUMSYSNAMES];
-    size_t len;
+    char **sysnamelist[MAXNUMSYSNAMES], *buf;
+    size_t bsz;
 
     if (state->index == -1)
 	return 0;		/* No list */
@@ -581,18 +581,32 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	    /*Move to the end of the string */ ;
 
 	if ((tname > state->name + 4) && (AFS_EQ_ATSYS(tname - 4))) {
-	    state->offset = (tname - 4) - state->name;
+	    int idx;
+	    size_t len;
+
+	    len = (tname - 4) - state->name;
+	    if (len >= AFS_LRALLOCSIZ) {
+		return 0;
+	    }
+
 	    tname = osi_AllocLargeSpace(AFS_LRALLOCSIZ);
-	    len = state->offset;
-	    osi_Assert(len < AFS_LRALLOCSIZ);
 	    /* intentionally truncating state->name */
 	    strlcpy(tname, state->name, len + 1);
-	    state->name = tname;
-	    state->allocked = 1;
+
+	    buf = tname + len;
+	    bsz = AFS_LRALLOCSIZ - len;
 	    num = 0;
-	    state->index =
-		afs_getsysname(areq, avc, state->name + len,
-			       AFS_LRALLOCSIZ - len, &num, sysnamelist);
+	    idx = afs_getsysname(areq, avc, buf, bsz, &num, sysnamelist);
+	    if (idx == -1) {
+		osi_FreeLargeSpace(tname);
+		return 0;
+	    }
+
+	    state->name = tname;
+	    state->offset = len;
+	    state->allocked = 1;
+	    state->index = idx;
+
 	    return 1;
 	} else
 	    return 0;		/* .*@sys doesn't match either */
@@ -617,9 +631,13 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	if (++(state->index) >= num || !(*sysnamelist)[(unsigned int)state->index])
 	    return 0;		/* end of list */
     }
-    len = MAXSYSNAME - state->offset;
-    osi_Assert(strlcpy(state->name + state->offset,
-		       (*sysnamelist)[(unsigned int)state->index], len) < len);
+
+    buf = state->name + state->offset;
+    bsz = MAXSYSNAME - state->offset;
+    if (strlcpy(buf, (*sysnamelist)[(unsigned int)state->index], bsz) >= bsz) {
+	state->index = -1;
+	return 0;
+    }
     return 1;
 }
 
