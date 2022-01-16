@@ -79,6 +79,7 @@ afs_MarinerLog(char *astring, struct vcache *avc)
 {
     struct sockaddr_in taddr;
     char *tp, *buf;
+    int tp_len;
     struct iovec dvec;
 
     AFS_STATCNT(afs_MarinerLog);
@@ -89,15 +90,17 @@ afs_MarinerLog(char *astring, struct vcache *avc)
     taddr.sin_len = sizeof(taddr);
 #endif
     tp = buf = osi_AllocSmallSpace(AFS_SMALLOCSIZ);
+    tp_len = AFS_SMALLOCSIZ;
 
     osi_Assert(strlcpy(tp, astring, AFS_SMALLOCSIZ) < AFS_SMALLOCSIZ);
     tp += strlen(astring);
+    tp_len -= strlen(astring);
     if (avc) {
 	char *tp1 = afs_GetMariner(avc);
-	size_t rem_len = AFS_SMALLOCSIZ - (tp - buf) - 1;
-	osi_Assert(rem_len > 0);
 	*tp++ = ' ';
-	strlcpy(tp, tp1, rem_len);
+	tp_len--;
+	osi_Assert(tp_len > strlen(tp1));
+	strlcpy(tp, tp1, tp_len);
 	tp += strlen(tp1);
     }
     *tp++ = '\n';
