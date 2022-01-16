@@ -102,7 +102,7 @@ afs_dir_Create(dir_file_t dir, char *entry, void *voidfid)
     struct DirEntry *ep;
     struct DirHeader *dhp;
     int code;
-    size_t len, rlen;
+    size_t rlen;
 
     /* check name quality */
     if (*entry == 0)
@@ -137,9 +137,8 @@ afs_dir_Create(dir_file_t dir, char *entry, void *voidfid)
      * Note, the sizeof ep->name does not represent the maxium size of the name.
      * FindBlobs has already ensured that the name can fit.
      */
-    len = strlen(entry) + 1;
-    rlen = strlcpy(ep->name, entry, len);
-    if (rlen >= len) {
+    rlen = strlcpy(ep->name, entry, AFSNAMEMAX + 1);
+    if (rlen >= AFSNAMEMAX + 1) {
 	DRelease(&entrybuf, 1);
 	return ENAMETOOLONG;
     }

@@ -48,7 +48,7 @@ afs_AddMarinerName(char *aname, struct vcache *avc)
 	marinerPtr = 1;
     }
     tp = marinerNames[i];
-    osi_Assert(strlcpy(tp, aname, SMAR) < SMAR);
+    strlcpy(tp, aname, SMAR);
     tp[SMAR - 1] = 0;
     marinerVCs[i] = avc;
     return 0;
@@ -97,7 +97,7 @@ afs_MarinerLog(char *astring, struct vcache *avc)
 	size_t rem_len = AFS_SMALLOCSIZ - (tp - buf) - 1;
 	osi_Assert(rem_len > 0);
 	*tp++ = ' ';
-	osi_Assert(strlcpy(tp, tp1, rem_len) < rem_len);
+	strlcpy(tp, tp1, rem_len);
 	tp += strlen(tp1);
     }
     *tp++ = '\n';
