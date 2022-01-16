@@ -713,7 +713,7 @@ afs_DynrootNewVnode(struct vcache *avc, struct AFSFetchStatus *status)
 		linklen = rw + namelen;
 		avc->linkData = afs_osi_Alloc(linklen + 1);
 		osi_Assert(avc->linkData != NULL);
-		osi_Assert(snprintf(avc->linkData, linklen + 1, "%c%s", prefix,
+		osi_Assert(snprintf(avc->linkData, linklen + 1, "%s%s", prefix,
 			   realName) < linklen + 1);
 	    }
 
@@ -760,7 +760,7 @@ afs_DynrootNewVnode(struct vcache *avc, struct AFSFetchStatus *status)
 	    linklen = 1 + namelen + 10;
 	    avc->linkData = afs_osi_Alloc(linklen + 1);
 	    osi_Assert(avc->linkData != NULL);
-	    osi_Assert(snprintf(avc->linkData, linklen + 1, "%c%s:root.cell",
+	    osi_Assert(snprintf(avc->linkData, linklen + 1, "%s%s:root.cell",
 		       prefix, c->cellName) < linklen + 1);
 
 	    status->UnixModeBits = 0644;

@@ -9,6 +9,7 @@
 
 #include <afsconfig.h>
 #include <afs/param.h>
+#include <afs/afsint.h>
 
 #ifdef KERNEL
 # if !defined(UKERNEL)
