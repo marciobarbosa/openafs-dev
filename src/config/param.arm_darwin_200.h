@@ -8,9 +8,7 @@
 #define AFS_64BIT_ENV           1	/* Defines afs_int32 as int, not long. */
 #define AFS_64BIT_CLIENT        1
 #define AFS_64BIT_IOPS_ENV	1
-#if defined(__ppc__)
-#define AFS_PPC_ENV		1
-#elif defined(__i386__) || defined(__amd64__)
+#if defined(__amd64__)
 #define AFS_X86_ENV		1
 #elif defined(__arm64__)
 #define AFS_ARM_ENV		1
@@ -53,54 +51,7 @@
 #define AFS_MOUNT_AFS    "afs"
 
 /* Machine / Operating system information */
-#if defined(__ppc__)
-#define sys_ppc_darwin_12	1
-#define sys_ppc_darwin_13	1
-#define sys_ppc_darwin_14	1
-#define sys_ppc_darwin_60	1
-#define sys_ppc_darwin_70	1
-#define sys_ppc_darwin_80	1
-#define sys_ppc_darwin_90	1
-#define sys_ppc_darwin_100	1
-#define SYS_NAME		"ppc_darwin_100"
-#define SYS_NAME_ID		SYS_NAME_ID_ppc_darwin_100
-#define AFSBIG_ENDIAN		1
-#elif defined(__ppc64__)
-#define sys_ppc_darwin_12	1
-#define sys_ppc_darwin_13	1
-#define sys_ppc_darwin_14	1
-#define sys_ppc_darwin_60	1
-#define sys_ppc_darwin_70	1
-#define sys_ppc_darwin_80	1
-#define sys_ppc_darwin_90	1
-#define sys_ppc_darwin_100	1
-#define sys_ppc64_darwin_100	1
-#define SYS_NAME		"ppc64_darwin_100"
-#define SYS_NAME_ID		SYS_NAME_ID_ppc64_darwin_100
-#define AFSBIG_ENDIAN		1
-#elif defined(__i386__)
-#define sys_x86_darwin_12	1
-#define sys_x86_darwin_13	1
-#define sys_x86_darwin_14	1
-#define sys_x86_darwin_60	1
-#define sys_x86_darwin_70	1
-#define sys_x86_darwin_80	1
-#define sys_x86_darwin_90	1
-#define sys_x86_darwin_100	1
-#define sys_x86_darwin_110      1
-#define sys_x86_darwin_120      1
-#define sys_x86_darwin_130      1
-#define sys_x86_darwin_140	1
-#define sys_x86_darwin_150	1
-#define sys_x86_darwin_160	1
-#define sys_x86_darwin_170	1
-#define sys_x86_darwin_180	1
-#define sys_x86_darwin_190	1
-#define sys_x86_darwin_200	1
-#define SYS_NAME		"x86_darwin_200"
-#define SYS_NAME_ID		SYS_NAME_ID_x86_darwin_200
-#define AFSLITTLE_ENDIAN	1
-#elif defined(__amd64__)
+#if defined(__amd64__)
 #define sys_x86_darwin_12	1
 #define sys_x86_darwin_13	1
 #define sys_x86_darwin_14	1
@@ -178,9 +129,7 @@
 #define AFS_ENV                 1
 #define AFS_64BIT_ENV           1	/* Defines afs_int32 as int, not long. */
 #define AFS_64BIT_CLIENT        1
-#if defined(__ppc__)
-#define AFS_PPC_ENV		1
-#elif defined(__i386__) || defined(__amd64__)
+#if defined(__amd64__)
 #define AFS_X86_ENV		1
 #elif defined(__arm64__)
 #define AFS_ARM_ENV		1
@@ -219,40 +168,7 @@
 #define AFS_MOUNT_AFS    "afs"
 
 /* Machine / Operating system information */
-#if defined(__ppc__)
-#define sys_ppc_darwin_12	1
-#define sys_ppc_darwin_13	1
-#define sys_ppc_darwin_14	1
-#define sys_ppc_darwin_60	1
-#define sys_ppc_darwin_70	1
-#define sys_ppc_darwin_80	1
-#define sys_ppc_darwin_90	1
-#define sys_ppc_darwin_100	1
-#define SYS_NAME		"ppc_darwin_100"
-#define SYS_NAME_ID		SYS_NAME_ID_ppc_darwin_100
-#define AFSBIG_ENDIAN		1
-#elif defined(__i386__)
-#define sys_x86_darwin_12	1
-#define sys_x86_darwin_13	1
-#define sys_x86_darwin_14	1
-#define sys_x86_darwin_60	1
-#define sys_x86_darwin_70	1
-#define sys_x86_darwin_80	1
-#define sys_x86_darwin_100	1
-#define sys_x86_darwin_110	1
-#define sys_x86_darwin_120	1
-#define sys_x86_darwin_130      1
-#define sys_x64_darwin_140	1
-#define sys_x64_darwin_150	1
-#define sys_x64_darwin_160	1
-#define sys_x64_darwin_170	1
-#define sys_x64_darwin_180	1
-#define sys_x64_darwin_190	1
-#define sys_x64_darwin_200	1
-#define SYS_NAME		"x86_darwin_200"
-#define SYS_NAME_ID		SYS_NAME_ID_x86_darwin_200
-#define AFSLITTLE_ENDIAN	1
-#elif defined(__amd64__)
+#if defined(__amd64__)
 #define sys_x86_darwin_12	1
 #define sys_x86_darwin_13	1
 #define sys_x86_darwin_14	1
