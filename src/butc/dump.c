@@ -2028,6 +2028,7 @@ DeleteDump(void *param)
     int allnotfound = 1, onenotfound = 0;
     extern struct udbHandleS udbHandle;
     extern struct deviceSyncNode *deviceLatch;
+    struct ubik_call ucall;
 
     dumpid = ptr->dumpID;
     taskId = ptr->taskId;	/* Get task Id */
@@ -2111,10 +2112,20 @@ DeleteDump(void *param)
 
     /* Query the backup database for list of volumes to delete */
     for (index = next = 0; index != -1; index = next) {
-	rc = ubik_Call_SingleServer(BUDB_GetVolumes, udbHandle.uh_client,
-				    UF_SINGLESERVER, BUDB_MAJORVERSION,
-				    BUDB_OP_DUMPID, tapeName, dumpid, 0,
-				    index, &next, &dbTime, &vl);
+	memset(&ucall, 0, sizeof(ucall));
+	ucall.func = BUDB_GETVOLUMES;
+	ucall.args.getvol.majorVersion = BUDB_MAJORVERSION;
+	ucall.args.getvol.flags = BUDB_OP_DUMPID;
+	ucall.args.getvol.name = tapeName;
+	ucall.args.getvol.start = dumpid;
+	ucall.args.getvol.end = 0;
+	ucall.args.getvol.index = index;
+	ucall.args.getvol.nextIndex = &next;
+	ucall.args.getvol.dbUpdate = &dbTime;
+	ucall.args.getvol.volumes = &vl;
+
+	rc = ubik_Call_SingleServer(udbHandle.uh_client, UF_SINGLESERVER,
+				    ucall);
 	if (rc) {
 	    if (rc == BUDB_ENDOFLIST)
 		break;

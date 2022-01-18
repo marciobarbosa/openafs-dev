@@ -408,6 +408,7 @@ writeDbDump(struct butm_tapeInfo *tapeInfoPtr, afs_uint32 taskId,
 #else
     PROCESS alivePid;
 #endif
+    struct ubik_call ucall;
 
     extern struct tapeConfig globalTapeConfig;
     extern struct udbHandleS udbHandle;
@@ -454,11 +455,16 @@ writeDbDump(struct butm_tapeInfo *tapeInfoPtr, afs_uint32 taskId,
 		charList.charListT_val = 0;
 	    }
 
+	    memset(&ucall, 0, sizeof(ucall));
+	    ucall.func = BUDB_DUMPDB;
+	    ucall.args.dumpdb.firstcall = firstcall;
+	    ucall.args.dumpdb.maxLength = maxReadSize;
+	    ucall.args.dumpdb.charListPtr = &charList;
+	    ucall.args.dumpdb.flags = &done;
+
 	    /* get the data */
-	    code =
-		ubik_Call_SingleServer(BUDB_DumpDB, udbHandle.uh_client,
-				       UF_SINGLESERVER, firstcall,
-				       maxReadSize, &charList, &done);
+	    code = ubik_Call_SingleServer(udbHandle.uh_client, UF_SINGLESERVER,
+					  ucall);
 	    if (code) {
 		ErrorLog(0, taskId, code, 0, "Can't read database\n");
 		ERROR_EXIT(code);
@@ -610,9 +616,11 @@ writeDbDump(struct butm_tapeInfo *tapeInfoPtr, afs_uint32 taskId,
 
   error_exit:
     /* Let the KeepAlive process stop on its own */
-    code =
-	ubik_Call_SingleServer(BUDB_DumpDB, udbHandle.uh_client,
-			       UF_END_SINGLESERVER, 0);
+    memset(&ucall, 0, sizeof(ucall));
+    ucall.func = BUDB_DUMPDB;
+
+    code = ubik_Call_SingleServer(udbHandle.uh_client, UF_END_SINGLESERVER,
+				  ucall);
 
     if (writeBlock)
 	free(writeBlock);
@@ -1117,6 +1125,7 @@ KeepAlive(void *unused)
     charListT charList;
     afs_int32 code;
     afs_int32 done;
+    struct ubik_call ucall;
 
     extern struct udbHandleS udbHandle;
 
@@ -1129,9 +1138,14 @@ KeepAlive(void *unused)
 #endif
 	charList.charListT_val = 0;
 	charList.charListT_len = 0;
-	code =
-	    ubik_Call_SingleServer(BUDB_DumpDB, udbHandle.uh_client,
-				   UF_SINGLESERVER, 0, 0, &charList, &done);
+
+	memset(&ucall, 0, sizeof(ucall));
+	ucall.func = BUDB_DUMPDB;
+	ucall.args.dumpdb.charListPtr = &charList;
+	ucall.args.dumpdb.flags = &done;
+
+	code = ubik_Call_SingleServer(udbHandle.uh_client, UF_SINGLESERVER,
+				      ucall);
 	if (code || done)
 	    break;
     }
