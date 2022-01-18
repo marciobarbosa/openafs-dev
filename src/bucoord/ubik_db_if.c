@@ -984,6 +984,33 @@ struct ubikCallState {
 
 static struct ubikCallState uServer;
 
+static int
+ubik_Call_Proc(struct rx_connection *tc, struct ubik_call ucall)
+{
+    int code;
+
+    switch (ucall.func) {
+    case BUDB_GETVOLUMES:
+	code = BUDB_GetVolumes(tc, ucall.args.getvol.majorVersion,
+			       ucall.args.getvol.flags, ucall.args.getvol.name,
+			       ucall.args.getvol.start, ucall.args.getvol.end,
+			       ucall.args.getvol.index,
+			       ucall.args.getvol.nextIndex,
+			       ucall.args.getvol.dbUpdate,
+			       ucall.args.getvol.volumes);
+	break;
+    case BUDB_DUMPDB:
+	code = BUDB_DumpDB(tc, ucall.args.dumpdb.firstcall,
+			   ucall.args.dumpdb.maxLength,
+			   ucall.args.dumpdb.charListPtr,
+			   ucall.args.dumpdb.flags);
+	break;
+    default:
+	code = BUDB_BADARGUMENT;
+    }
+    return code;
+}
+
 /* ubik_Call_SingleServer
  *	variant of ubik_Call. This is used by the backup system to initiate
  *	a series of calls to a single ubik server. The first call sets up
@@ -995,11 +1022,8 @@ static struct ubikCallState uServer;
  */
 
 afs_int32
-ubik_Call_SingleServer(int (*aproc) (), struct ubik_client *aclient,
-		       afs_int32 aflags, char *p1, char *p2, char *p3,
-		       char *p4, char *p5, char *p6, char *p7, char *p8,
-		       char *p9, char *p10, char *p11, char *p12, char *p13,
-		       char *p14, char *p15, char *p16)
+ubik_Call_SingleServer(struct ubik_client *aclient, afs_int32 aflags,
+		       struct ubik_call ucall)
 {
     afs_int32 code;
     afs_int32 someCode;
@@ -1015,9 +1039,7 @@ ubik_Call_SingleServer(int (*aproc) (), struct ubik_client *aclient,
 	    /* have a selected server */
 	    tc = aclient->conns[uServer.ucs_selectedServer];
 
-	    code =
-		(*aproc) (tc, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11,
-			  p12, p13, p14, p15, p16);
+	    code = ubik_Call_Proc(tc, ucall);
 	    if (code) {
 		/* error. Clean up single server state */
 		memset(&uServer, 0, sizeof(uServer));
@@ -1049,9 +1071,7 @@ ubik_Call_SingleServer(int (*aproc) (), struct ubik_client *aclient,
 	    continue;		/* this guy's down, try someone else first */
 	}
 
-	code =
-	    (*aproc) (tc, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12,
-		      p13, p14, p15, p16);
+	code = ubik_Call_Proc(tc, ucall);
 
 	/* note that getting a UNOTSYNC error code back does *not* guarantee
 	 * that there is a sync site yet elected.  However, if there is a

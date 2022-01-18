@@ -2849,6 +2849,7 @@ dumpInfo(afs_int32 dumpid, afs_int32 detailFlag)
     struct tapeLink *head = 0;
     struct tapeLink *tapeLinkPtr, *lastTapeLinkPtr;
     struct volumeLink **link, *volumeLinkPtr, *lastVolumeLinkPtr;
+    struct ubik_call ucall;
 
     budb_volumeList vl;
     afs_int32 last, next, dbTime;
@@ -2936,14 +2937,21 @@ dumpInfo(afs_int32 dumpid, afs_int32 detailFlag)
 	    vl.budb_volumeList_val = 0;
 	    last = next;
 
+	    memset(&ucall, 0, sizeof(ucall));
+	    ucall.func = BUDB_GETVOLUMES;
+	    ucall.args.getvol.majorVersion = BUDB_MAJORVERSION;
+	    ucall.args.getvol.flags = BUDB_OP_DUMPID | BUDB_OP_TAPENAME;
+	    ucall.args.getvol.name = tapeLinkPtr->tapeEntry.name; /* tape name */
+	    ucall.args.getvol.start = dumpid;		/* dumpid (not initial dumpid) */
+	    ucall.args.getvol.end = 0;			/* end */
+	    ucall.args.getvol.index = last;		/* last */
+	    ucall.args.getvol.nextIndex = &next;	/* nextindex */
+	    ucall.args.getvol.dbUpdate = &dbTime;	/* update time */
+	    ucall.args.getvol.volumes = &vl;
+
 	    /* now get all the volumes in this dump. */
-	    code = ubik_Call_SingleServer(BUDB_GetVolumes, udbHandle.uh_client, UF_SINGLESERVER, BUDB_MAJORVERSION, BUDB_OP_DUMPID | BUDB_OP_TAPENAME, tapeLinkPtr->tapeEntry.name,	/* tape name */
-					  dumpid,	/* dumpid (not initial dumpid) */
-					  0,	/* end */
-					  last,	/* last */
-					  &next,	/* nextindex */
-					  &dbTime,	/* update time */
-					  &vl);
+	    code = ubik_Call_SingleServer(udbHandle.uh_client, UF_SINGLESERVER,
+					  ucall);
 
 	    if (code) {
 		if (code == BUDB_ENDOFLIST) {	/* 0 volumes on tape */
