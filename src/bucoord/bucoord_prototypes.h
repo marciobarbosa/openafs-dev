@@ -58,5 +58,40 @@ extern afs_int32 udbClientInit(int noAuthFlag, int localauth, char *cellName);
 struct ktc_token;
 extern int vldbClientInit(int noAuthFlag, int localauth, char *cellName,
                           struct ubik_client **cstruct, time_t *expires);
+
+#define BUDB_GETVOLUMES	0
+#define BUDB_DUMPDB	1
+
+struct budb_getvolumes_args {
+    afs_int32 majorVersion;
+    afs_int32 flags;
+    char *name;
+    afs_int32 start;
+    afs_int32 end;
+    afs_int32 index;
+    afs_int32 *nextIndex;
+    afs_int32 *dbUpdate;
+    budb_volumeList *volumes;
+};
+
+struct budb_dumpdb_args {
+    int firstcall;
+    afs_int32 maxLength;
+    charListT *charListPtr;
+    afs_int32 *flags;
+};
+
+struct ubik_call {
+    int func;
+    union {
+	struct budb_getvolumes_args getvol;
+	struct budb_dumpdb_args dumpdb;
+    } args;
+};
+
+extern afs_int32 ubik_Call_SingleServer(struct ubik_client *aclient,
+					afs_int32 aflags,
+					struct ubik_call ucall);
+
 #endif
 
