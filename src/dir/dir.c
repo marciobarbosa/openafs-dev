@@ -47,6 +47,7 @@
 # else /* !defined(UKERNEL) */
 #  include "afs/stds.h"
 #  include "afs/sysincludes.h"
+#  include "roken/libuafs/roken.h"
 # endif /* !defined(UKERNEL) */
 
 /* afs_buffer.c */
