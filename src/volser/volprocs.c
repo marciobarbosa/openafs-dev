@@ -96,7 +96,8 @@ static afs_int32 VolForward(struct rx_call *, afs_int32, afs_int32,
 			    struct destServer *destination, afs_int32,
 			    struct restoreCookie *cookie);
 static afs_int32 VolDump(struct rx_call *, afs_int32, afs_int32, afs_int32);
-static afs_int32 VolRestore(struct rx_call *, afs_int32, struct restoreCookie *);
+static afs_int32 VolRestore(struct rx_call *, afs_int32, afs_int32,
+			    struct restoreCookie *);
 static afs_int32 VolEndTrans(struct rx_call *, afs_int32, afs_int32 *);
 static afs_int32 VolSetForwarding(struct rx_call *, afs_int32, afs_int32);
 static afs_int32 VolGetStatus(struct rx_call *, afs_int32,
@@ -1533,13 +1534,14 @@ SAFSVolRestore(struct rx_call *acid, afs_int32 atrans, afs_int32 aflags,
 {
     afs_int32 code;
 
-    code = VolRestore(acid, atrans, cookie);
+    code = VolRestore(acid, atrans, aflags, cookie);
     osi_auditU(acid, VS_RestoreEvent, code, AUD_LONG, atrans, AUD_END);
     return code;
 }
 
 static afs_int32
-VolRestore(struct rx_call *acid, afs_int32 atrans, struct restoreCookie *cookie)
+VolRestore(struct rx_call *acid, afs_int32 atrans, afs_int32 aflags,
+	   struct restoreCookie *cookie)
 {
     struct volser_trans *tt;
     afs_int32 code, tcode;
@@ -1564,7 +1566,7 @@ VolRestore(struct rx_call *acid, afs_int32 atrans, struct restoreCookie *cookie)
 
     DFlushVolume(V_parentId(tt->volume)); /* Ensure dir buffers get dropped */
 
-    code = RestoreVolume(acid, tt->volume, cookie);
+    code = RestoreVolume(acid, tt->volume, (aflags & 1), cookie);	/* last is incrementalp */
     FSYNC_VolOp(tt->volid, NULL, FSYNC_VOL_BREAKCBKS, 0l, NULL);
     TClearRxCall(tt);
     tcode = TRELE(tt);
