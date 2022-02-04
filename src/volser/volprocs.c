@@ -1364,6 +1364,7 @@ SAFSVolForwardMultiple(struct rx_call *acid, afs_int32 fromTrans, afs_int32
     struct rx_call **tcalls;
     struct Volume *vp;
     int i, is_incremental;
+    int code_i;
 
     if (results) {
 	memset(results, 0, sizeof(manyResults));
@@ -1437,6 +1438,11 @@ SAFSVolForwardMultiple(struct rx_call *acid, afs_int32 fromTrans, afs_int32
     /* these next calls implictly call rx_Write when writing out data */
     code = DumpVolMulti(tcalls, i, vp, fromDate, 0, codes);
 
+    for (code_i = 0; code_i < i; code_i++) {
+	if (codes[code_i] == VOLSERDUMPERROR) {
+	    codes[code_i] = DumpVolume(tcalls[code_i], vp, 0, 1);
+	}
+    }
 
   fail:
     for (i--; i >= 0; i--) {

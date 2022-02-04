@@ -50,6 +50,7 @@
 struct RestoreInfo {
     afs_int32 filecount;
     afs_int32 diskused;
+    afs_int32 oldest_mtime;
     /*
      * If del_vnodes[class][n] is nonzero, it means to delete vnode with index
      * n, and del_vnodes[class][n] is the offset in the vnode index for that
@@ -1203,7 +1204,6 @@ RestoreVolume(struct rx_call *call, Volume * avp, int incremental,
     struct RestoreInfo rinfo;
 
     iod_Init(iodp, call);
-    memset(&rinfo, 0, sizeof(rinfo));
 
     vp = avp;
 
@@ -1224,6 +1224,9 @@ RestoreVolume(struct rx_call *call, Volume * avp, int incremental,
 	    V_id(vp));
 	return VOLSERREAD_DUMPERROR;
     }
+
+    memset(&rinfo, 0, sizeof(rinfo));
+    rinfo.oldest_mtime = vol.updateDate;
 
     if (!delo)
 	delo = ProcessIndex(vp, vLarge, &rinfo, 0);
@@ -1285,12 +1288,19 @@ RestoreVolume(struct rx_call *call, Volume * avp, int incremental,
 	}
     }
 
-    if (rinfo.filecount != vol.filecount || rinfo.diskused != vol.diskused) {
-	Log("Restore %" AFS_VOLID_FMT ": filecount %d -> %d diskused %d -> %d\n",
-	    afs_printable_VolumeId_lu(V_id(vp)), vol.filecount, rinfo.filecount,
-	    vol.diskused, rinfo.diskused);
-	vol.filecount = rinfo.filecount;
-	vol.diskused = rinfo.diskused;
+    if (rinfo.filecount != vol.filecount || rinfo.diskused != vol.diskused ||
+	rinfo.oldest_mtime < vol.copyDate) {
+	if (!incremental) {
+	    Log("Restore %" AFS_VOLID_FMT ": filecount %d -> %d diskused %d -> "
+		"%d\n", afs_printable_VolumeId_lu(V_id(vp)), vol.filecount,
+		rinfo.filecount, vol.diskused, rinfo.diskused);
+	    vol.filecount = rinfo.filecount;
+	    vol.diskused = rinfo.diskused;
+	} else {
+	    /* force a full dump */
+	    error = VOLSERDUMPERROR;
+	    goto clean;
+	}
     }
 
   clean:
@@ -1392,6 +1402,8 @@ ReadVnodes(struct iod *iodp, Volume * vp, int incremental,
 	    case 's':
 		if (!ReadInt32(iodp, &vnode->serverModifyTime))
 		    return VOLSERREAD_DUMPERROR;
+		if (vnode->serverModifyTime < rinfo->oldest_mtime)
+		    rinfo->oldest_mtime = vnode->serverModifyTime;
 		break;
 	    case 'a':
 		if (!ReadInt32(iodp, &vnode->author))
