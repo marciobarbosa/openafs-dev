@@ -1297,6 +1297,13 @@ RestoreVolume(struct rx_call *call, Volume * avp, int incremental,
 	    vol.filecount = rinfo.filecount;
 	    vol.diskused = rinfo.diskused;
 	} else {
+	    Log("<marcio> filecount %d but should be %d\n", rinfo.filecount,
+		vol.filecount);
+	    Log("<marcio> diskused %d but should be %d\n", rinfo.diskused,
+		vol.diskused);
+	    Log("<marcio> oldest mtime is %d but volume created at %d\n",
+		rinfo.oldest_mtime, vol.copyDate);
+	    Log("<marcio> ----------\n");
 	    /* force a full dump */
 	    error = VOLSERDUMPERROR;
 	    goto clean;

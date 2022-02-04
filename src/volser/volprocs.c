@@ -1440,6 +1440,7 @@ SAFSVolForwardMultiple(struct rx_call *acid, afs_int32 fromTrans, afs_int32
 
     for (code_i = 0; code_i < i; code_i++) {
 	if (codes[code_i] == VOLSERDUMPERROR) {
+	    Log("<marcio> Dump is corrupted. Trying again (full dump)\n");
 	    codes[code_i] = DumpVolume(tcalls[code_i], vp, 0, 1);
 	}
     }
