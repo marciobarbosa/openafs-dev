@@ -1267,6 +1267,7 @@ VolForward(struct rx_call *acid, afs_int32 fromTrans, afs_int32 fromDate,
     struct rx_securityClass *securityObject;
     afs_int32 securityIndex;
     char caller[MAXKTCNAMELEN];
+    int is_incremental;
 
     if (!afsconf_SuperUser(tdir, acid, caller))
 	return VOLSERBAD_ACCESS;	/*not a super user */
@@ -1282,6 +1283,21 @@ VolForward(struct rx_call *acid, afs_int32 fromTrans, afs_int32 fromDate,
     }
     vp = tt->volume;
     TSetRxCall(tt, NULL, "Forward");
+
+    if (fromDate > V_updateDate(vp)) {
+	Log("1 Volser: VolForward: volume %s (%u) appears to have been "
+	    "partially or completely restored to an earlier version "
+	    "(updateDate of read-only copy(ies) is moving from %u to %u). This "
+	    "is allowed, but may indicate a mistake in whatever tool is "
+	    "releasing this volume. If this volume appears corrupted, this is "
+	    "probably why. In an effort to mitigate the possible undesirable "
+	    "side effects of this operation, force a full release.\n",
+	    V_name(vp), V_id(vp), fromDate, V_updateDate(vp));
+	fromDate = 0;
+    }
+
+    /* (fromDate == 0) ==> full dump */
+    is_incremental = (fromDate ? 1 : 0);
 
     /* get auth info for the this connection (uses afs from ticket file) */
     code = MakeClient(acid, &securityObject, &securityIndex);
@@ -1306,7 +1322,7 @@ VolForward(struct rx_call *acid, afs_int32 fromTrans, afs_int32 fromDate,
     tcall = rx_NewCall(tcon);
     TSetRxCall(tt, tcall, "Forward");
     /* start restore going.  fromdate == 0 --> doing an incremental dump/restore */
-    code = StartAFSVolRestore(tcall, destTrans, (fromDate ? 1 : 0), cookie);
+    code = StartAFSVolRestore(tcall, destTrans, is_incremental, cookie);
     if (code) {
 	goto fail;
     }
@@ -1384,6 +1400,18 @@ SAFSVolForwardMultiple(struct rx_call *acid, afs_int32 fromTrans, afs_int32
     }
     vp = tt->volume;
     TSetRxCall(tt, NULL, "ForwardMulti");
+
+    if (fromDate > V_updateDate(vp)) {
+	Log("1 Volser: VolForward: volume %s (%u) appears to have been "
+	    "partially or completely restored to an earlier version "
+	    "(updateDate of read-only copy(ies) is moving from %u to %u). This "
+	    "is allowed, but may indicate a mistake in whatever tool is "
+	    "releasing this volume. If this volume appears corrupted, this is "
+	    "probably why. In an effort to mitigate the possible undesirable "
+	    "side effects of this operation, force a full release.\n",
+	    V_name(vp), V_id(vp), fromDate, V_updateDate(vp));
+	fromDate = 0;
+    }
 
     /* (fromDate == 0) ==> full dump */
     is_incremental = (fromDate ? 1 : 0);
