@@ -128,7 +128,8 @@ extern afs_int32 afs_rx_idledead_rep;
 struct sysname_info {
     char *name;
     short offset;
-    signed char index, allocked;
+    signed char index;
+    size_t allocated_size;
 };
 
 /* flags to use with AFSOP_CACHEINIT */
