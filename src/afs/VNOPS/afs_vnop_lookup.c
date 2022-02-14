@@ -493,33 +493,50 @@ afs_ENameOK(char *aname)
 
 static int
 afs_getsysname(struct vrequest *areq, struct vcache *adp,
-	       char *bufp, int *num, char **sysnamelist[])
+	       char *bufp, size_t bufsize, int *num, char **sysnamelist[])
 {
-    struct unixuser *au;
-    afs_int32 error;
+    struct unixuser *au = NULL;
+    afs_int32 error, code = 0;
+    size_t rlen;
 
     AFS_STATCNT(getsysname);
 
     *sysnamelist = afs_sysnamelist;
 
-    if (!afs_nfsexporter)
-	strcpy(bufp, (*sysnamelist)[0]);
-    else {
+    if (!afs_nfsexporter) {
+	rlen = strlcpy(bufp, (*sysnamelist)[0], bufsize);
+	if (rlen >= bufsize) {
+	    code = -1;
+	    goto done;
+	}
+    } else {
 	au = afs_GetUser(areq->uid, adp->f.fid.Cell, READ_LOCK);
 	if (au->exporter) {
 	    error = EXP_SYSNAME(au->exporter, (char *)0, sysnamelist, num, 0);
 	    if (error) {
-		strcpy(bufp, "@sys");
-		afs_PutUser(au, READ_LOCK);
-		return -1;
+		strlcpy(bufp, "@sys", bufsize);
+		code = -1;
+		goto done;
 	    } else {
-		strcpy(bufp, (*sysnamelist)[0]);
+		rlen = strlcpy(bufp, (*sysnamelist)[0], bufsize);
+		if (rlen >= bufsize) {
+		    code = -1;
+		    goto done;
+		}
 	    }
-	} else
-	    strcpy(bufp, afs_sysname);
+	} else {
+	    rlen = strlcpy(bufp, afs_sysname, bufsize);
+	    if (rlen >= bufsize) {
+		code = -1;
+		goto done;
+	    }
+	}
+    }
+ done:
+    if (au != NULL) {
 	afs_PutUser(au, READ_LOCK);
     }
-    return 0;
+    return code;
 }
 
 void
@@ -534,7 +551,8 @@ Check_AtSys(struct vcache *avc, const char *aname,
 	state->name = osi_AllocLargeSpace(MAXSYSNAME);
 	state->allocated_size = MAXSYSNAME;
 	state->index =
-	    afs_getsysname(areq, avc, state->name, &num, sysnamelist);
+	    afs_getsysname(areq, avc, state->name, MAXSYSNAME, &num,
+			   sysnamelist);
     } else {
 	state->offset = -1;
 	state->allocated_size = 0;
@@ -548,7 +566,8 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	   struct sysname_info *state)
 {
     int num = afs_sysnamecount;
-    char **sysnamelist[MAXNUMSYSNAMES];
+    char **sysnamelist[MAXNUMSYSNAMES], *buf;
+    size_t bsz;
 
     if (state->index == -1)
 	return 0;		/* No list */
@@ -562,15 +581,32 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	    /*Move to the end of the string */ ;
 
 	if ((tname > state->name + 4) && (AFS_EQ_ATSYS(tname - 4))) {
-	    state->offset = (tname - 4) - state->name;
+	    int idx;
+	    size_t len;
+
+	    len = (tname - 4) - state->name;
+	    if (len >= AFS_LRALLOCSIZ) {
+		return 0;
+	    }
+
 	    tname = osi_AllocLargeSpace(AFS_LRALLOCSIZ);
-	    strncpy(tname, state->name, state->offset);
-	    state->name = tname;
-	    state->allocated_size = AFS_LRALLOCSIZ;
+	    /* intentionally truncating state->name */
+	    strlcpy(tname, state->name, len + 1);
+
+	    buf = tname + len;
+	    bsz = AFS_LRALLOCSIZ - len;
 	    num = 0;
-	    state->index =
-		afs_getsysname(areq, avc, state->name + state->offset, &num,
-			       sysnamelist);
+	    idx = afs_getsysname(areq, avc, buf, bsz, &num, sysnamelist);
+	    if (idx == -1) {
+		osi_FreeLargeSpace(tname);
+		return 0;
+	    }
+
+	    state->name = tname;
+	    state->offset = len;
+	    state->allocated_size = AFS_LRALLOCSIZ;
+	    state->index = idx;
+
 	    return 1;
 	} else
 	    return 0;		/* .*@sys doesn't match either */
@@ -595,7 +631,13 @@ Next_AtSys(struct vcache *avc, struct vrequest *areq,
 	if (++(state->index) >= num || !(*sysnamelist)[(unsigned int)state->index])
 	    return 0;		/* end of list */
     }
-    strcpy(state->name + state->offset, (*sysnamelist)[(unsigned int)state->index]);
+
+    buf = state->name + state->offset;
+    bsz = state->allocated_size - state->offset;
+    if (strlcpy(buf, (*sysnamelist)[(unsigned int)state->index], bsz) >= bsz) {
+	state->index = -1;
+	return 0;
+    }
     return 1;
 }
 
