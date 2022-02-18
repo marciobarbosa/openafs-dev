@@ -3428,6 +3428,7 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 	if (!roexists) {
 	    complete_release |= CR_RO_MISSING;	/* Do a complete release if RO clone does not exist */
 	} else {
+	    afs_uint32 trwupdate, tclupdate;
 	    /* Begin transaction on RW and mark it busy while we query it */
 	    code = AFSVolTransCreate_retry(
 			fromconn, afromvol, afrompart, ITBusy, &fromtid
@@ -3440,6 +3441,7 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 	    ONERROR(code, afromvol,
 		    "Failed to get the status of RW volume %u\n");
 	    rwcrdate = volstatus.creationDate;
+	    trwupdate = volstatus.updateDate;
 
 	    /* End transaction on RW */
 	    code = AFSVolEndTrans(fromconn, fromtid, &rcode);
@@ -3459,6 +3461,7 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 	    ONERROR(code, cloneVolId,
 		    "Failed to get the status of RW clone %u\n");
 	    clcrdate = volstatus.creationDate;
+	    tclupdate = volstatus.updateDate;
 
 	    /* End transaction on clone */
 	    code = AFSVolEndTrans(fromconn, clonetid, &rcode);
@@ -3466,8 +3469,12 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 	    ONERROR((code ? code : rcode), cloneVolId,
 		    "Failed to end transaction on RW clone %u\n");
 
-	    if (rwcrdate > clcrdate)
-		complete_release |= CR_NEW_RW; /* Do a complete release if RO clone older than RW */
+	    /*
+	     * Do a complete release if RO clone is older than RW or if the RW
+	     * was incrementally restored to an earlier version.
+	     */
+	    if (rwcrdate > clcrdate || tclupdate > trwupdate)
+		complete_release |= CR_NEW_RW;
 	}
     }
 
@@ -3517,6 +3524,7 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 
     if (complete_release) {
 	afs_int32 oldest = 0;
+	afs_int32 lastup = 0;
 	/* If the RO clone exists, then if the clone is a temporary
 	 * clone, delete it. Or if the RO clone is marked RO_DONTUSE
 	 * (it was recently added), then also delete it. We do not
@@ -3539,7 +3547,7 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 	    for (vldbindex = 0; vldbindex < entry.nServers; vldbindex++) {
 		volEntries volumeInfo;
 		struct rx_connection *conn;
-		afs_int32 crdate;
+		afs_int32 crdate, update;
 
 		if (!(entry.serverFlags[vldbindex] & VLSF_ROVOL)) {
 		    continue;
@@ -3570,9 +3578,13 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 		}
 
 		crdate = CLOCKADJ(volumeInfo.volEntries_val[0].creationDate);
+		update = CLOCKADJ(volumeInfo.volEntries_val[0].updateDate);
 
 		if (oldest == 0 || crdate < oldest) {
 		    oldest = crdate;
+		}
+		if (update > lastup) {
+		    lastup = update;
 		}
 
 		rx_DestroyConnection(conn);
@@ -3602,8 +3614,11 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 		volumeInfo.volEntries_len = 0;
 	    }
 	}
-	if (justnewsites && oldest <= rwupdate) {
-	    /* RW has changed */
+	if (justnewsites && (oldest <= rwupdate || lastup > rwupdate)) {
+	    /*
+	     * RW has been updated or incrementally restored to an earlier
+	     * version.
+	     */
 	    justnewsites = 0;
 	}
 
@@ -3845,6 +3860,18 @@ UV_ReleaseVolume(afs_uint32 afromvol, afs_uint32 afromserver,
 		 */
 		VPRINT
 		    ("This will be a full dump: read-write volume was replaced\n");
+		thisdate = 0;
+	    } else if (orig_status.updateDate < times[volcount].uptime) {
+		/*
+		 * The volserver doesn't prevent restoring older volume data to
+		 * a volume. In an effort to mitigate the possible undesirable
+		 * side effects of this operation, force a full release.
+		 */
+		VPRINT("This will be a full dump: read-write volume was "
+		       "replaced by an earlier version. This is allowed, but "
+		       "may indicate a mistake in whatever tool is "
+		       "restoring/releasing this volume. If this volume "
+		       "appears corrupted, this is probably why.\n");
 		thisdate = 0;
 	    } else if (remembertime[vldbindex].validtime) {
 		/* Trans was prev ended. Use the time from the prev trans
