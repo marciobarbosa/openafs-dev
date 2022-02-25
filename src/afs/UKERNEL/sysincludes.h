@@ -202,7 +202,6 @@ typedef unsigned int fsblkcnt_t;
 #define statfs			usr_statfs
 #define file			usr_file
 #define dirent			usr_dirent
-#define flock			usr_flock
 #define fid			usr_fid
 #define sysent			usr_sysent
 #define ifaddr                  usr_ifaddr
@@ -1109,7 +1108,7 @@ struct usr_socket {
 
 struct vcache;
 #define afs_ucred_t struct usr_ucred
-#define AFS_FLOCK       flock
+#define AFS_FLOCK   usr_flock
 
 
 struct usr_vnodeops {
