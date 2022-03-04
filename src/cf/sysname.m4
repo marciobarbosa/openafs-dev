@@ -198,6 +198,14 @@ else
 			AFS_SYSNAME="arm_darwin_200"
 			OSXSDK="macosx11.0"
 			;;
+		x86_64-apple-darwin21.*)
+			AFS_SYSNAME="x86_darwin_210"
+			OSXSDK="macosx12.0"
+			;;
+		arm-apple-darwin21.*)
+			AFS_SYSNAME="arm_darwin_210"
+			OSXSDK="macosx12.0"
+			;;
                 sparc-sun-solaris2.8)
                         AFS_SYSNAME="sun4x_58"
                         ;;
@@ -375,6 +383,7 @@ case $AFS_SYSNAME in
     *_linux_26) AFS_PARAM_COMMON=param.linux26.h ;;
     *_fbsd_*)   AFS_PARAM_COMMON=param.generic_fbsd.h ;;
     *_darwin_200) AFS_PARAM_COMMON=param.generic_darwin_200.h ;;
+    *_darwin_210) AFS_PARAM_COMMON=param.generic_darwin_210.h ;;
 esac
 
 case $AFS_SYSNAME in
@@ -386,6 +395,19 @@ case $AFS_SYSNAME in
                 fi
                 if test "${ARCH_arm64}" = "yes" ; then
                     AFS_PARAM="${AFS_PARAM} param.arm_darwin_200.h"
+                fi
+                if test "x${AFS_PARAM}" = "x" ; then
+                    AFS_PARAM=param.${AFS_SYSNAME}.h
+                fi
+                ;;
+        *_darwin_210)
+                ARCH_amd64=$(echo "${ARCHFLAGS}" | grep -q -w x86_64 && echo yes)
+                ARCH_arm64=$(echo "${ARCHFLAGS}" | grep -q -w arm64 && echo yes)
+                if test "${ARCH_amd64}" = "yes" ; then
+                    AFS_PARAM=param.x86_darwin_210.h
+                fi
+                if test "${ARCH_arm64}" = "yes" ; then
+                    AFS_PARAM="${AFS_PARAM} param.arm_darwin_210.h"
                 fi
                 if test "x${AFS_PARAM}" = "x" ; then
                     AFS_PARAM=param.${AFS_SYSNAME}.h
