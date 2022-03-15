@@ -1,0 +1,7 @@
+#!/bin/bash
+
+make clean
+./regen.sh
+rm src/libuafs/libuafs.a
+ARCHFLAGS="-arch x86_64 -arch arm64" ./configure --enable-transarc-paths --enable-debug --enable-debug-kernel --with-krb5-conf=/usr/bin/krb5-config --libdir=/Library/OpenAFS/Tools/lib
+ARCHFLAGS="-arch x86_64 -arch arm64" make dest
