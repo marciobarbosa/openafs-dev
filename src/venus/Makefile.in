@@ -7,7 +7,7 @@
 
 srcdir=@srcdir@
 include @TOP_OBJDIR@/src/config/Makefile.config
-include @TOP_OBJDIR@/src/config/Makefile.lwp
+include @TOP_OBJDIR@/src/config/Makefile.pthread
 
 INCLS=${TOP_INCDIR}/afs/afsint.h \
 	${TOP_INCDIR}/afs/cmd.h \
@@ -31,36 +31,33 @@ AFSIO_LIBS = \
 	$(top_builddir)/src/util/liboafs_util.la \
 	$(top_builddir)/src/opr/liboafs_opr.la
 
-FSLIBS=${TOP_LIBDIR}/libsys.a \
-	 ${TOP_LIBDIR}/libvldb.a \
-	 ${TOP_LIBDIR}/libubik.a \
-	 ${TOP_LIBDIR}/vlib.a \
-	 ${TOP_LIBDIR}/libauth.a \
-	 ${TOP_LIBDIR}/librxkad.a \
-	 ${TOP_LIBDIR}/libafscom_err.a \
-	 ${TOP_LIBDIR}/libcmd.a \
-	 ${TOP_LIBDIR}/libkauth.a \
-	 ${TOP_LIBDIR}/librx.a \
-	 ${TOP_LIBDIR}/libsys.a \
-	 ${TOP_LIBDIR}/liblwp.a \
-	 ${TOP_LIBDIR}/libaudit.a \
-	 $(TOP_LIBDIR)/libafsutil.a \
-	 $(TOP_LIBDIR)/libopr.a \
-	 ${TOP_LIBDIR}/libafsrfc3961.a \
-	 ${TOP_LIBDIR}/libafshcrypto_lwp.a
+FSLIBS= \
+	$(top_builddir)/src/sys/liboafs_sys.la \
+	$(top_builddir)/src/vlserver/liboafs_vldb.la \
+	$(top_builddir)/src/ubik/liboafs_ubik.la \
+	$(top_builddir)/src/auth/liboafs_auth.la \
+	$(top_builddir)/src/rxkad/liboafs_rxkad.la \
+	$(top_builddir)/src/comerr/liboafs_comerr.la \
+	$(top_builddir)/src/cmd/liboafs_cmd.la \
+	$(top_builddir)/src/kauth/liboafs_kauth.la \
+	$(top_builddir)/src/rx/liboafs_rx.la \
+	$(top_builddir)/src/audit/liboafs_audit.la \
+	$(top_builddir)/src/util/liboafs_util.la \
+	$(top_builddir)/src/opr/liboafs_opr.la \
+	$(top_builddir)/src/crypto/rfc3961/liboafs_rfc3961.la \
+	$(top_builddir)/src/crypto/hcrypto/libafshcrypto.la
 
-CMLIBS=${TOP_LIBDIR}/libsys.a \
-	 ${TOP_LIBDIR}/libafsint.a \
-	 ${TOP_LIBDIR}/librxkad.a \
-	 ${TOP_LIBDIR}/libauth.a \
-	 ${TOP_LIBDIR}/libafscom_err.a \
-	 ${TOP_LIBDIR}/libcmd.a \
-	 ${TOP_LIBDIR}/librx.a \
-	 ${TOP_LIBDIR}/libafshcrypto_lwp.a \
-	 ${TOP_LIBDIR}/libsys.a \
-	 ${TOP_LIBDIR}/liblwp.a \
-	 $(TOP_LIBDIR)/libopr.a \
-	 $(TOP_LIBDIR)/libafsutil.a
+CMLIBS= \
+	$(top_builddir)/src/sys/liboafs_sys.la \
+	$(top_builddir)/src/fsint/liboafs_fsint.la \
+	$(top_builddir)/src/rxkad/liboafs_rxkad.la \
+	$(top_builddir)/src/auth/liboafs_auth.la \
+	$(top_builddir)/src/comerr/liboafs_comerr.la \
+	$(top_builddir)/src/cmd/liboafs_cmd.la \
+	$(top_builddir)/src/rx/liboafs_rx.la \
+	$(top_builddir)/src/crypto/hcrypto/libafshcrypto.la \
+	$(top_builddir)/src/opr/liboafs_opr.la \
+	$(top_builddir)/src/util/liboafs_util.la
 
 LIBS = ${FSLIBS}
 
@@ -70,7 +67,7 @@ all: fs up fstrace cmdebug livesys cacheout afsio
 # Build targets
 #
 cacheout: cacheout.o
-	$(AFS_LDRULE) cacheout.o ${LIBS} $(LIB_roken) ${XLIBS} ${CMLIBS}
+	$(LT_LDRULE_static) cacheout.o ${LIBS} $(LIB_roken) ${XLIBS} ${CMLIBS}
 
 cacheout.o: cacheout.c
 
@@ -78,12 +75,12 @@ cacheout.o: cacheout.c
 up.o: up.c AFS_component_version_number.c
 
 up: up.o
-	$(AFS_LDRULE) up.o ${LIBS} $(LIB_roken) ${XLIBS}
+	$(LT_LDRULE_static) up.o ${LIBS} $(LIB_roken) ${XLIBS}
 
 fs.o: fs.c ${INCLS} AFS_component_version_number.c
 
 fs: fs.o $(LIBS)
-	$(AFS_LDRULE) fs.o ${TOP_LIBDIR}/libprot.a $(LIBS) \
+	$(LT_LDRULE_static) fs.o ${TOP_LIBDIR}/libprot.a $(LIBS) \
 		$(LIB_roken) ${XLIBS}
 
 afsio.o: afsio.c ${AFSIO_INCLS} AFS_component_version_number.c
@@ -100,31 +97,31 @@ afsio: afsio.o afscbint.ss.o ${AFSIO_LIBS}
 livesys.o: livesys.c ${INCLS} AFS_component_version_number.c
 
 livesys: livesys.o $(LIBS)
-	$(AFS_LDRULE) livesys.o $(LIBS) $(LIB_roken) ${XLIBS}
+	$(LT_LDRULE_static) livesys.o $(LIBS) $(LIB_roken) ${XLIBS}
 
 twiddle: twiddle.o $(LIBS)
-	$(AFS_LDRULE) twiddle.o $(LIBS) $(LIB_roken) ${XLIBS}
+	$(LT_LDRULE_static) twiddle.o $(LIBS) $(LIB_roken) ${XLIBS}
 
 gcpags: gcpags.o $(LIBS)
-	$(AFS_LDRULE) gcpags.o $(LIBS) $(LIB_roken) ${XLIBS}
+	$(LT_LDRULE_static) gcpags.o $(LIBS) $(LIB_roken) ${XLIBS}
 
 whatfid.o: whatfid.c ${INCLS} AFS_component_version_number.c
 
 whatfid: whatfid.o ${LIBS}
-	$(AFS_LDRULE) whatfid.o ${LIBS} $(LIB_roken) ${XLIBS}
+	$(LT_LDRULE_static) whatfid.o ${LIBS} $(LIB_roken) ${XLIBS}
 
 fstrace: fstrace.o
-	$(AFS_LDRULE) fstrace.o $(LIBS) $(LIB_roken) ${XLIBS}
+	$(LT_LDRULE_static) fstrace.o $(LIBS) $(LIB_roken) ${XLIBS}
 
 cmdebug.o: cmdebug.c ${INCLS} AFS_component_version_number.c
 
 cmdebug: cmdebug.o ${CMLIBS}
-	$(AFS_LDRULE) cmdebug.o ${CMLIBS} $(LIB_roken) ${XLIBS}
+	$(LT_LDRULE_static) cmdebug.o ${CMLIBS} $(LIB_roken) ${XLIBS}
 
 dedebug.o: dedebug.c ${INCLS} AFS_component_version_number.c
 
 dedebug: dedebug.o ${CMLIBS}
-	$(AFS_LDRULE) dedebug.o ${CMLIBS} $(LIB_roken) ${XLIBS}
+	$(LT_LDRULE_static) dedebug.o ${CMLIBS} $(LIB_roken) ${XLIBS}
 
 #
 # Install targets
