@@ -1,24 +1,39 @@
 srcdir=@srcdir@
 include @TOP_OBJDIR@/src/config/Makefile.config
 include @TOP_OBJDIR@/src/config/Makefile.pthread
+include @TOP_OBJDIR@/src/config/Makefile.libtool
 
 #for debugging:
 #CFLAGS += -DAFSCP_DEBUG
 KRB5CPPFLAGS = @KRB5_CPPFLAGS@
 
-LIBOBJS = \
-	afscp_callback.o \
-	afscp_server.o \
-	afscp_fid.o \
-	afscp_volume.o \
-	afscp_file.o \
-	afscp_dir.o \
-	afscp_init.o \
-	afscp_util.o \
-	afscp_dirops.o \
-	afscp_acl.o
+LT_objs = \
+	afscp_callback.lo \
+	afscp_server.lo \
+	afscp_fid.lo \
+	afscp_volume.lo \
+	afscp_file.lo \
+	afscp_dir.lo \
+	afscp_init.lo \
+	afscp_util.lo \
+	afscp_dirops.lo \
+	afscp_acl.lo
+
+LT_deps = \
+	$(top_builddir)/src/fsint/liboafs_fsint.la \
+	$(top_builddir)/src/rxkad/liboafs_rxkad.la \
+	$(top_builddir)/src/vlserver/liboafs_vldb.la \
+	$(top_builddir)/src/ubik/liboafs_ubik.la \
+	$(top_builddir)/src/rx/liboafs_rx.la \
+	$(top_builddir)/src/util/liboafs_util.la
+
+LT_libs = \
+	$(LDFLAGS_krb5) $(LIB_krb5) \
+	$(LDFLAGS_hcrypto) $(LIB_hcrypto) \
+	$(LDFLAGS_roken) $(LIB_roken)
 
 all: \
+	liboafs_afscp.la \
 	${TOP_LIBDIR}/libafscp.a \
 	depinstall
 
@@ -28,10 +43,11 @@ all: \
 ${TOP_LIBDIR}/libafscp.a: libafscp.a
 	${INSTALL_DATA} $? $@
 
-libafscp.a: ${LIBOBJS} AFS_component_version_number.o
-	$(RM) -f $@
-	$(AR) crv $@ ${LIBOBJS} AFS_component_version_number.o
-	$(RANLIB) $@
+libafscp.a: ${LT_objs}
+	$(LT_LDLIB_static) $(LT_objs)
+
+liboafs_afscp.la: liboafs_afscp.la.sym $(LT_objs) $(LT_deps)
+	$(LT_LDLIB_shlib) $(LT_objs) $(LT_deps) $(LT_libs)
 
 depinstall: \
 	${TOP_INCDIR}/afs/afscp.h
@@ -61,6 +77,7 @@ dest: all
 # Misc targets
 #
 clean:
+	$(LT_CLEAN)
 	$(RM) -f *.o *.a *.gch libafscp* core AFS_component_version_number.c
 
 include ../config/Makefile.version
