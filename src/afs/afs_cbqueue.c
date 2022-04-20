@@ -293,11 +293,15 @@ afs_FlushCBs(void)
 {
     int i;
     struct vcache *tvc;
+    struct afs_q *cq, *tq;
 
     ObtainWriteLock(&afs_xcbhash, 86);	/* pretty likely I'm going to remove something */
 
     for (i = 0; i < VCSIZE; i++)	/* reset all the vnodes */
-	for (tvc = afs_vhashT[i]; tvc; tvc = tvc->hnext) {
+	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+	    tvc = QTOVC(cq);
+	    tq = QNext(cq);
+
 	    afs_StaleVCacheFlags(tvc, AFS_STALEVC_CBLOCKED |
 				 AFS_STALEVC_CLEARCB |
 				 AFS_STALEVC_SKIP_DNLC_FOR_INIT_FLUSHED, 0);
@@ -319,11 +323,15 @@ afs_FlushServerCBs(struct server *srvp)
 {
     int i;
     struct vcache *tvc;
+    struct afs_q *cq, *tq;
 
     ObtainWriteLock(&afs_xcbhash, 86);	/* pretty likely I'm going to remove something */
 
     for (i = 0; i < VCSIZE; i++) {	/* reset all the vnodes */
-	for (tvc = afs_vhashT[i]; tvc; tvc = tvc->hnext) {
+	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+	    tvc = QTOVC(cq);
+	    tq = QNext(cq);
+
 	    if (tvc->callback == srvp) {
 		afs_StaleVCacheFlags(tvc, AFS_STALEVC_CBLOCKED |
 				     AFS_STALEVC_CLEARCB |

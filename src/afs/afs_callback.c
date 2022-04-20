@@ -101,9 +101,10 @@ SRXAFSCB_GetCE(struct rx_call *a_call, afs_int32 a_index,
 {
 
     int i;		/*Loop variable */
-    struct vcache *tvc;	/*Ptr to current cache entry */
+    struct vcache *tvc = NULL;	/*Ptr to current cache entry */
     int code;			/*Return code */
     XSTATS_DECLS;
+    struct afs_q *cq, *tq;
 
     RX_AFS_GLOCK();
 
@@ -111,10 +112,14 @@ SRXAFSCB_GetCE(struct rx_call *a_call, afs_int32 a_index,
 
     AFS_STATCNT(SRXAFSCB_GetCE);
     for (i = 0; i < VCSIZE; i++) {
-	for (tvc = afs_vhashT[i]; tvc; tvc = tvc->hnext) {
+	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+	    tvc = QTOVC(cq);
+	    tq = QNext(cq);
+
 	    if (a_index == 0)
 		goto searchDone;
 	    a_index--;
+	    tvc = NULL;
 	}			/*Zip through current hash chain */
     }				/*Zip through hash chains */
 
@@ -180,9 +185,10 @@ SRXAFSCB_GetCE64(struct rx_call *a_call, afs_int32 a_index,
 		 struct AFSDBCacheEntry64 *a_result)
 {
     int i;		/*Loop variable */
-    struct vcache *tvc;	/*Ptr to current cache entry */
+    struct vcache *tvc = NULL;	/*Ptr to current cache entry */
     int code;			/*Return code */
     XSTATS_DECLS;
+    struct afs_q *cq, *tq;
 
     RX_AFS_GLOCK();
 
@@ -190,10 +196,14 @@ SRXAFSCB_GetCE64(struct rx_call *a_call, afs_int32 a_index,
 
     AFS_STATCNT(SRXAFSCB_GetCE64);
     for (i = 0; i < VCSIZE; i++) {
-	for (tvc = afs_vhashT[i]; tvc; tvc = tvc->hnext) {
+	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+	    tvc = QTOVC(cq);
+	    tq = QNext(cq);
+
 	    if (a_index == 0)
 		goto searchDone;
 	    a_index--;
+	    tvc = NULL;
 	}			/*Zip through current hash chain */
     }				/*Zip through hash chains */
 
@@ -482,7 +492,7 @@ loop1:
 	    /*
 	     * Clear callbacks just for the one file.
 	     */
-	    struct vcache *uvc;
+	    struct afs_q *cq, *tq;
 	    afs_allCBs++;
 	    if (a_fid->Vnode & 1)
 		afs_oddCBs++;	/*Could do this on volume basis, too */
@@ -491,8 +501,10 @@ loop1:
 loop2:
 	    ObtainReadLock(&afs_xvcache);
 	    i = VCHash(&localFid);
-	    for (tvc = afs_vhashT[i]; tvc; tvc = uvc) {
-		uvc = tvc->hnext;
+	    for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+		tvc = QTOVC(cq);
+		tq = QNext(cq);
+
 		if (tvc->f.fid.Fid.Vnode == a_fid->Vnode
 		    && tvc->f.fid.Fid.Volume == a_fid->Volume
 		    && tvc->f.fid.Fid.Unique == a_fid->Unique) {
@@ -537,7 +549,7 @@ loop2:
 		    vnode_put(AFSTOV(tvc));
 #endif
 		    ObtainReadLock(&afs_xvcache);
-		    uvc = tvc->hnext;
+		    tq = QNext(cq);
 		    AFS_FAST_RELE(tvc);
 		}
 	    }			/*Walk through hash table */
@@ -682,6 +694,7 @@ SRXAFSCB_InitCallBackState(struct rx_call *a_call)
     struct server *ts;
     int code = 0;
     XSTATS_DECLS;
+    struct afs_q *cq, *tq;
 
     RX_AFS_GLOCK();
 
@@ -701,7 +714,10 @@ SRXAFSCB_InitCallBackState(struct rx_call *a_call)
 			    0);
 	if (ts) {
 	    for (i = 0; i < VCSIZE; i++)
-		for (tvc = afs_vhashT[i]; tvc; tvc = tvc->hnext) {
+		for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+		    tvc = QTOVC(cq);
+		    tq = QNext(cq);
+
 		    if (tvc->callback == ts) {
 			afs_StaleVCacheFlags(tvc, AFS_STALEVC_NODNLC |
 						  AFS_STALEVC_CLEARCB,
