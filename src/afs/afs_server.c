@@ -255,11 +255,14 @@ afs_HaveCallBacksFrom(struct server *aserver)
     afs_int32 now;
     int i;
     struct vcache *tvc;
+    struct afs_q *cq, *tq;
 
     AFS_STATCNT(HaveCallBacksFrom);
     now = osi_Time();		/* for checking for expired callbacks */
     for (i = 0; i < VCSIZE; i++) {	/* for all guys in the hash table */
-	for (tvc = afs_vhashT[i]; tvc; tvc = tvc->hnext) {
+	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+	    tvc = QTOVC(cq);
+	    tq = QNext(cq);
 	    /*
 	     * Check to see if this entry has an unexpired callback promise
 	     * from the required host

@@ -147,6 +147,7 @@ afs_CheckTokenCache(void)
     struct vcache *tvc;
     struct axscache *tofreelist;
     int do_scan = 0;
+    struct afs_q *cq, *tq;
 
     AFS_STATCNT(afs_CheckCacheResets);
     ObtainReadLock(&afs_xvcache);
@@ -177,7 +178,9 @@ afs_CheckTokenCache(void)
 
     tofreelist = NULL;
     for (i = 0; i < VCSIZE; i++) {
-	for (tvc = afs_vhashT[i]; tvc; tvc = tvc->hnext) {
+	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+	    tvc = QTOVC(cq);
+	    tq = QNext(cq);
 	    /* really should do this under cache write lock, but that.
 	     * is hard to under locking hierarchy */
 	    if (tvc->Access) {
@@ -225,12 +228,16 @@ afs_ResetAccessCache(afs_int32 uid, afs_int32 cell, int alock)
     int i;
     struct vcache *tvc;
     struct axscache *ac;
+    struct afs_q *cq, *tq;
 
     AFS_STATCNT(afs_ResetAccessCache);
     if (alock)
 	ObtainReadLock(&afs_xvcache);
     for (i = 0; i < VCSIZE; i++) {
-	for (tvc = afs_vhashT[i]; tvc; tvc = tvc->hnext) {
+	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
+	    tvc = QTOVC(cq);
+	    tq = QNext(cq);
+
 	    /* really should do this under cache write lock, but that.
 	     * is hard to under locking hierarchy */
 	    if (tvc->Access && (cell == -1 || tvc->f.fid.Cell == cell)) {
