@@ -47,6 +47,7 @@
 
 afs_int32 afs_maxvcount = 0;	/* max number of vcache entries */
 afs_int32 afs_vcount = 0;	/* number of vcache in use now */
+afs_uint32 afs_delvcount = 0;	/* number of unliked vcaches that haven't been flushed */
 
 #ifdef AFS_SGI_ENV
 int afsvnumbers = 0;
@@ -809,6 +810,15 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 
     loop = 0;
 
+    /*
+     * Always reset afs_delvcount. If we can't flush all unlinked vcaches, let
+     * the regular flushing mechanism take over (best-effort).
+     */
+    if (afs_delvcount > anumber) {
+	anumber = afs_delvcount;
+    }
+    afs_delvcount = 0;
+
  retry:
     i = 0;
     limit = afs_vcount;
@@ -999,6 +1009,7 @@ afs_FlushAllVCaches(void)
 
     ObtainWriteLock(&afs_xvcache, 867);
 
+    afs_delvcount = 0;
  retry:
     for (i = 0; i < VCSIZE; i++) {
 	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
@@ -1042,6 +1053,15 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 
     AFS_STATCNT(afs_NewVCache);
 
+    if (afs_delvcount) {
+	/*
+	 * We have unlinked vcaches that haven't been flushed. In this case, let
+	 * afs_ShakeLooseVCaches() flush them all, as there is no reason to keep
+	 * them around. These entries should be at the 'least recently used
+	 * position' in our VLRU.
+	 */
+	afs_ShakeLooseVCaches(afs_delvcount);
+    }
     afs_FlushReclaimedVcaches();
 
 #if defined(AFS_LINUX_ENV)

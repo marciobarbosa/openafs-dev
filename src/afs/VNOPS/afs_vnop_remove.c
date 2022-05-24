@@ -128,6 +128,28 @@ afsremove(struct vcache *adp, struct dcache *tdc,
 		afs_TryToSmush(tvc, acred, 0);
 	}
 	ReleaseWriteLock(&tvc->lock);
+
+#if !defined(AFS_DARWIN_ENV) && !defined(AFS_XBSD_ENV)
+	/*
+	 * On Darwin and *BSD, unlinked vcaches are reclaimed in vop_reclaim(),
+	 * which calls afs_FlushVCache().
+	 */
+	if (NBObtainWriteLock(&afs_xvcache, 1210) == 0) {
+	    struct afs_q *tail = VLRU.prev;
+	    /*
+	     * Move this vcache to the 'least recently used position' in our
+	     * VLRU so it can be flushed the next time afs_ShakeLooseVCaches()
+	     * is executed. Note that trying to flush this entry in this
+	     * function wouldn't work, as this entry may still be in use
+	     * (refcount > 1) on some platforms. Also, don't block waiting for
+	     * afs_xvcache. If we can't get it, don't bother (best-effort).
+	     */
+	    QRemove(&tvc->vlruq);
+	    QAdd(tail, &tvc->vlruq);
+	    afs_delvcount++;
+	    ReleaseWriteLock(&afs_xvcache);
+	}
+#endif
 	afs_PutVCache(tvc);
     }
     return (0);

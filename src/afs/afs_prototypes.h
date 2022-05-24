@@ -1019,6 +1019,7 @@ extern int afs_VCacheStressed(void);
 extern int afs_ShakeLooseVCaches(afs_int32 anumber);
 extern afs_int32 afs_maxvcount;
 extern afs_int32 afs_vcount;
+extern afs_uint32 afs_delvcount;
 extern int afsvnumbers;
 extern afs_rwlock_t afs_xvreclaim;
 extern afs_rwlock_t afs_xvcache;
