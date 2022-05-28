@@ -75,6 +75,7 @@ struct afs_q afs_vhashTV[VCSIZE];
 static struct afs_cbr *afs_cbrHashT[CBRSIZE];
 afs_int32 afs_bulkStatsLost;
 int afs_norefpanic = 0;
+int afs_shakeloosevcaches_running = 0;
 
 
 /* Disk backed vcache definitions
@@ -795,13 +796,13 @@ afs_VCacheStressed(void)
 #endif /* AFS_LINUX_ENV */
 
 int
-afs_ShakeLooseVCaches(afs_int32 anumber)
+afs_ShakeLooseVCaches(afs_int32 anumber, afs_int32 aflags)
 {
     /* Try not to run for more than about 3 seconds */
     static const int DEADLINE = 3;
 
     afs_int32 i, loop;
-    int evicted;
+    int evicted, n_evicted = 0;
     struct vcache *tvc;
     struct afs_q *tq, *uq;
     int fv_slept, defersleep = 0;
@@ -809,6 +810,11 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
     afs_uint32 start = osi_Time();
 
     loop = 0;
+
+    if (afs_shakeloosevcaches_running) {
+	return -1;
+    }
+    afs_shakeloosevcaches_running = 1;
 
     /*
      * Always reset afs_delvcount. If we can't flush all unlinked vcaches, let
@@ -839,9 +845,12 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 
 	fv_slept = 0;
 	evicted = osi_TryEvictVCache(tvc, &fv_slept, defersleep);
-	if (evicted) {
+	if ((aflags & AFS_SLVC_BESTEFFORT)) {
+	    anumber--;
+	} else if (evicted) {
 	    anumber--;
 	}
+	n_evicted += evicted;
 
 	if (fv_slept) {
 	    if (loop++ > 100) {
@@ -871,7 +880,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 		    break;
 		}
 	    }
-	    if (!evicted) {
+	    if (!evicted && !(aflags & AFS_SLVC_BESTEFFORT)) {
 		/*
 		 * This vcache was busy and we slept while trying to evict it.
 		 * Move this busy vcache to the head of the VLRU so vcaches
@@ -883,7 +892,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 	    goto retry;	/* start over - may have raced. */
 	}
 	if (uq == &VLRU) {
-	    if (anumber && !defersleep) {
+	    if (anumber && !defersleep && !(aflags & AFS_SLVC_BESTEFFORT)) {
 		defersleep = 1;
 		goto retry;
 	    }
@@ -913,7 +922,8 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 	}
     }
 
-    return 0;
+    afs_shakeloosevcaches_running = 0;
+    return n_evicted;
 }
 
 /* Alloc new vnode. */
@@ -1054,19 +1064,21 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
     AFS_STATCNT(afs_NewVCache);
 
     if (afs_delvcount) {
+	int n_evicted, n_del = afs_delvcount;
 	/*
 	 * We have unlinked vcaches that haven't been flushed. In this case, let
 	 * afs_ShakeLooseVCaches() flush them all, as there is no reason to keep
 	 * them around. These entries should be at the 'least recently used
 	 * position' in our VLRU.
 	 */
-	afs_ShakeLooseVCaches(afs_delvcount);
+	n_evicted = afs_ShakeLooseVCaches(n_del, AFS_SLVC_BESTEFFORT);
+	afs_delvcount += n_del - n_evicted;
     }
     afs_FlushReclaimedVcaches();
 
 #if defined(AFS_LINUX_ENV)
     if(!afsd_dynamic_vcaches && afs_vcount >= afs_maxvcount) {
-	afs_ShakeLooseVCaches(anumber);
+	afs_ShakeLooseVCaches(anumber, AFS_SLVC_REGULAR);
 	if (afs_vcount >= afs_maxvcount) {
 	    afs_warn("afs_NewVCache - none freed\n");
 	    return NULL;
@@ -1079,7 +1091,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 #else /* AFS_LINUX_ENV */
     /* pull out a free cache entry */
     if (!freeVCList) {
-	afs_ShakeLooseVCaches(anumber);
+	afs_ShakeLooseVCaches(anumber, AFS_SLVC_REGULAR);
     }
 
     if (!freeVCList) {
