@@ -187,13 +187,16 @@ afs_Daemon(void)
         if (afsd_dynamic_vcaches && (last5MinCheck + 300 < now)) {
             /* start with trying to drop us back to our base usage */
             int anumber = VCACHE_FREE + (afs_vcount - afs_cacheStats);
+	    int n_evicted = 0;
 
 	    if (anumber > 0) {
 		ObtainWriteLock(&afs_xvcache, 734);
-		/*afs_ShakeLooseVCaches(anumber, AFS_SLVC_REGULAR);*/
+		n_evicted = afs_ShakeLooseVCaches(anumber, AFS_SLVC_REGULAR);
 		ReleaseWriteLock(&afs_xvcache);
 	    }
-            last5MinCheck = now;
+	    if (n_evicted != -1) {
+		last5MinCheck = now;
+	    }
         }
 
 	if (!afs_CheckServerDaemonStarted) {

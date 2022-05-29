@@ -1072,7 +1072,9 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 	 * position' in our VLRU.
 	 */
 	n_evicted = afs_ShakeLooseVCaches(n_del, AFS_SLVC_BESTEFFORT);
-	afs_delvcount += n_del - n_evicted;
+	if (n_evicted != -1) {
+	    afs_delvcount += (n_del - n_evicted);
+	}
     }
     afs_FlushReclaimedVcaches();
 
