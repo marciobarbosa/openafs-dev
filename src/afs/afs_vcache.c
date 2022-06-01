@@ -59,11 +59,9 @@ char *makesname();
 /* Exported variables */
 afs_rwlock_t afs_xvcdirty;	/*Lock: discon vcache dirty list mgmt */
 afs_rwlock_t afs_xvcache;	/*Lock: alloc new stat cache entries */
-afs_rwlock_t afs_xvreclaim;	/*Lock: entries reclaimed, not on free list */
 afs_lock_t afs_xvcb;		/*Lock: fids on which there are callbacks */
 #if !defined(AFS_LINUX_ENV)
 static struct vcache *freeVCList;	/*Free list for stat cache entries */
-struct vcache *ReclaimedVCList;	/*Reclaimed list for stat entries */
 static struct vcache *Initial_freeVCList;	/*Initial list for above */
 #endif
 struct afs_q VLRU;		/*vcache LRU */
@@ -75,6 +73,13 @@ static struct afs_cbr *afs_cbrHashT[CBRSIZE];
 afs_int32 afs_bulkStatsLost;
 int afs_norefpanic = 0;
 
+/*
+ * List containing vcaches that have been evicted but not yet flushed.
+ * Protected by afs_xvreclaim.
+ */
+struct afs_q ReclaimedVCList;
+afs_rwlock_t afs_xvreclaim;
+afs_int32 afs_reclaim_running = 0;
 
 /* Disk backed vcache definitions
  * Both protected by xvcache */
@@ -191,6 +196,12 @@ afs_FlushVCache(struct vcache *avc, int *slept)
     QRemove(&avc->hashq);
     /* remove entry from the volume hash table */
     QRemove(&avc->vhashq);
+    /* remove entry from the reclaimed list, if present */
+    ObtainWriteLock(&afs_xvreclaim, 1210);
+    if (avc->reclaimq.prev != NULL && avc->reclaimq.next != NULL) {
+	QRemove(&avc->reclaimq);
+    }
+    ReleaseWriteLock(&afs_xvreclaim);
 
 #if defined(AFS_LINUX_ENV)
     {
@@ -672,48 +683,81 @@ afs_RemoveVCB(struct VenusFid *afid)
     ReleaseWriteLock(&afs_xvcb);
 }
 
+static int
+afs_FlushUnlinkedVCache(struct vcache *avc, int *aslept)
+{
+    int code, flags = 0;
+
+#if defined(AFS_DARWIN_ENV)
+    flags = CVInit;
+# if defined(AFS_DARWIN80_ENV)
+    flags |= CDeadVnode;
+# endif
+#endif
+    /*
+     * Since afs_FlushVCache() may have to drop and reacquire GLOCK and
+     * afs_xvcache, drop afs_xvreclaim to avoid lock inversion.
+     */
+    ReleaseWriteLock(&afs_xvreclaim);
+#if defined(AFS_DARWIN_ENV) || defined(AFS_XBSD_ENV)
+    code = afs_FlushVCache(avc, aslept);
+#else
+    code = !osi_TryEvictVCache(avc, aslept, 0);
+#endif
+    if (code == 0 && (avc->f.states & flags)) {
+	avc->f.states &= ~flags;
+	afs_osi_Wakeup(&avc->f.states);
+    }
+    ObtainWriteLock(&afs_xvreclaim, 1210);
+
+    return code;
+}
+
 void
 afs_FlushReclaimedVcaches(void)
 {
-#if !defined(AFS_LINUX_ENV)
+    int code, slept, attempts = 0;
     struct vcache *tvc;
-    int code, fv_slept;
-    struct vcache *tmpReclaimedVCList = NULL;
+    struct afs_q *cq, *tq;
 
     ObtainWriteLock(&afs_xvreclaim, 76);
-    while (ReclaimedVCList) {
-	tvc = ReclaimedVCList;	/* take from free list */
-	ReclaimedVCList = tvc->nextfree;
-	tvc->nextfree = NULL;
-	code = afs_FlushVCache(tvc, &fv_slept);
-	if (code) {
-	    /* Ok, so, if we got code != 0, uh, wtf do we do? */
-	    /* Probably, build a temporary list and then put all back when we
-	       get to the end of the list */
-	    /* This is actually really crappy, but we need to not leak these.
-	       We probably need a way to be smarter about this. */
-	    tvc->nextfree = tmpReclaimedVCList;
-	    tmpReclaimedVCList = tvc;
-	    /* printf("Reclaim list flush %lx failed: %d\n", (unsigned long) tvc, code); */
+
+    if (afs_reclaim_running) {
+	ReleaseWriteLock(&afs_xvreclaim);
+	return;
+    }
+    afs_reclaim_running = 1;
+
+ retry:
+    if (attempts == 3) {
+	/* Do not retry forever. */
+	goto done;
+    }
+    for (cq = ReclaimedVCList.next; cq != &ReclaimedVCList; cq = tq) {
+	tvc = QTORVC(cq);
+	tq = QNext(cq);
+
+	code = afs_FlushUnlinkedVCache(tvc, &slept);
+	if (slept) {
+	    /*
+	     * afs_ShakeLooseVCaches() may have modified ReclaimedVCList while
+	     * we were sleeping.
+	     */
+	    attempts++;
+	    goto retry;
 	}
-        if (tvc->f.states & (CVInit
-# ifdef AFS_DARWIN80_ENV
-			  | CDeadVnode
-# endif
-           )) {
-	   tvc->f.states &= ~(CVInit
-# ifdef AFS_DARWIN80_ENV
-			    | CDeadVnode
-# endif
-	   );
-	   afs_osi_Wakeup(&tvc->f.states);
+	if (code != 0) {
+	    /*
+	     * If we could not flush this entry, ignore it for now. We will try
+	     * again later.
+	     */
+	    continue;
 	}
     }
-    if (tmpReclaimedVCList)
-	ReclaimedVCList = tmpReclaimedVCList;
-
+ done:
+    afs_reclaim_running = 0;
+    afs_osi_Wakeup(&afs_reclaim_running);
     ReleaseWriteLock(&afs_xvreclaim);
-#endif
 }
 
 void
@@ -961,6 +1005,7 @@ afs_PrePopulateVCache(struct vcache *avc, struct VenusFid *afid,
 
     avc->diskSlot = slot;
     QZero(&avc->metadirty);
+    QZero(&avc->reclaimq);
 
     AFS_RWLOCK_INIT(&avc->lock, "vcache lock");
 
@@ -2911,6 +2956,7 @@ afs_vcacheInit(int astatSize)
 #endif
 
     AFS_RWLOCK_INIT(&afs_xvcache, "afs_xvcache");
+    AFS_RWLOCK_INIT(&afs_xvreclaim, "afs_xvreclaim");
     LOCK_INIT(&afs_xvcb, "afs_xvcb");
 
 #if !defined(AFS_LINUX_ENV)
@@ -2942,6 +2988,7 @@ afs_vcacheInit(int astatSize)
     }
 #endif
     QInit(&VLRU);
+    QInit(&ReclaimedVCList);
     for (i = 0; i < VCSIZE; i++) {
 	QInit(&afs_vhashT[i]);
 	QInit(&afs_vhashTV[i]);
@@ -3065,8 +3112,10 @@ shutdown_vcache(void)
 #endif
 
     AFS_RWLOCK_INIT(&afs_xvcache, "afs_xvcache");
+    AFS_RWLOCK_INIT(&afs_xvreclaim, "afs_xvreclaim");
     LOCK_INIT(&afs_xvcb, "afs_xvcb");
     QInit(&VLRU);
+    QInit(&ReclaimedVCList);
     for (i = 0; i < VCSIZE; i++) {
 	QInit(&afs_vhashT[i]);
 	QInit(&afs_vhashTV[i]);

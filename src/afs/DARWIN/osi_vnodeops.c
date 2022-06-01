@@ -1806,8 +1806,13 @@ afs_vop_reclaim(ap)
 #endif
 	   AFSTOV(tvc) = NULL;             /* also drop the ptr to vnode */
 	   tvc->f.states |= CVInit; /* also CDeadVnode? */
-	   tvc->nextfree = ReclaimedVCList;
-	   ReclaimedVCList = tvc;
+
+	   while (afs_reclaim_running) {
+	       ReleaseWriteLock(&afs_xvreclaim);
+	       afs_osi_Sleep(&afs_reclaim_running);
+	       ObtainWriteLock(&afs_xvreclaim, 1211);
+	   }
+	   QAdd(&ReclaimedVCList, &tvc->reclaimq);
 	   ReleaseWriteLock(&afs_xvreclaim);
        } else {
 	   error = afs_FlushVCache(tvc, &sl);	/* toss our stuff from vnode */
