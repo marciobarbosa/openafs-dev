@@ -727,7 +727,7 @@ afs_FlushUnlinkedVCache(struct vcache *avc, int *aslept)
 	avc->f.states &= ~flags;
 	afs_osi_Wakeup(&avc->f.states);
     }
-    ObtainWriteLock(&afs_xvreclaim, 1210);
+    ObtainWriteLock(&afs_xvreclaim, 1213);
 
     return code;
 }
