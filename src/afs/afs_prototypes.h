@@ -1030,10 +1030,12 @@ extern unsigned int afs_paniconwarn;
 extern struct afs_q afs_vhashTV[VCSIZE];
 extern afs_int32 afs_bulkStatsLost;
 extern int afs_norefpanic;
-extern struct vcache *ReclaimedVCList;
+extern struct afs_q ReclaimedVCList;
 extern ino_t vcacheMetaInode;
 extern struct osi_file *afs_vcacheMetaInodep;
 
+extern void afs_ReclaimedVcachesAdd(struct vcache *avc);
+extern void afs_ReclaimedVcachesRemove(struct vcache *avc);
 extern void afs_FlushReclaimedVcaches(void);
 void afs_vcacheInit(int astatSize);
 extern struct vcache *afs_FindVCache(struct VenusFid *afid, afs_int32 flag);

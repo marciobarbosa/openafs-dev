@@ -1797,7 +1797,6 @@ afs_vop_reclaim(ap)
        AFS_GLOCK();
        writelocked = (0 == NBObtainWriteLock(&afs_xvcache, 335));
        if (!writelocked) {
-	   ObtainWriteLock(&afs_xvreclaim, 176);
 #ifdef AFS_DARWIN80_ENV
 	   vnode_clearfsnode(AFSTOV(tvc));
 	   vnode_removefsref(AFSTOV(tvc));
@@ -1806,9 +1805,7 @@ afs_vop_reclaim(ap)
 #endif
 	   AFSTOV(tvc) = NULL;             /* also drop the ptr to vnode */
 	   tvc->f.states |= CVInit; /* also CDeadVnode? */
-	   tvc->nextfree = ReclaimedVCList;
-	   ReclaimedVCList = tvc;
-	   ReleaseWriteLock(&afs_xvreclaim);
+	   afs_ReclaimedVcachesAdd(tvc);
        } else {
 	   error = afs_FlushVCache(tvc, &sl);	/* toss our stuff from vnode */
 	   if (tvc->f.states & (CVInit

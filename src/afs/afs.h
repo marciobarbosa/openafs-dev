@@ -255,6 +255,7 @@ struct afs_q {
 #define QTOC(e)	    QEntry(e, struct cell, lruq)
 #define QTOVC(e)    QEntry(e, struct vcache, hashq)
 #define QTOVH(e)    QEntry(e, struct vcache, vhashq)
+#define QTORVC(e)   QEntry(e, struct vcache, reclaimq)
 
 /*!
  * List of free slot numbers
@@ -874,6 +875,8 @@ struct vcache {
     struct afs_q shadowq;
     /*! Queue of vcaches with dirty metadata. Locked by afs_xvcdirty */
     struct afs_q metadirty;
+    /*! Queue of reclaimed vcaches. Locked by afs_xvreclaim */
+    struct afs_q reclaimq;
     /*! Vcaches slot number in the disk backup. Protected by tvc->lock */
     afs_uint32 diskSlot;
     struct fvcache f;
