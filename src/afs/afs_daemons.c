@@ -172,7 +172,7 @@ afs_Daemon(void)
 	    DFlush();		/* write out dir buffers */
 	    (void)afs_WriteThroughDSlots();	/* write through cacheinfo entries */
 	    ObtainWriteLock(&afs_xvcache, 736);
-	    afs_FlushReclaimedVcaches();
+	    /*afs_FlushReclaimedVcaches();*/
 	    ReleaseWriteLock(&afs_xvcache);
 	    afs_FlushActiveVcaches(1);	/* keep flocks held & flush nfs writes */
 	    last1MinCheck = now;
@@ -190,7 +190,7 @@ afs_Daemon(void)
 
 	    if (anumber > 0) {
 		ObtainWriteLock(&afs_xvcache, 734);
-		afs_ShakeLooseVCaches(anumber);
+		/*afs_ShakeLooseVCaches(anumber);*/
 		ReleaseWriteLock(&afs_xvcache);
 	    }
             last5MinCheck = now;

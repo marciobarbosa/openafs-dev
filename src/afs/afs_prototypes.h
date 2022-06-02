@@ -1034,6 +1034,7 @@ extern struct afs_q ReclaimedVCList;
 extern ino_t vcacheMetaInode;
 extern struct osi_file *afs_vcacheMetaInodep;
 
+extern void afs_ReclaimedVcachesPrint(void);
 extern void afs_ReclaimedVcachesAdd(struct vcache *avc);
 extern void afs_ReclaimedVcachesRemove(struct vcache *avc);
 extern void afs_FlushReclaimedVcaches(void);

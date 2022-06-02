@@ -4215,6 +4215,8 @@ DECL_PIOCTL(PGetSPrefs)
     if (!afs_resourceinit_flag)	/* afs daemons haven't started yet */
 	return EIO;		/* Inappropriate ioctl for device */
 
+    afs_ReclaimedVcachesPrint();
+
     /* Work out from the size whether we've got a new, or old, style pioctl */
     if (afs_pd_remaining(ain) < sizeof(struct sprefrequest)) {
 	if (afs_pd_getBytes(ain, &spin, sizeof(struct sprefrequest_33)) != 0)

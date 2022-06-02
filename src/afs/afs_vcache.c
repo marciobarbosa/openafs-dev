@@ -680,6 +680,25 @@ afs_RemoveVCB(struct VenusFid *afid)
 }
 
 void
+afs_ReclaimedVcachesPrint(void)
+{
+    struct vcache *tvc;
+    struct afs_q *cq, *tq;
+
+    ObtainWriteLock(&afs_xvreclaim, 76);
+
+    afs_warn("marcio> Dumping ReclaimedVCList ----\n");
+    for (cq = ReclaimedVCList.next; cq != &ReclaimedVCList; cq = tq) {
+	tvc = QTORVC(cq);
+	tq = QNext(cq);
+	afs_warn("marcio> %u.%u.%u\n", tvc->f.fid.Fid.Volume, tvc->f.fid.Fid.Vnode, tvc->f.fid.Fid.Unique);
+    }
+    afs_warn("marcio> ----\n");
+
+    ReleaseWriteLock(&afs_xvreclaim);
+}
+
+void
 afs_ReclaimedVcachesAdd(struct vcache *avc)
 {
     ObtainWriteLock(&afs_xvreclaim, 1210);
