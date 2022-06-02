@@ -116,6 +116,7 @@ afsremove(struct vcache *adp, struct dcache *tdc,
      * call FindVCache instead of GetVCache since if the file's really
      * gone, we won't be able to fetch the status info anyway.  */
     if (tvc) {
+	int smushed = 0;
 	if (afs_mariner)
 	    afs_MarinerLog("store$Removing", tvc);
 	ObtainWriteLock(&tvc->lock, 141);
@@ -124,10 +125,16 @@ afsremove(struct vcache *adp, struct dcache *tdc,
 	tvc->f.m.LinkCount--;
 	tvc->f.states &= ~CUnique;	/* For the dfs xlator */
 	if (tvc->f.m.LinkCount == 0 && !osi_Active(tvc)) {
-	    if (!AFS_NFSXLATORREQ(acred))
+	    if (!AFS_NFSXLATORREQ(acred)) {
 		afs_TryToSmush(tvc, acred, 0);
+		smushed = 1;
+	    }
 	}
 	ReleaseWriteLock(&tvc->lock);
+
+	if (smushed) {
+	    afs_ReclaimedVcachesAdd(tvc);
+	}
 	afs_PutVCache(tvc);
     }
     return (0);

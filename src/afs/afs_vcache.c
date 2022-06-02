@@ -707,22 +707,27 @@ afs_ReclaimedVcachesRemove(struct vcache *avc)
     ReleaseWriteLock(&afs_xvreclaim);
 }
 
-#if defined(AFS_DARWIN_ENV)
 static int
 afs_FlushUnlinkedVCache(struct vcache *avc, int *aslept)
 {
     int code, flags = 0;
 
+#if defined(AFS_DARWIN_ENV)
     flags = CVInit;
 # if defined(AFS_DARWIN80_ENV)
     flags |= CDeadVnode;
 # endif
+#endif
     /*
      * Since afs_FlushVCache() may have to drop and reacquire GLOCK and
      * afs_xvcache, drop afs_xvreclaim to avoid lock inversion.
      */
     ReleaseWriteLock(&afs_xvreclaim);
+#if defined(AFS_DARWIN_ENV) || defined(AFS_XBSD_ENV)
     code = afs_FlushVCache(avc, aslept);
+#else
+    code = !osi_TryEvictVCache(avc, aslept, 0);
+#endif
     if (code == 0 && (avc->f.states & flags)) {
 	avc->f.states &= ~flags;
 	afs_osi_Wakeup(&avc->f.states);
@@ -731,12 +736,10 @@ afs_FlushUnlinkedVCache(struct vcache *avc, int *aslept)
 
     return code;
 }
-#endif
 
 void
 afs_FlushReclaimedVcaches(void)
 {
-#if defined(AFS_DARWIN_ENV)
     int code, slept, attempts = 0;
     struct vcache *tvc;
     struct afs_q *cq, *tq;
@@ -779,9 +782,6 @@ afs_FlushReclaimedVcaches(void)
     afs_reclaim_running = 0;
     afs_osi_Wakeup(&afs_reclaim_running);
     ReleaseWriteLock(&afs_xvreclaim);
-#else
-    return;
-#endif
 }
 
 void
