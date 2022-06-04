@@ -47,6 +47,7 @@
 
 afs_int32 afs_maxvcount = 0;	/* max number of vcache entries */
 afs_int32 afs_vcount = 0;	/* number of vcache in use now */
+afs_uint32 afs_delvcount = 0;	/* number of unlinked vcaches that haven't been flushed */
 
 #ifdef AFS_SGI_ENV
 int afsvnumbers = 0;
@@ -675,7 +676,7 @@ afs_RemoveVCB(struct VenusFid *afid)
 void
 afs_FlushReclaimedVcaches(void)
 {
-#if !defined(AFS_LINUX_ENV)
+#if defined(AFS_DARWIN_ENV)
     struct vcache *tvc;
     int code, fv_slept;
     struct vcache *tmpReclaimedVCList = NULL;
@@ -713,6 +714,25 @@ afs_FlushReclaimedVcaches(void)
 	ReclaimedVCList = tmpReclaimedVCList;
 
     ReleaseWriteLock(&afs_xvreclaim);
+#else
+    afs_uint32 n_evicted, delvcount;
+
+    if (afs_delvcount) {
+	/*
+	 * Save afs_delvcount before calling afs_ShakeLooseVCaches(), as this
+	 * function always resets this global.
+	 */
+	delvcount = afs_delvcount;
+
+	/*
+	 * We have unlinked vcaches that haven't been flushed. In this case, let
+	 * afs_ShakeLooseVCaches() flush them all, as there is no reason to keep
+	 * them around. These entries should be at the 'least recently used
+	 * position' in our VLRU.
+	 */
+	n_evicted = afs_ShakeLooseVCaches(delvcount, 1);
+	afs_delvcount += delvcount - n_evicted;
+    }
 #endif
 }
 
@@ -794,13 +814,13 @@ afs_VCacheStressed(void)
 #endif /* AFS_LINUX_ENV */
 
 int
-afs_ShakeLooseVCaches(afs_int32 anumber)
+afs_ShakeLooseVCaches(afs_int32 anumber, afs_int32 besteffort)
 {
     /* Try not to run for more than about 3 seconds */
     static const int DEADLINE = 3;
 
     afs_int32 i, loop;
-    int evicted;
+    int evicted, n_evicted = 0;
     struct vcache *tvc;
     struct afs_q *tq, *uq;
     int fv_slept, defersleep = 0;
@@ -808,6 +828,22 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
     afs_uint32 start = osi_Time();
 
     loop = 0;
+
+    /*
+     * Always reset afs_delvcount so other threads don't think we still have
+     * unlinked vcaches to be flushed while we're sleeping in afs_FlushVCache().
+     * If we can't flush them all, the caller will either update afs_delvcount
+     * accordingly or let the regular flushing mechanism deal with these entries
+     * later on.
+     */
+    if (afs_delvcount > anumber && afs_delvcount < afs_vcount) {
+	/*
+	 * Make sure that (afs_delvcount < afs_vcount) so a possible
+	 * afs_delvcount underflow wouldn't affect us (sanity check).
+	 */
+	anumber = afs_delvcount;
+    }
+    afs_delvcount = 0;
 
  retry:
     i = 0;
@@ -829,8 +865,9 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 
 	fv_slept = 0;
 	evicted = osi_TryEvictVCache(tvc, &fv_slept, defersleep);
-	if (evicted) {
+	if (evicted || besteffort) {
 	    anumber--;
+	    n_evicted += evicted;
 	}
 
 	if (fv_slept) {
@@ -861,7 +898,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 		    break;
 		}
 	    }
-	    if (!evicted) {
+	    if (!evicted && !besteffort) {
 		/*
 		 * This vcache was busy and we slept while trying to evict it.
 		 * Move this busy vcache to the head of the VLRU so vcaches
@@ -873,7 +910,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 	    goto retry;	/* start over - may have raced. */
 	}
 	if (uq == &VLRU) {
-	    if (anumber && !defersleep) {
+	    if (anumber && !defersleep && !besteffort) {
 		defersleep = 1;
 		goto retry;
 	    }
@@ -903,7 +940,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 	}
     }
 
-    return 0;
+    return n_evicted;
 }
 
 /* Alloc new vnode. */
@@ -999,6 +1036,7 @@ afs_FlushAllVCaches(void)
 
     ObtainWriteLock(&afs_xvcache, 867);
 
+    afs_delvcount = 0;
  retry:
     for (i = 0; i < VCSIZE; i++) {
 	for (cq = afs_vhashT[i].next; cq != &afs_vhashT[i]; cq = tq) {
@@ -1046,7 +1084,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 
 #if defined(AFS_LINUX_ENV)
     if(!afsd_dynamic_vcaches && afs_vcount >= afs_maxvcount) {
-	afs_ShakeLooseVCaches(anumber);
+	afs_ShakeLooseVCaches(anumber, 0);
 	if (afs_vcount >= afs_maxvcount) {
 	    afs_warn("afs_NewVCache - none freed\n");
 	    return NULL;
@@ -1059,7 +1097,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 #else /* AFS_LINUX_ENV */
     /* pull out a free cache entry */
     if (!freeVCList) {
-	afs_ShakeLooseVCaches(anumber);
+	afs_ShakeLooseVCaches(anumber, 0);
     }
 
     if (!freeVCList) {
