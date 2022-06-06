@@ -794,8 +794,16 @@ afs_VCacheStressed(void)
 }
 #endif /* AFS_LINUX_ENV */
 
+/**
+ * Evict a subset of the least recently used vcaches.
+ *
+ * @param[in]  anumber     number of vcaches to be evicted
+ * @param[in]  besteffort  if we can't evict an entry, don't bother
+ *
+ * @return number of evicted vcaches
+ */
 int
-afs_ShakeLooseVCaches(afs_int32 anumber)
+afs_ShakeLooseVCaches(afs_int32 anumber, afs_int32 besteffort)
 {
     /* Try not to run for more than about 3 seconds */
     static const int DEADLINE = 3;
@@ -807,6 +815,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
     int fv_slept, defersleep = 0;
     int limit;
     afs_uint32 start = osi_Time();
+    afs_uint32 n_evicted = 0;
 
     loop = 0;
 
@@ -830,8 +839,9 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 
 	fv_slept = 0;
 	evicted = osi_TryEvictVCache(tvc, &fv_slept, defersleep);
-	if (evicted) {
+	if (evicted || besteffort) {
 	    anumber--;
+	    n_evicted += evicted;
 	}
 
 	if (fv_slept) {
@@ -862,7 +872,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 		    break;
 		}
 	    }
-	    if (!evicted) {
+	    if (!evicted && !besteffort) {
 		/*
 		 * This vcache was busy and we slept while trying to evict it.
 		 * Move this busy vcache to the head of the VLRU so vcaches
@@ -874,7 +884,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 	    goto retry;	/* start over - may have raced. */
 	}
 	if (uq == &VLRU) {
-	    if (anumber && !defersleep) {
+	    if (anumber && !defersleep && !besteffort) {
 		defersleep = 1;
 		goto retry;
 	    }
@@ -904,7 +914,7 @@ afs_ShakeLooseVCaches(afs_int32 anumber)
 	}
     }
 
-    return 0;
+    return n_evicted;
 }
 
 /* Alloc new vnode. */
@@ -1047,7 +1057,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 
 #if defined(AFS_LINUX_ENV)
     if(!afsd_dynamic_vcaches && afs_vcount >= afs_maxvcount) {
-	afs_ShakeLooseVCaches(anumber);
+	afs_ShakeLooseVCaches(anumber, 0);
 	if (afs_vcount >= afs_maxvcount) {
 	    afs_warn("afs_NewVCache - none freed\n");
 	    return NULL;
@@ -1060,7 +1070,7 @@ afs_NewVCache_int(struct VenusFid *afid, struct server *serverp, int seq)
 #else /* AFS_LINUX_ENV */
     /* pull out a free cache entry */
     if (!freeVCList) {
-	afs_ShakeLooseVCaches(anumber);
+	afs_ShakeLooseVCaches(anumber, 0);
     }
 
     if (!freeVCList) {

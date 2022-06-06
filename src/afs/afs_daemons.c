@@ -190,7 +190,7 @@ afs_Daemon(void)
 
 	    if (anumber > 0) {
 		ObtainWriteLock(&afs_xvcache, 734);
-		afs_ShakeLooseVCaches(anumber);
+		afs_ShakeLooseVCaches(anumber, 0);
 		ReleaseWriteLock(&afs_xvcache);
 	    }
             last5MinCheck = now;

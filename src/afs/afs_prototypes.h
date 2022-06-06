@@ -1016,7 +1016,7 @@ extern void afs_WarnENOSPC(void);
 extern int VCHash(struct VenusFid *fid);
 extern int VCHashV(struct VenusFid *fid);
 extern int afs_VCacheStressed(void);
-extern int afs_ShakeLooseVCaches(afs_int32 anumber);
+extern int afs_ShakeLooseVCaches(afs_int32 anumber, afs_int32 besteffort);
 extern afs_int32 afs_maxvcount;
 extern afs_int32 afs_vcount;
 extern int afsvnumbers;
