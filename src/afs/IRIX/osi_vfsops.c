@@ -185,6 +185,7 @@ afs_unmount(OSI_VFS_ARG(afsp), flags, cr)
      * EBUSY if any still in use
      */
     ObtainWriteLock(&afs_xvcache, 172);
+    afs_delvcount = 0;
  retry:
     for (tq = VLRU.prev; tq != &VLRU; tq = uq) {
 	tvc = QTOV(tq);

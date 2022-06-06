@@ -47,6 +47,7 @@
 
 afs_int32 afs_maxvcount = 0;	/* max number of vcache entries */
 afs_int32 afs_vcount = 0;	/* number of vcache in use now */
+afs_uint32 afs_delvcount = 0;	/* number of unlinked vcaches that haven't been flushed */
 
 #ifdef AFS_SGI_ENV
 int afsvnumbers = 0;
@@ -714,6 +715,25 @@ afs_FlushReclaimedVcaches(void)
 	ReclaimedVCList = tmpReclaimedVCList;
 
     ReleaseWriteLock(&afs_xvreclaim);
+#else
+    afs_uint32 n_evicted, delvcount;
+
+    if (afs_delvcount) {
+	/*
+	 * Save afs_delvcount before calling afs_ShakeLooseVCaches(), as this
+	 * function always resets this global.
+	 */
+	delvcount = afs_delvcount;
+
+	/*
+	 * We have unlinked vcaches that haven't been flushed. In this case, let
+	 * afs_ShakeLooseVCaches() flush them all, as there is no reason to keep
+	 * them around. These entries should be at the 'least recently used
+	 * position' in our VLRU.
+	 */
+	n_evicted = afs_ShakeLooseVCaches(delvcount, 1);
+	afs_delvcount += delvcount - n_evicted;
+    }
 #endif
 }
 
@@ -818,6 +838,22 @@ afs_ShakeLooseVCaches(afs_int32 anumber, afs_int32 besteffort)
     afs_uint32 n_evicted = 0;
 
     loop = 0;
+
+    /*
+     * Always reset afs_delvcount so other threads don't think we still have
+     * unlinked vcaches to be flushed while we're sleeping in afs_FlushVCache().
+     * If we can't flush them all, the caller will either update afs_delvcount
+     * accordingly or let the regular flushing mechanism deal with these entries
+     * later on.
+     */
+    if (afs_delvcount > anumber && afs_delvcount < afs_vcount) {
+	/*
+	 * Make sure that (afs_delvcount < afs_vcount) so a possible
+	 * afs_delvcount underflow wouldn't affect us (sanity check).
+	 */
+	anumber = afs_delvcount;
+    }
+    afs_delvcount = 0;
 
  retry:
     i = 0;
@@ -1009,6 +1045,7 @@ afs_FlushAllVCaches(void)
     struct afs_q *cq, *tq;
 
     ObtainWriteLock(&afs_xvcache, 867);
+    afs_delvcount = 0;
 
  retry:
     for (i = 0; i < VCSIZE; i++) {
