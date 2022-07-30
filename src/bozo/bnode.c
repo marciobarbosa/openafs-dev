@@ -842,7 +842,13 @@ bnode_Init(void)
     return code;
 }
 
-/* free token list returned by parseLine */
+/**
+ * Free the token list returned by bnode_ParseLine()
+ *
+ * @param[in] alist  linked list of token strings created
+ *                   by bnode_ParseLine()
+ * @return 0 on success
+ */
 int
 bnode_FreeTokens(struct bnode_token *alist)
 {
@@ -855,63 +861,72 @@ bnode_FreeTokens(struct bnode_token *alist)
     return 0;
 }
 
-static int
-space(int x)
+struct parse_line_tokens
 {
-    if (x == 0 || x == ' ' || x == '\t' || x == '\n')
-	return 1;
-    else
-	return 0;
+    struct bnode_token *first;
+    struct bnode_token *last;
+};
+
+/**
+ * Add a token to the token list.
+ *
+ * @param[in]  token  token parsed by cmd_Tokenize()
+ * @param[out] rock   context
+ * @return 0 on success
+ *   @retval ENOMEM  out of memory
+ */
+static int
+add_token(char *token, void *rock)
+{
+    struct parse_line_tokens *t = rock;
+    struct bnode_token *node;
+
+    node = calloc(1, sizeof(*node));
+    if (node == NULL)
+	return ENOMEM;
+
+    node->next = NULL;
+    node->key = token;
+    if (t->first == NULL)
+	t->first = node;
+    if (t->last != NULL)
+	t->last->next = node;
+    t->last = node;
+
+    return 0;
 }
 
+/**
+ * Parse a command line string into a list of tokens.
+ *
+ * The caller is responsible for freeing the output linked list with
+ * bnode_FreeTokens().
+ *
+ * @param[in]  aline  input string
+ * @param[out] alist  linked list of token strings
+ *
+ * @return 0 on success
+ *   @retval ENOMEM              out of memory
+ *   @retval CMD_TOOMANY         argv is too small
+ *   @retval CMD_NOCLOSINGQUOTE  missing closing quote in text
+ *   @retval CMD_NOESCAPEDCHAR   bad escape sequence in text
+ */
 int
 bnode_ParseLine(char *aline, struct bnode_token **alist)
 {
-    char tbuffer[256];
-    char *tptr = NULL;
-    int inToken;
-    struct bnode_token *first, *last;
-    struct bnode_token *ttok;
-    int tc;
+    int code;
+    struct parse_line_tokens tokens;
 
-    inToken = 0;		/* not copying token chars at start */
-    first = (struct bnode_token *)0;
-    last = (struct bnode_token *)0;
-    while (1) {
-	tc = *aline++;
-	if (tc == 0 || space(tc)) {	/* terminating null gets us in here, too */
-	    if (inToken) {
-		inToken = 0;	/* end of this token */
-		*tptr++ = 0;
-		ttok = malloc(sizeof(struct bnode_token));
-		ttok->next = (struct bnode_token *)0;
-		ttok->key = strdup(tbuffer);
-		if (last) {
-		    last->next = ttok;
-		    last = ttok;
-		} else
-		    last = ttok;
-		if (!first)
-		    first = ttok;
-	    }
-	} else {
-	    /* an alpha character */
-	    if (!inToken) {
-		tptr = tbuffer;
-		inToken = 1;
-	    }
-	    if (tptr - tbuffer >= sizeof(tbuffer))
-		return -1;	/* token too long */
-	    *tptr++ = tc;
-	}
-	if (tc == 0) {
-	    /* last token flushed 'cause space(0) --> true */
-	    if (last)
-		last->next = (struct bnode_token *)0;
-	    *alist = first;
-	    return 0;
-	}
+    tokens.first = NULL;
+    tokens.last = NULL;
+
+    code = cmd_Tokenize(aline, add_token, &tokens);
+    if (code != 0) {
+	bnode_FreeTokens(tokens.first);
+	return code;
     }
+    *alist = tokens.first;
+    return 0;
 }
 
 #define	MAXVARGS	    128
@@ -919,14 +934,13 @@ int
 bnode_NewProc(struct bnode *abnode, char *aexecString, char *coreName,
 	      struct bnode_proc **aproc)
 {
-    struct bnode_token *tlist, *tt;
     afs_int32 code;
     struct bnode_proc *tp;
     pid_t cpid;
-    char *argv[MAXVARGS];
-    int i;
+    int argc;
+    char **argv = NULL;
 
-    code = bnode_ParseLine(aexecString, &tlist);	/* try parsing first */
+    code = cmd_Split(aexecString, &argc, &argv);    /* try parsing first */
     if (code)
 	return code;
     tp = calloc(1, sizeof(struct bnode_proc));
@@ -937,24 +951,18 @@ bnode_NewProc(struct bnode *abnode, char *aexecString, char *coreName,
     abnode->procStartTime = FT_ApproxTime();
     abnode->procStarts++;
 
-    /* convert linked list of tokens into argv structure */
-    for (tt = tlist, i = 0; i < (MAXVARGS - 1) && tt; tt = tt->next, i++) {
-	argv[i] = tt->key;
-    }
-    argv[i] = NULL;		/* null-terminated */
-
     cpid = spawnprocve(argv[0], argv, environ, -1);
     osi_audit(BOSSpawnProcEvent, 0, AUD_STR, aexecString, AUD_END);
 
     if (cpid == (pid_t) - 1) {
 	bozo_Log("Failed to spawn process for bnode '%s'\n", abnode->name);
-	bnode_FreeTokens(tlist);
+	cmd_FreeSplit(&argv);
 	free(tp);
 	return errno;
     }
     bozo_Log("%s started pid %ld: %s\n", abnode->name, cpid, aexecString);
 
-    bnode_FreeTokens(tlist);
+    cmd_FreeSplit(&argv);
     opr_queue_Prepend(&allProcs, &tp->q);
     *aproc = tp;
     tp->pid = cpid;
