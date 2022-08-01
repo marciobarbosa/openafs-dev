@@ -334,6 +334,8 @@ main(int argc, char **argv)
     code = cmd_Parse(tc, tv, &retopts);
     is_int(CMD_HELP, code, "cmd_Parse returns help indicator with help output");
     ok(retopts == NULL, " ... and options is empty");
+    cmd_FreeOptions(&retopts);
+    cmd_FreeArgv(tv);
 
     /* Check splitting with '=' */
 
@@ -366,6 +368,8 @@ main(int argc, char **argv)
     cmd_SetCommandName("test");
     code = cmd_OpenConfigFile(path);
     is_int(0, code, "cmd_OpenConfigFile succeeds");
+    free(path);
+    path = NULL;
 
     code = cmd_ParseLine("-first 1", tv, &tc, 100);
     is_int(0, code, "cmd_ParseLine succeeds");
@@ -378,11 +382,15 @@ main(int argc, char **argv)
     is_int(0, code, "cmd_OptionAsString succeeds");
     is_string("testing", retstring,
 	      " ... and we have the correct value for sanity");
+    free(retstring);
+    retstring = NULL;
 
     /* Check breaking up a list of options */
     code = cmd_OptionAsList(retopts, copt_second, &list);
     is_int(0, code, "cmd_OptionAsList succeeds");
     checkList(list, "one", "two", "three", "four", NULL);
+    cmd_FreeOptions(&retopts);
+    cmd_FreeArgv(tv);
 
     return 0;
 }
