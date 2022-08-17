@@ -106,6 +106,23 @@ opr_time64_cmp(struct afs_time64 *t1, struct afs_time64 *t2)
 }
 
 static_inline int
+opr_time64_add(struct afs_time64 *in, const struct afs_time64 *add)
+{
+    if (in->clunks > 0 && add->clunks > 0) {
+	if (in->clunks > MAX_AFS_INT64 - add->clunks) {
+	    return ERANGE;
+	}
+    }
+    if (in->clunks < 0 && add->clunks < 0) {
+	if (in->clunks < MIN_AFS_INT64 - add->clunks) {
+	    return ERANGE;
+	}
+    }
+    in->clunks += add->clunks;
+    return 0;
+}
+
+static_inline int
 opr_time64_now(struct afs_time64 *out)
 {
     struct timeval tv;
