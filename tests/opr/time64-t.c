@@ -41,7 +41,7 @@ main(int argc, char **argv)
     time_t now;
     int code;
 
-    plan(19);
+    plan(29);
 
     code = opr_time64_fromSecs(1337065355, &got64);
     is_int(0, code, "opr_time64_fromSecs succeeds");
@@ -94,6 +94,44 @@ main(int argc, char **argv)
     got64.clunks = -922337203685LL;
     val64.clunks = 0;
     is_int(-1, opr_time64_cmp(&got64, &val64), "cmp(-<0)");
+
+    got64.clunks = 13370653551230000LL;
+    val64.clunks = 12345678;
+    code = opr_time64_add(&got64, &val64);
+    is_int(0, code, "opr_time64_add success");
+    is_int64(13370653563575678LL, got64.clunks, "opr_time64_add result");
+
+
+    got64.clunks = 9223372036854775800LL;
+    val64.clunks = 8;
+    code = opr_time64_add(&got64, &val64);
+    is_int(ERANGE, code, "opr_time64_add fails with ERANGE (+)");
+
+    got64.clunks = 9223372036854775800LL;
+    val64.clunks = 7;
+    code = opr_time64_add(&got64, &val64);
+    is_int(0, code, "opr_time64_add success (+ limit)");
+    is_int64(9223372036854775807LL, got64.clunks, "opr_time64_add value");
+
+
+    got64.clunks = -9223372036854775800LL;
+    val64.clunks = -9;
+    code = opr_time64_add(&got64, &val64);
+    is_int(ERANGE, code, "opr_time64_add fails with ERANGE (-)");
+
+    got64.clunks = -9223372036854775800LL;
+    val64.clunks = -8;
+    code = opr_time64_add(&got64, &val64);
+    is_int(0, code, "opr_time64_add success (- limit)");
+    is_int64(-9223372036854775807LL - 1LL, got64.clunks, "opr_time64_add value");
+
+
+    got64.clunks = -9223372036854775800LL;
+    val64.clunks = 9223372036854775807LL;
+    code = opr_time64_add(&got64, &val64);
+    is_int(0, code, "opr_time64_add success (large add)");
+    is_int64(7, got64.clunks, "opr_time64_add value");
+
 
     code = opr_time64_now(&got64);
     is_int(0, code, "opr_time64_now succeeds");
