@@ -2380,6 +2380,12 @@ afsd_run(void)
     int vFilesFound;		/*How many data cache files were found in sweep */
     int currVFile;		/*Current AFS cache file number passed in */
 
+    FILE *fd = fopen("/home/vagrant/control", "r");
+    int control;
+
+    fscanf(fd, "%d", &control);
+    fclose(fd);
+
 	/*
      * Pull out all the configuration info for the workstation's AFS cache and
      * the cellular community we're willing to let our users see.
@@ -2695,6 +2701,10 @@ afsd_run(void)
     if (code) {
 	printf("%s: Error %d during cache init.\n", rn, code);
         exit(1);
+    }
+
+    if (control == 1) {
+	sleep(305);
     }
 
     /* do it before we init the cache inodes */
