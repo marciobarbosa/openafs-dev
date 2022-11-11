@@ -1170,7 +1170,11 @@ DoSalvage(struct rx_connection * aconn, char * aparm1, char * aparm2,
 	}
     } else {
 	/* partition salvage */
-	add_arg(AFSDIR_CANONICAL_SERVER_SALVAGER_FILEPATH);
+	if (dafs) {
+	    add_arg(AFSDIR_CANONICAL_SERVER_DASALVAGER_FILEPATH);
+	} else {
+	    add_arg(AFSDIR_CANONICAL_SERVER_SALVAGER_FILEPATH);
+	}
 	add_arg("-force");
 	add_arg(partName);
     }
