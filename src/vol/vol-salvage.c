@@ -270,6 +270,7 @@ char *tmpdir = NULL;
 
 
 /* Forward declarations */
+static void LogMaybe(const char *format, ...);
 static void QuietExit(int) AFS_NORETURN;
 static void SalvageShowLog(void);
 static int IsVnodeOrphaned(struct SalvInfo *salvinfo, VnodeId vnode);
@@ -577,9 +578,8 @@ SalvageFileSysParallel(struct DiskPartition64 *partP)
 
 	/* Start up a new salvage job on a partition in job slot "startjob" */
 	if (startjob != -1) {
-	    if (!Showmode)
-		Log("Starting salvage of file system partition %s\n",
-		    jobs[startjob]->partP->name);
+	    LogMaybe("Starting salvage of file system partition %s\n",
+		     jobs[startjob]->partP->name);
 #ifdef AFS_NT40_ENV
 	    /* For NT, we not only fork, but re-exec the salvager. Pass in the
 	     * commands and pass the child job number via the data path.
@@ -771,9 +771,8 @@ SalvageFileSys1(struct DiskPartition64 *partP, VolumeId singleVolumeNumber)
 	} else {
 	    ForceSalvage = UseTheForceLuke(salvinfo->fileSysPath);
 	}
-	if (!Showmode)
-	    Log("SALVAGING FILE SYSTEM PARTITION %s (device=%s%s)\n",
-		partP->name, name, (Testing ? "(READONLY mode)" : ""));
+	LogMaybe("SALVAGING FILE SYSTEM PARTITION %s (device=%s%s)\n",
+		 partP->name, name, (Testing ? "(READONLY mode)" : ""));
 	if (ForceSalvage)
 	    Log("***Forced salvage of all volumes on this partition***\n");
     }
@@ -972,9 +971,9 @@ SalvageFileSys1(struct DiskPartition64 *partP, VolumeId singleVolumeNumber)
 	    }
 	}
     } else {
-	if (!Showmode)
-	    Log("SALVAGING OF PARTITION %s%s COMPLETED\n",
-		salvinfo->fileSysPartition->name, (Testing ? " (READONLY mode)" : ""));
+	char *pname = salvinfo->fileSysPartition->name;
+	LogMaybe("SALVAGING OF PARTITION %s%s COMPLETED\n", pname,
+		 (Testing ? " (READONLY mode)" : ""));
     }
 
     OS_CLOSE(inodeFile);		/* SalvageVolumeGroup was the last which needed it. */
@@ -993,8 +992,8 @@ DeleteExtraVolumeHeaderFile(struct SalvInfo *salvinfo, struct VolumeSummary *vsp
     VolumeExternalName_r(vsp->header.id, filename, sizeof(filename));
     sprintf(path, "%s" OS_DIRSEP "%s", salvinfo->fileSysPath, filename);
 
-    if (!Showmode)
-	Log("The volume header file %s is not associated with any actual data (%sdeleted)\n", path, (Testing ? "would have been " : ""));
+    LogMaybe("The volume header file %s is not associated with any actual data "
+	     "(%sdeleted)\n", path, (Testing ? "would have been " : ""));
     if (!Testing) {
 	afs_int32 code;
 	code = VDestroyVolumeDiskHeader(salvinfo->fileSysPartition, vsp->header.id, vsp->header.parent);
@@ -1659,11 +1658,11 @@ RecordHeader(struct DiskPartition64 *dp, const char *name,
 	    }
 	}
 	if (badname) {
-	    if (last && !Showmode) {
-		Log("Volume header file %s is incorrectly named (should be %s "
-		    "not %s); %sdeleted (it will be recreated later, if "
-		    "necessary)\n", name, nameShouldBe, base,
-		    (Testing ? "it would have been " : ""));
+	    if (last) {
+		LogMaybe("Volume header file %s is incorrectly named (should "
+			 "be %s not %s); %sdeleted (it will be recreated "
+			 "later, if necessary)\n", name, nameShouldBe, base,
+			 (Testing ? "it would have been " : ""));
 	    }
 	    return 1;
 	}
@@ -1718,9 +1717,8 @@ UnlinkHeader(struct DiskPartition64 *dp, const char *name,
 
     if (!hdr) {
 	/* no header; header is too bogus to read in at all */
-	if (!Showmode) {
-	    Log("%s is not a legitimate volume header file; %sdeleted\n", name, (Testing ? "it would have been " : ""));
-	}
+	LogMaybe("%s is not a legitimate volume header file; %sdeleted\n", name,
+		 (Testing ? "it would have been " : ""));
 	if (!Testing) {
 	    dounlink = 1;
 	}
@@ -2100,9 +2098,10 @@ DoSalvageVolumeGroup(struct SalvInfo *salvinfo, struct InodeSummary *isp, int nV
 	    }
 	}
 #endif
-	if (!Showmode)
-	    Log("%s VOLUME %" AFS_VOLID_FMT "%s.\n", rw ? "SALVAGING" : "CHECKING CLONED",
-		afs_printable_VolumeId_lu(lisp->volumeId), (Testing ? "(READONLY mode)" : ""));
+	LogMaybe("%s VOLUME %" AFS_VOLID_FMT "%s.\n",
+		 rw ? "SALVAGING" : "CHECKING CLONED",
+		 afs_printable_VolumeId_lu(lisp->volumeId),
+		 (Testing ? "(READONLY mode)" : ""));
 	/* Check inodes twice.  The second time do things seriously.  This
 	 * way the whole RO volume can be deleted, below, if anything goes wrong */
 	for (check = 1; check >= 0; check--) {
@@ -2337,19 +2336,16 @@ SalvageVolumeHeaderFile(struct SalvInfo *salvinfo, struct InodeSummary *isp,
 		/* Will be caught in the loop below */
 		continue;
 	    }
-	    if (!Showmode) {
-		Log("Duplicate special %d inodes for volume %" AFS_VOLID_FMT " found (%s, %s);\n",
-		    ip->u.special.type, afs_printable_VolumeId_lu(isp->volumeId),
-		    PrintInode(stmp1, ip->inodeNumber),
-		    PrintInode(stmp2, (ip+1)->inodeNumber));
-	    }
+	    LogMaybe("Duplicate special %d inodes for volume %" AFS_VOLID_FMT " "
+		     "found (%s, %s);\n", ip->u.special.type,
+		     afs_printable_VolumeId_lu(isp->volumeId),
+		     PrintInode(stmp1, ip->inodeNumber),
+		     PrintInode(stmp2, (ip+1)->inodeNumber));
 	    if (skip && goodspecial[ip->u.special.type-1].valid) {
 		Inode gi = goodspecial[ip->u.special.type-1].inode;
 
-		if (!Showmode) {
-		    Log("using special inode referenced by vol header (%s)\n",
-		        PrintInode(stmp1, gi));
-		}
+		LogMaybe("using special inode referenced by vol header (%s)\n",
+			 PrintInode(stmp1, gi));
 
 		/* the volume header references some special inode of
 		 * this type in the inodes array; are we it? */
@@ -2361,8 +2357,9 @@ SalvageVolumeHeaderFile(struct SalvInfo *salvinfo, struct InodeSummary *isp,
 		    skip[i+1] = 1;
 		}
 	    } else {
-		if (!Showmode)
-		    Log("cannot determine which is correct; salvage of volume %" AFS_VOLID_FMT " aborted\n", afs_printable_VolumeId_lu(isp->volumeId));
+		LogMaybe("cannot determine which is correct; salvage of volume "
+			 "%" AFS_VOLID_FMT " aborted\n",
+			 afs_printable_VolumeId_lu(isp->volumeId));
 		if (skip) {
 		    free(skip);
 		}
@@ -2450,10 +2447,9 @@ SalvageVolumeHeaderFile(struct SalvInfo *salvinfo, struct InodeSummary *isp,
 	    Log("No header file for volume %" AFS_VOLID_FMT "\n", afs_printable_VolumeId_lu(isp->volumeId));
 	    return -1;
 	}
-	if (!Showmode)
-	    Log("No header file for volume %" AFS_VOLID_FMT "; %screating %s\n",
-		afs_printable_VolumeId_lu(isp->volumeId), (Testing ? "it would have been " : ""),
-		path);
+	LogMaybe("No header file for volume %" AFS_VOLID_FMT "; %screating "
+		 "%s\n", afs_printable_VolumeId_lu(isp->volumeId),
+		 (Testing ? "it would have been " : ""), path);
 	isp->volSummary = calloc(1, sizeof(struct VolumeSummary));
 
 	writefunc = VCreateVolumeDiskHeader;
@@ -2483,9 +2479,9 @@ SalvageVolumeHeaderFile(struct SalvInfo *salvinfo, struct InodeSummary *isp,
 	memcpy(&isp->volSummary->header, &tempHeader,
 	       sizeof(struct VolumeHeader));
 	if (Testing) {
-	    if (!Showmode)
-		Log("It would have written a new header file for volume %" AFS_VOLID_FMT "\n",
-		    afs_printable_VolumeId_lu(isp->volumeId));
+	    LogMaybe("It would have written a new header file for volume "
+		     "%" AFS_VOLID_FMT "\n",
+		     afs_printable_VolumeId_lu(isp->volumeId));
 	} else {
 	    afs_int32 code;
 	    VolumeHeaderToDisk(&diskHeader, &tempHeader);
@@ -2527,9 +2523,8 @@ SalvageHeader(struct SalvInfo *salvinfo, struct afs_inode_info *sp,
 	    Log("Missing inode in volume header (%s)\n", sp->description);
 	    return -1;
 	}
-	if (!Showmode)
-	    Log("Missing inode in volume header (%s); %s\n", sp->description,
-		(Testing ? "it would have recreated it" : "recreating"));
+	LogMaybe("Missing inode in volume header (%s); %s\n", sp->description,
+		 (Testing ? "it would have recreated it" : "recreating"));
 	if (!Testing) {
 	    *(sp->inode) =
 		IH_CREATE(NULL, salvinfo->fileSysDevice, salvinfo->fileSysPath, 0, isp->volumeId,
@@ -2546,8 +2541,8 @@ SalvageHeader(struct SalvInfo *salvinfo, struct afs_inode_info *sp,
     fdP = IH_OPEN(specH);
     if (OKToZap && (fdP == NULL) && BadError(errno)) {
 	/* bail out early and destroy the volume */
-	if (!Showmode)
-	    Log("Still can't open volume header inode (%s), destroying volume\n", sp->description);
+	LogMaybe("Still can't open volume header inode (%s), destroying "
+		 "volume\n", sp->description);
 	if (deleteMe)
 	    *deleteMe = 1;
 	IH_RELEASE(specH);
@@ -2651,15 +2646,16 @@ SalvageHeader(struct SalvInfo *salvinfo, struct afs_inode_info *sp,
 
 	    if (salvinfo->VolInfo.updateDate) {
 		strcpy(update, TimeStamp(buffer, sizeof(buffer), salvinfo->VolInfo.updateDate, 0));
-		if (!Showmode)
-		    Log("%s (%" AFS_VOLID_FMT ") %supdated %s\n", salvinfo->VolInfo.name,
-			afs_printable_VolumeId_lu(salvinfo->VolInfo.id),
-			(Testing ? "it would have been " : ""), update);
+		LogMaybe("%s (%" AFS_VOLID_FMT ") %supdated %s\n",
+			 salvinfo->VolInfo.name,
+			 afs_printable_VolumeId_lu(salvinfo->VolInfo.id),
+			 (Testing ? "it would have been " : ""), update);
 	    } else {
 		strcpy(update, TimeStamp(buffer, sizeof(buffer), salvinfo->VolInfo.creationDate, 0));
-		if (!Showmode)
-		    Log("%s (%" AFS_VOLID_FMT ") not updated (created %s)\n",
-			salvinfo->VolInfo.name, afs_printable_VolumeId_lu(salvinfo->VolInfo.id), update);
+		LogMaybe("%s (%" AFS_VOLID_FMT ") not updated (created %s)\n",
+			 salvinfo->VolInfo.name,
+			 afs_printable_VolumeId_lu(salvinfo->VolInfo.id),
+			 update);
 	    }
 
 	}
@@ -2809,9 +2805,10 @@ SalvageIndex(struct SalvInfo *salvinfo, Inode ino, VnodeClass class, int RW,
 			 * uniquifiers of the same vnode...
 			 */
 			if (IUnique(vu) != IUnique(iu)) {
-			    if (!Showmode) {
-				Log("Vnode %u: vnode.unique, %u, does not match inode unique, %u; fixed, but status will be wrong\n", vnodeNumber, IUnique(vu), IUnique(iu));
-			    }
+			    LogMaybe("Vnode %u: vnode.unique, %u, does not "
+				     "match inode unique, %u; fixed, but "
+				     "status will be wrong\n", vnodeNumber,
+				     IUnique(vu), IUnique(iu));
 
 			    vnode->uniquifier = iu;
 #ifdef	AFS_3DISPARES
@@ -2861,8 +2858,8 @@ SalvageIndex(struct SalvInfo *salvinfo, Inode ino, VnodeClass class, int RW,
 			    if (vd < id) {
 #endif /* AFS_SGI_EXMAG */
 #endif
-				if (!Showmode)
-				    Log("Vnode %d: version < inode version; fixed (old status)\n", vnodeNumber);
+				LogMaybe("Vnode %d: version < inode version; "
+					 "fixed (old status)\n", vnodeNumber);
 				vnode->dataVersion = id;
 				vnodeChanged = 1;
 			    }
@@ -2870,29 +2867,38 @@ SalvageIndex(struct SalvInfo *salvinfo, Inode ino, VnodeClass class, int RW,
 		    }
 		    if (ip->inodeNumber != VNDISK_GET_INO(vnode)) {
 			if (check) {
-			    if (!Showmode) {
-				Log("Vnode %d:  inode number incorrect (is %s should be %s). FileSize=%llu\n", vnodeNumber, PrintInode(stmp1, VNDISK_GET_INO(vnode)), PrintInode(stmp2, ip->inodeNumber), (afs_uintmax_t) ip->byteCount);
-			    }
+			    LogMaybe("Vnode %d:  inode number incorrect (is %s "
+				     "should be %s). FileSize=%llu\n",
+				     vnodeNumber,
+				     PrintInode(stmp1, VNDISK_GET_INO(vnode)),
+				     PrintInode(stmp2, ip->inodeNumber),
+				     (afs_uintmax_t) ip->byteCount);
 			    VNDISK_SET_INO(vnode, ip->inodeNumber);
 			    err = -1;
 			    goto zooks;
 			}
-			if (!Showmode) {
-			    Log("Vnode %d: inode number incorrect; changed from %s to %s. FileSize=%llu\n", vnodeNumber, PrintInode(stmp1, VNDISK_GET_INO(vnode)), PrintInode(stmp2, ip->inodeNumber), (afs_uintmax_t) ip->byteCount);
-			}
+			LogMaybe("Vnode %d: inode number incorrect; changed "
+				 "from %s to %s. FileSize=%llu\n", vnodeNumber,
+				 PrintInode(stmp1, VNDISK_GET_INO(vnode)),
+				 PrintInode(stmp2, ip->inodeNumber),
+				 (afs_uintmax_t) ip->byteCount);
 			VNDISK_SET_INO(vnode, ip->inodeNumber);
 			vnodeChanged = 1;
 		    }
 		    VNDISK_GET_LEN(vnodeLength, vnode);
 		    if (ip->byteCount != vnodeLength) {
 			if (check) {
-			    if (!Showmode)
-				Log("Vnode %d: length incorrect; (is %llu should be %llu)\n", vnodeNumber, (afs_uintmax_t) vnodeLength, (afs_uintmax_t) ip->byteCount);
+			    LogMaybe("Vnode %d: length incorrect; (is %llu "
+				     "should be %llu)\n", vnodeNumber,
+				     (afs_uintmax_t) vnodeLength,
+				     (afs_uintmax_t) ip->byteCount);
 			    err = -1;
 			    goto zooks;
 			}
-			if (!Showmode)
-			    Log("Vnode %d: length incorrect; changed from %llu to %llu\n", vnodeNumber, (afs_uintmax_t) vnodeLength, (afs_uintmax_t) ip->byteCount);
+			LogMaybe("Vnode %d: length incorrect; changed from "
+				 "%llu to %llu\n", vnodeNumber,
+				 (afs_uintmax_t) vnodeLength,
+				 (afs_uintmax_t) ip->byteCount);
 			VNDISK_SET_LEN(vnode, ip->byteCount);
 			vnodeChanged = 1;
 		    }
@@ -2907,12 +2913,14 @@ SalvageIndex(struct SalvInfo *salvinfo, Inode ino, VnodeClass class, int RW,
 			/* No matching inode--get rid of the vnode */
 			if (check) {
 			    if (VNDISK_GET_INO(vnode)) {
-				if (!Showmode) {
-				    Log("Vnode %d (unique %u): corresponding inode %s is missing\n", vnodeNumber, vnode->uniquifier, PrintInode(stmp, VNDISK_GET_INO(vnode)));
-				}
+				LogMaybe("Vnode %d (unique %u): corresponding "
+					 "inode %s is missing\n", vnodeNumber,
+					 vnode->uniquifier,
+					 PrintInode(stmp, VNDISK_GET_INO(vnode)));
 			    } else {
-				if (!Showmode)
-				    Log("Vnode %d (unique %u): bad directory vnode (no inode number listed)\n", vnodeNumber, vnode->uniquifier);
+				LogMaybe("Vnode %d (unique %u): bad directory "
+					 "vnode (no inode number listed)\n",
+					 vnodeNumber, vnode->uniquifier);
 			    }
 			    err = -1;
 			    goto zooks;
@@ -3136,9 +3144,9 @@ JudgeEntry(void *arock, char *name, afs_int32 vnodeNumber,
 
     vnodeEssence = CheckVnodeNumber(salvinfo, vnodeNumber);
     if (vnodeEssence == NULL) {
-	if (!Showmode) {
-	    Log("dir vnode %u: invalid entry deleted: %s" OS_DIRSEP "%s (vnode %u, unique %u)\n", dir->vnodeNumber, dir->name ? dir->name : "??", name, vnodeNumber, unique);
-	}
+	LogMaybe("dir vnode %u: invalid entry deleted: %s" OS_DIRSEP "%s "
+		 "(vnode %u, unique %u)\n", dir->vnodeNumber,
+		 dir->name ? dir->name : "??", name, vnodeNumber, unique);
 	if (!Testing) {
 	    CopyOnWrite(salvinfo, dir);
 	    opr_Verify(afs_dir_Delete(&dir->dirHandle, name) == 0);
@@ -3203,11 +3211,12 @@ JudgeEntry(void *arock, char *name, afs_int32 vnodeNumber,
 		 * at the vnode of the current directory (if '.') or the parent
 		 * directory (if '..'). */
 	} else {
-	    if (!Showmode) {
-		Log("dir vnode %u: %s" OS_DIRSEP "%s (vnode %u): unique changed from %u to %u %s\n",
-		    dir->vnodeNumber, (dir->name ? dir->name : "??"), name, vnodeNumber, unique,
-		    vnodeEssence->unique, (!todelete ? "" : (Testing ? "-- would have deleted" : "-- deleted")));
-	    }
+	    char *delmsg = (Testing ? "-- would have deleted" : "-- deleted");
+	    LogMaybe("dir vnode %u: %s" OS_DIRSEP "%s (vnode %u): unique "
+		     "changed from %u to %u %s\n", dir->vnodeNumber,
+		     (dir->name ? dir->name : "??"), name, vnodeNumber, unique,
+		     vnodeEssence->unique,
+		     (!todelete ? "" : delmsg));
 	    if (!Testing) {
 		AFSFid fid;
 		fid.Vnode = vnodeNumber;
@@ -3224,8 +3233,9 @@ JudgeEntry(void *arock, char *name, afs_int32 vnodeNumber,
 
     if (strcmp(name, ".") == 0) {
 	if (dir->vnodeNumber != vnodeNumber || (dir->unique != unique)) {
-	    if (!Showmode)
-		Log("directory vnode %u.%u: bad '.' entry (was %u.%u); fixed\n", dir->vnodeNumber, dir->unique, vnodeNumber, unique);
+	    LogMaybe("directory vnode %u.%u: bad '.' entry (was %u.%u); "
+		     "fixed\n", dir->vnodeNumber, dir->unique, vnodeNumber,
+		     unique);
 	    if (!Testing) {
 		AFSFid fid;
 		CopyOnWrite(salvinfo, dir);
@@ -3252,8 +3262,9 @@ JudgeEntry(void *arock, char *name, afs_int32 vnodeNumber,
 	    pa.Unique = dir->unique;
 	}
 	if ((pa.Vnode != vnodeNumber) || (pa.Unique != unique)) {
-	    if (!Showmode)
-		Log("directory vnode %u.%u: bad '..' entry (was %u.%u); fixed\n", dir->vnodeNumber, dir->unique, vnodeNumber, unique);
+	    LogMaybe("directory vnode %u.%u: bad '..' entry (was %u.%u); "
+		     "fixed\n", dir->vnodeNumber, dir->unique, vnodeNumber,
+		     unique);
 	    if (!Testing) {
 		CopyOnWrite(salvinfo, dir);
 		opr_Verify(afs_dir_Delete(&dir->dirHandle, "..") == 0);
@@ -3266,9 +3277,9 @@ JudgeEntry(void *arock, char *name, afs_int32 vnodeNumber,
 	}
 	dir->haveDotDot = 1;
     } else if (strncmp(name, ".__afs", 6) == 0) {
-	if (!Showmode) {
-	    Log("dir vnode %u: special old unlink-while-referenced file %s %s deleted (vnode %u)\n", dir->vnodeNumber, name, (Testing ? "would have been" : "is"), vnodeNumber);
-	}
+	LogMaybe("dir vnode %u: special old unlink-while-referenced file %s %s "
+		 "deleted (vnode %u)\n", dir->vnodeNumber, name,
+		 (Testing ? "would have been" : "is"), vnodeNumber);
 	if (!Testing) {
 	    CopyOnWrite(salvinfo, dir);
 	    opr_Verify(afs_dir_Delete(&dir->dirHandle, name) == 0);
@@ -3345,21 +3356,33 @@ JudgeEntry(void *arock, char *name, afs_int32 vnodeNumber,
 		 * Orphaned dirs cannot claim a file (it may belong to
 		 * another non-orphaned dir).
 		 */
-		if (!Showmode) {
-		    Log("dir vnode %u: %s" OS_DIRSEP "%s (vnode %u, unique %u) -- parent vnode %schanged from %u to %u\n", dir->vnodeNumber, (dir->name ? dir->name : "??"), name, vnodeNumber, unique, (Testing ? "would have been " : ""), vnodeEssence->parent, dir->vnodeNumber);
-		}
+		LogMaybe("dir vnode %u: %s" OS_DIRSEP "%s (vnode %u, unique %u) "
+			 "-- parent vnode %schanged from %u to %u\n",
+			 dir->vnodeNumber, (dir->name ? dir->name : "??"), name,
+			 vnodeNumber, unique, (Testing ? "would have been " : ""),
+			 vnodeEssence->parent, dir->vnodeNumber);
 		vnodeEssence->parent = dir->vnodeNumber;
 		vnodeEssence->changed = 1;
 	    } else {
 		/* Vnode was claimed by another directory */
-		if (!Showmode) {
-		    if (dirOrphaned) {
-			Log("dir vnode %u: %s" OS_DIRSEP "%s parent vnode is %u (vnode %u, unique %u) -- %sdeleted\n", dir->vnodeNumber, (dir->name ? dir->name : "??"), name, vnodeEssence->parent, vnodeNumber, unique, (Testing ? "would have been " : ""));
-		    } else if (vnodeNumber == 1) {
-			Log("dir vnode %d: %s" OS_DIRSEP "%s is invalid (vnode %d, unique %d) -- %sdeleted\n", dir->vnodeNumber, (dir->name ? dir->name : "??"), name, vnodeNumber, unique, (Testing ? "would have been " : ""));
-		    } else {
-			Log("dir vnode %u: %s" OS_DIRSEP "%s already claimed by directory vnode %u (vnode %u, unique %u) -- %sdeleted\n", dir->vnodeNumber, (dir->name ? dir->name : "??"), name, vnodeEssence->parent, vnodeNumber, unique, (Testing ? "would have been " : ""));
-		    }
+		if (dirOrphaned) {
+		    LogMaybe("dir vnode %u: %s" OS_DIRSEP "%s parent vnode is "
+			     "%u (vnode %u, unique %u) -- %sdeleted\n",
+			     dir->vnodeNumber, (dir->name ? dir->name : "??"),
+			     name, vnodeEssence->parent, vnodeNumber, unique,
+			     (Testing ? "would have been " : ""));
+		} else if (vnodeNumber == 1) {
+		    LogMaybe("dir vnode %d: %s" OS_DIRSEP "%s is invalid (vnode "
+			     "%d, unique %d) -- %sdeleted\n", dir->vnodeNumber,
+			     (dir->name ? dir->name : "??"), name, vnodeNumber,
+			     unique, (Testing ? "would have been " : ""));
+		} else {
+		    LogMaybe("dir vnode %u: %s" OS_DIRSEP "%s already claimed "
+			     "by directory vnode %u (vnode %u, unique %u) -- "
+			     "%sdeleted\n", dir->vnodeNumber,
+			     (dir->name ? dir->name : "??"), name,
+			     vnodeEssence->parent, vnodeNumber, unique,
+			     (Testing ? "would have been " : ""));
 		}
 		if (!Testing) {
 		    CopyOnWrite(salvinfo, dir);
@@ -4227,9 +4250,10 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
 			memset(&vnode, 0, sizeof(vnode));
 		    }
 		} else if (vnp->count) {
-		    if (!Showmode) {
-			Log("Vnode %u: link count incorrect (was %d, %s %d)\n", vnodeNumber, oldCount, (Testing ? "would have changed to" : "now"), vnode.linkCount);
-		    }
+		    LogMaybe("Vnode %u: link count incorrect (was %d, %s %d)\n",
+			     vnodeNumber, oldCount,
+			     (Testing ? "would have changed to" : "now"),
+			     vnode.linkCount);
 		} else {
 		    vnode.modeBits = vnp->modeBits;
 		}
@@ -4246,11 +4270,10 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
 	    }
 	}
     }
-    if (!Showmode && ofiles) {
-	Log("%s %d orphaned files and directories (approx. %u KB)\n",
-	    (!Testing
-	     && (orphans == ORPH_REMOVE)) ? "Removed" : "Found", ofiles,
-	    oblocks);
+    if (ofiles) {
+	LogMaybe("%s %d orphaned files and directories (approx. %u KB)\n",
+		 (!Testing && (orphans == ORPH_REMOVE)) ? "Removed" : "Found",
+		 ofiles, oblocks);
     }
 
     for (class = 0; class < nVNODECLASSES; class++) {
@@ -4270,8 +4293,8 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
 
     /* Make sure the uniquifer is big enough: maxunique is the real maxUniquifier */
     if (volHeader.uniquifier < (maxunique + 1)) {
-	if (!Showmode)
-	    Log("Volume uniquifier %u is too low (max uniq %u); fixed\n", volHeader.uniquifier, maxunique);
+	LogMaybe("Volume uniquifier %u is too low (max uniq %u); fixed\n",
+		 volHeader.uniquifier, maxunique);
 	/* Plus 2,000 in case there are workstations out there with
 	 * cached vnodes that have since been deleted
 	 */
@@ -4336,11 +4359,10 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
 	nBytes = IH_IWRITE(h, 0, (char *)&volHeader, sizeof(volHeader));
 	opr_Assert(nBytes == sizeof(volHeader));
     }
-    if (!Showmode) {
-	Log("%sSalvaged %s (%" AFS_VOLID_FMT "): %d files, %d blocks\n",
-	    (Testing ? "It would have " : ""), volHeader.name, afs_printable_VolumeId_lu(volHeader.id),
-	    FilesInVolume, BlocksInVolume);
-    }
+    LogMaybe("%sSalvaged %s (%" AFS_VOLID_FMT "): %d files, %d blocks\n",
+	     (Testing ? "It would have " : ""), volHeader.name,
+	     afs_printable_VolumeId_lu(volHeader.id), FilesInVolume,
+	     BlocksInVolume);
 
     IH_RELEASE(salvinfo->vnodeInfo[vSmall].handle);
     IH_RELEASE(salvinfo->vnodeInfo[vLarge].handle);
@@ -4381,15 +4403,17 @@ MaybeZapVolume(struct SalvInfo *salvinfo, struct InodeSummary *isp,
     if (readOnly(isp) || deleteMe) {
 	if (isp->volSummary && !isp->volSummary->deleted) {
 	    if (deleteMe) {
-		if (!Showmode)
-		    Log("Volume %" AFS_VOLID_FMT " (is only a partial volume--probably an attempt was made to move/restore it when a machine crash occured.\n", afs_printable_VolumeId_lu(isp->volumeId));
-		if (!Showmode)
-		    Log("It will be deleted on this server (you may find it elsewhere)\n");
+		LogMaybe("Volume %" AFS_VOLID_FMT " (is only a partial volume "
+			 "--probably an attempt was made to move/restore it "
+			 "when a machine crash occured.\n",
+			 afs_printable_VolumeId_lu(isp->volumeId));
+		LogMaybe("It will be deleted on this server (you may find it "
+			 "elsewhere)\n");
 	    } else {
-		if (!Showmode)
-		    Log("Volume %" AFS_VOLID_FMT " needs to be salvaged.  Since it is read-only, however,\n", afs_printable_VolumeId_lu(isp->volumeId));
-		if (!Showmode)
-		    Log("it will be deleted instead.  It should be recloned.\n");
+		LogMaybe("Volume %" AFS_VOLID_FMT " needs to be salvaged. "
+			 "Since it is read-only, however,\n",
+			 afs_printable_VolumeId_lu(isp->volumeId));
+		LogMaybe("it will be deleted instead.  It should be recloned.\n");
 	    }
 	    if (!Testing) {
 		afs_int32 code;
@@ -4917,6 +4941,18 @@ Log(const char *format, ...)
     va_start(args, format);
     vLog(format, args);
     va_end(args);
+}
+
+void
+LogMaybe(const char *format, ...)
+{
+    va_list args;
+
+    if (!Showmode) {
+	va_start(args, format);
+	vLog(format, args);
+	va_end(args);
+    }
 }
 
 void
