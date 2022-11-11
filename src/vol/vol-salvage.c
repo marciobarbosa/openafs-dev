@@ -1624,8 +1624,8 @@ RecordHeader(struct DiskPartition64 *dp, const char *name,
 	    base = name;
 	}
 
-	snprintf(nameShouldBe, sizeof nameShouldBe,
-	         VFORMAT, afs_printable_VolumeId_lu(summary.header.id));
+	VolumeExternalName_r(summary.header.id, nameShouldBe,
+			     sizeof(nameShouldBe));
 
 
 	if (strcmp(nameShouldBe, base)) {
@@ -2439,8 +2439,7 @@ SalvageVolumeHeaderFile(struct SalvInfo *salvinfo, struct InodeSummary *isp,
     if (isp->volSummary == NULL) {
 	char path[VMAXPATHLEN];
 	char headerName[64];
-	snprintf(headerName, sizeof headerName, VFORMAT,
-		 afs_printable_VolumeId_lu(isp->volumeId));
+	VolumeExternalName_r(isp->volumeId, headerName, sizeof(headerName));
 	snprintf(path, sizeof path, "%s" OS_DIRSEP "%s",
 	         salvinfo->fileSysPath, headerName);
 	if (check) {

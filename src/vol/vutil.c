@@ -195,8 +195,7 @@ VCreateVolume_r(Error * ec, char *partname, VolumeId volumeId, VolumeId parentId
     vol.stamp.magic = VOLUMEINFOMAGIC;
     vol.stamp.version = VOLUMEINFOVERSION;
     vol.destroyMe = DESTROY_ME;
-    snprintf(headerName, sizeof headerName, VFORMAT,
-	     afs_printable_VolumeId_lu(vol.id));
+    VolumeExternalName_r(vol.id, headerName, sizeof(headerName));
     snprintf(volumePath, sizeof volumePath, "%s" OS_DIRSEP "%s",
 	     VPartitionPath(partition), headerName);
     rc = stat(volumePath, &st);
