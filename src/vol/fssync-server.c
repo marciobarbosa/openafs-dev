@@ -779,7 +779,7 @@ FSYNC_com_VolOn(FSSYNC_VolOp_command * vcom, SYNC_response * res)
     }
 #else /* !AFS_DEMAND_ATTACH_FS */
     tvolName[0] = OS_DIRSEPC;
-    snprintf(&tvolName[1], sizeof(tvolName)-1, VFORMAT, afs_printable_VolumeId_lu(vcom->vop->volume));
+    VolumeExternalName_r(vcom->vop->volume, &tvolName[1], sizeof(tvolName) - 1);
     tvolName[sizeof(tvolName)-1] = '\0';
 
     vp = VAttachVolumeByName_r(&error, vcom->vop->partName, tvolName,
@@ -2009,7 +2009,7 @@ FSYNC_Drop(osi_socket fd)
 	    }
 #else
 	    tvolName[0] = OS_DIRSEPC;
-	    sprintf(&tvolName[1], VFORMAT, afs_printable_VolumeId_lu(p[i].volumeID));
+	    VolumeExternalName_r(p[i].volumeID, &tvolName[1], sizeof(tvolName) - 1);
 	    vp = VAttachVolumeByName_r(&error, p[i].partName, tvolName,
 				       V_VOLUPD);
 	    if (vp)

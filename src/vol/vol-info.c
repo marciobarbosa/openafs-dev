@@ -627,8 +627,7 @@ volinfo_ScanPartitions(struct VolInfoOpt *opt, char *partNameOrId, VolumeId volu
 		goto cleanup;
 	    }
 	}
-	snprintf(name1, sizeof name1, VFORMAT,
-		 afs_printable_VolumeId_lu(volumeId));
+	VolumeExternalName_r(volumeId, name1, sizeof(name1));
 	if (opt->printHeading) {
 	    PrintColumnHeading(opt);
 	}

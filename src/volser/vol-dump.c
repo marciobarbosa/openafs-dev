@@ -201,7 +201,7 @@ handleit(struct cmd_syndesc *as, void *arock)
 	exit(1);
     }
 
-    snprintf(name1, sizeof name1, VFORMAT, (unsigned long)volumeId);
+    VolumeExternalName_r(volumeId, name1, sizeof(name1));
     HandleVolume(partP, name1, fileName, fromtime);
     return 0;
 }
