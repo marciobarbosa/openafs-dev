@@ -203,8 +203,10 @@ handleit(struct cmd_syndesc *as, void *arock)
     }
     if (as->parms[2].items)	/* -debug */
 	debug = 1;
-    if (as->parms[3].items)	/* -nowrite */
+    if (as->parms[3].items) {	/* -nowrite */
 	Testing = 1;
+	onRWerror = RW_IGNORE;	/* overrides default RW_KEEP */
+    }
     if (as->parms[4].items)	/* -inodes */
 	ListInodeOption = 1;
     if (as->parms[5].items || as->parms[21].items)	/* -force, -f */
@@ -323,6 +325,22 @@ handleit(struct cmd_syndesc *as, void *arock)
 	Exit(0);
     }
 #endif
+
+    if ((ti = as->parms[22].items)) {	/* -on-rw-error */
+	if (Testing) {
+	    printf("-nowrite option overrides -on-rw-error %s\n", ti->data);
+	    onRWerror = RW_IGNORE;	/* prohibit changes or removal */
+	} else if (strcmp(ti->data, "keep") == 0
+		 || strcmp(ti->data, "k") == 0)
+	    onRWerror = RW_KEEP;	/* keep changed RW volumes */
+	else if (strcmp(ti->data, "remove") == 0
+		 || strcmp(ti->data, "r") == 0)
+	    onRWerror = RW_REMOVE;	/* remove changed RW volumes */
+	else {
+	    printf("Invalid argument -on-rw-error %s\n", ti->data);
+	    exit(-1);
+	}
+    }
 
     /* Note:  if seenvol we initialize this as a standard volume utility:  this has the
      * implication that the file server may be running; negotations have to be made with
@@ -540,6 +558,7 @@ main(int argc, char **argv)
 #endif /* FAST_RESTART */
     cmd_Seek(ts, 21); /* skip DontSalvage and forceDAFS if needed */
     cmd_AddParm(ts, "-f", CMD_FLAG, CMD_OPTIONAL, "Alias for -force");
+    cmd_AddParm(ts, "-on-rw-error", CMD_SINGLE, CMD_OPTIONAL, "keep | remove modified RW volumes");
     err = cmd_Dispatch(argc, argv);
     Exit(err);
     AFS_UNREACHED(return 0);

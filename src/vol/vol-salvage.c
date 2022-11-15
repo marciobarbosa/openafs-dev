@@ -204,6 +204,7 @@ char *ShowLogFilename = NULL;    /* log file name for -showlog */
 int ShowSuid = 0;		/* -showsuid flag */
 int ShowMounts = 0;		/* -showmounts flag */
 int orphans = ORPH_IGNORE;	/* -orphans option */
+int onRWerror = RW_KEEP;	/* -on-rw-error option */
 int Showmode = 0;
 int ClientMode = 0;		/* running as salvager server client */
 
@@ -2128,7 +2129,7 @@ DoSalvageVolumeGroup(struct SalvInfo *salvinfo, struct InodeSummary *isp, int nV
 	    if (SalvageVolumeHeaderFile(salvinfo, lisp, allInodes, rw, check, &deleteMe)
 		== -1) {
 		MaybeZapVolume(salvinfo, lisp, "Volume header", deleteMe, check);
-		if (rw && deleteMe) {
+		if (rw && (deleteMe || (onRWerror == RW_REMOVE))) {
 		    haveRWvolume = 0;	/* This will cause its inodes to be deleted--since salvage
 					 * volume won't be called */
 		    break;
@@ -4004,6 +4005,51 @@ CreateRootDir(struct SalvInfo *salvinfo, VolumeDiskData *volHeader,
     return -1;
 }
 
+static void
+RemoveChangedRWVolume(struct SalvInfo *salvinfo, struct VolumeSummary *vsp)
+{
+    Volume *vp;
+    VolumeId vid;
+    Error ec;
+    char name[VMAXPATHLEN];
+    struct DiskPartition64 *partp;
+
+    vp = NULL;
+    ec = 0;
+    partp = salvinfo->fileSysPartition;
+    vid = vsp->header.id;
+
+    Log("RemoveChangedRWVolume removing modified RW %u as requested\n", vid);
+
+    /* This is solely to gain a Volume struct for convenience. */
+    (void)VolumeExternalName_r(vid, name, sizeof(name));
+    vp = VFakeAttachVolumeByName(partp, name, &vsp->header);
+    if (vp == NULL) {
+	Log("RemoveChangedRWVolume failed to attach volume: %u\n", vid);
+	ec = -1;
+	goto error;
+    }
+
+    Log("RemoveChangedRWVolume found volume: %u vp: %p\n", vid, vp);
+
+    /* Since ec is completely ignored by VPurgeVolume, logs are unreliable. */
+    VPurgeVolume(&ec, vp, salvinfo->useFSYNC);
+    if (ec) {
+	Log("RemoveChangedRWVolume failed to purge volume %u\n", vid);
+	goto error;
+    }
+
+ error:
+    if (ec) {
+	Log("RemoveChangedRWVolume failed to remove changed RW %u\n", vid);
+    } else {
+	Log("RemoveChangedRWVolume successfully removed changed RW %u\n", vid);
+	vsp->deleted = 1;
+    }
+    VFakeDetachVolume(&vp);
+}
+
+
 /**
  * salvage a volume group.
  *
@@ -4024,6 +4070,7 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
     struct DirSummary rootdir, oldrootdir;
     struct VnodeInfo *dirVnodeInfo;
     struct VnodeDiskObject vnode;
+    struct VolumeSummary *vsp;
     VolumeDiskData volHeader;
     VolumeId vid;
     int orphaned, rootdirfound = 0;
@@ -4039,8 +4086,9 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
     char npath[128];
     int newrootdir = 0;
 
-    vid = rwIsp->volSummary->header.id;
-    IH_INIT(h, salvinfo->fileSysDevice, vid, rwIsp->volSummary->header.volumeInfo);
+    vsp = rwIsp->volSummary;
+    vid = vsp->header.id;
+    IH_INIT(h, salvinfo->fileSysDevice, vid, vsp->header.volumeInfo);
     nBytes = IH_IREAD(h, 0, (char *)&volHeader, sizeof(volHeader));
     opr_Assert(nBytes == sizeof(volHeader));
     opr_Assert(volHeader.stamp.magic == VOLUMEINFOMAGIC);
@@ -4048,9 +4096,9 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
     /* (should not have gotten this far with DESTROY_ME flag still set!) */
 
     DistilVnodeEssence(salvinfo, vid, vLarge,
-                       rwIsp->volSummary->header.largeVnodeIndex, &maxunique);
+                       vsp->header.largeVnodeIndex, &maxunique);
     DistilVnodeEssence(salvinfo, vid, vSmall,
-                       rwIsp->volSummary->header.smallVnodeIndex, &maxunique);
+                       vsp->header.smallVnodeIndex, &maxunique);
 
     dirVnodeInfo = &salvinfo->vnodeInfo[vLarge];
     for (i = 0; i < dirVnodeInfo->nVnodes; i++) {
@@ -4327,6 +4375,9 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
     }
 
     if (!Testing && salvinfo->VolumeChanged) {
+	if (onRWerror == RW_REMOVE)
+	    RemoveChangedRWVolume(salvinfo, vsp);
+
 #ifdef FSSYNC_BUILD_CLIENT
 	if (salvinfo->useFSYNC) {
 	    afs_int32 fsync_code;
@@ -4361,26 +4412,28 @@ SalvageVolume(struct SalvInfo *salvinfo, struct InodeSummary *rwIsp, IHandle_t *
 #endif
     }
 
-    /* Turn off the inUse bit; the volume's been salvaged! */
-    volHeader.inUse = 0;	/* clear flag indicating inUse@last crash */
-    volHeader.needsSalvaged = 0;	/* clear 'damaged' flag */
-    volHeader.inService = 1;	/* allow service again */
-    if (salvinfo->VolumeChanged) {
-	volHeader.needsCallback = 1;
-	volHeader.updateDate = time(NULL);
-    } else {
-	volHeader.needsCallback = 0;
+    if (!vsp->deleted) {
+	/* Turn off the inUse bit; the volume's been salvaged! */
+	volHeader.inUse = 0;	/* clear flag indicating inUse@last crash */
+	volHeader.needsSalvaged = 0;	/* clear 'damaged' flag */
+	volHeader.inService = 1;	/* allow service again */
+	if (salvinfo->VolumeChanged) {
+	    volHeader.needsCallback = 1;
+	    volHeader.updateDate = time(NULL);
+	} else {
+	    volHeader.needsCallback = 0;
+	}
+	volHeader.dontSalvage = DONT_SALVAGE;
+	salvinfo->VolumeChanged = 0;
+	if (!Testing) {
+	    nBytes = IH_IWRITE(h, 0, (char *)&volHeader, sizeof(volHeader));
+	    opr_Assert(nBytes == sizeof(volHeader));
+	}
+	LogMaybe("%sSalvaged %s (%" AFS_VOLID_FMT "): %d files, %d blocks\n",
+		 (Testing ? "It would have " : ""), volHeader.name,
+		 afs_printable_VolumeId_lu(volHeader.id), FilesInVolume,
+		 BlocksInVolume);
     }
-    volHeader.dontSalvage = DONT_SALVAGE;
-    salvinfo->VolumeChanged = 0;
-    if (!Testing) {
-	nBytes = IH_IWRITE(h, 0, (char *)&volHeader, sizeof(volHeader));
-	opr_Assert(nBytes == sizeof(volHeader));
-    }
-    LogMaybe("%sSalvaged %s (%" AFS_VOLID_FMT "): %d files, %d blocks\n",
-	     (Testing ? "It would have " : ""), volHeader.name,
-	     afs_printable_VolumeId_lu(volHeader.id), FilesInVolume,
-	     BlocksInVolume);
 
     IH_RELEASE(salvinfo->vnodeInfo[vSmall].handle);
     IH_RELEASE(salvinfo->vnodeInfo[vLarge].handle);
@@ -4435,6 +4488,10 @@ MaybeZapVolume(struct SalvInfo *salvinfo, struct InodeSummary *isp,
 	    }
 	    DeleteVolHeader(salvinfo, isp->volSummary);
 	}
+    } else if (onRWerror == RW_REMOVE) {
+	Log("%s salvage removing the modified read-write volume %u\n",
+		message, isp->volumeId);
+	DeleteVolHeader(salvinfo, isp->volSummary);
     } else if (!check) {
 	Log("%s salvage was unsuccessful: read-write volume %" AFS_VOLID_FMT "\n", message,
 	    afs_printable_VolumeId_lu(isp->volumeId));

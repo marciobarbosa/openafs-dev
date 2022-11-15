@@ -163,6 +163,26 @@ directory.
 
 =back
 
+=item B<-on-rw-error> (keep | remove)
+
+Controls how the Salvager handles modified/corrected RW volumes.  Choose
+one of the following values:
+
+=over 4
+
+=item keep
+
+Keep the modified RW volume on the vice partition.
+This is the default if the B<-on-rw-error> argument is omitted.
+
+=item remove
+
+Removes (deletes) the modified RW volume, and prints a message to the
+F</usr/afs/logs/SalvageLog> file reporting the name and volume id of
+the removed volume.
+
+=back
+
 =item B<-help>
 
 Prints the online help for this command. All other valid options are

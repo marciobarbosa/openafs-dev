@@ -31,10 +31,10 @@ SALVAGEROBJS=salvager.o s_vol-salvage.o s_physio.o
 DIROBJS=buffer.o dir.o salvage.o
 SDIROBJS=s_buffer.o s_dir.o s_salvage.o
 
-VLIBOBJS=volume.o vnode.o vutil.o partition.o fssync-client.o \
+VLIBOBJS=volume.o vnode.o vutil.o purge.o partition.o fssync-client.o \
 	 clone.o nuke.o devname.o listinodes.o ihandle.o \
 	 namei_ops.o salvsync-server.o salvsync-client.o daemon_com.o
-SVLIBOBJS=s_volume.o s_vnode.o s_vutil.o s_partition.o s_fssync-client.o \
+SVLIBOBJS=s_volume.o s_vnode.o s_vutil.o s_purge.o s_partition.o s_fssync-client.o \
 	 s_clone.o s_nuke.o s_devname.o s_listinodes.o s_ihandle.o \
 	 s_namei_ops.o s_salvsync-server.o s_salvsync-client.o s_daemon_com.o
 
@@ -66,6 +66,8 @@ s_volume.o: ${VOL}/volume.c
 s_vnode.o: ${VOL}/vnode.c
 	${SCCRULE}
 s_vutil.o: ${VOL}/vutil.c
+	${SCCRULE}
+s_purge.o: ${VOL}/purge.c
 	${SCCRULE}
 s_partition.o: ${VOL}/partition.c
 	${SCCRULE}
@@ -125,6 +127,9 @@ volume.o: ${VOL}/volume.c
 
 vutil.o: ${VOL}/vutil.c
 	$(AFS_CCRULE) $(VOL)/vutil.c
+
+purge.o: ${VOL}/purge.c
+	$(AFS_CCRULE) $(VOL)/purge.c
 
 partition.o: ${VOL}/partition.c
 	$(AFS_CCRULE) $(VOL)/partition.c

@@ -14,6 +14,7 @@ B<salvageserver> [I<initcmd>] S<<< [B<-partition> <I<name of partition to salvag
     S<<< [B<-parallel> <I<# of max parallel partition salvaging>>] >>>
     S<<< [B<-tmpdir> <I<name of dir to place tmp files>>] >>>
     S<<< [B<-orphans> (ignore | remove | attach)] >>>
+    S<<< [B<-on-rw-error> (keep | remove)] >>>
     [B<-syslog>]
     S<<< [B<-syslogfacility> <I<Syslog facility number to use>>] >>>
     [B<-client>] [B<-help>]
@@ -264,6 +265,25 @@ where I<index> is a two-digit number that uniquely identifies each
 object. The orphans are charged against the volume's quota and appear in
 the output of the B<ls> command issued against the volume's root
 directory.
+
+=back
+
+=item B<-on-rw-error> (keep | remove)
+
+Controls how the Salvageserver handles RW volumes that are modified/corrected
+by the salvage.  Choose one of the following values:
+
+=over 4
+
+=item keep
+
+Keeps the modified RW volume on the vice partition.
+This is the default if the B<-orphans> argument is omitted.
+
+=item remove
+
+Removes (deletes) the modified RW volume, and prints a message to the
+F</usr/afs/logs/SalsrvLog> file reporting which volume(s) were removed.
 
 =back
 
