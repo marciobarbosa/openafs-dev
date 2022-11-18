@@ -6,4 +6,5 @@ B<dasalvager>
     S<<< [B<-parallel> <I<# of max parallel partition salvaging>>] >>>
     S<<< [B<-tmpdir> <I<name of dir to place tmp files>>] >>>
     [B<-showlog>] [B<-showsuid>] [B<-showmounts>]
-    S<<< [B<-orphans> (ignore | remove | attach)] >>> [B<-help>]
+    S<<< [B<-orphans> (ignore | remove | attach)] >>>
+    S<<< [B<-on-rw-error> (keep | remove)] >>> [B<-help>]

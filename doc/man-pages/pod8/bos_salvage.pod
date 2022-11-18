@@ -14,6 +14,7 @@ B<bos salvage> S<<< B<-server> <I<machine name>> >>>
     S<<< [B<-parallel> <I<# of max parallel partition salvaging>>] >>>
     S<<< [B<-tmpdir> <I<directory to place tmp files>>] >>>
     S<<< [B<-orphans> (ignore | remove | attach)] >>> S<<< [B<-cell> <I<cell name>>] >>>
+    S<<< [B<-on-rw-error> (keep | remove)] >>>
     S<<< [B<-forceDAFS>] >>>
     [B<-noauth>] [B<-localauth>] [B<-help>]
 
@@ -22,7 +23,8 @@ B<bos sa> S<<< B<-se> <I<machine name>> >>> S<<< [B<-part> <I<salvage partition>
     S<<< [B<-f> <I<salvage log output file>>] >>> [B<-a>] [B<-sh>]
     [<-para> <I<# of max parallel partition salvaging>>]
     S<<< [B<-t> <I<directory to place tmp files>>] >>>
-    S<<< [B<-o> (ignore | remove | attach)] >>> S<<< [B<-c> <I<cell name>>] >>> [B<-n>]
+    S<<< [B<-or> (ignore | remove | attach)] >>> S<<< [B<-c> <I<cell name>>] >>> [B<-n>]
+    S<<< [B<-on> (keep | remove)] >>>
     S<<< [B<-force>] >>>
     [B<-l>] [B<-h>]
 
@@ -277,6 +279,26 @@ where I<index> is a two-digit number that uniquely identifies each
 object. The orphans are charged against the volume's quota and appear in
 the output of the B<ls> command issued against the volume's root
 directory.
+
+=back
+
+
+=item B<-on-rw-error> (keep | remove)
+
+Controls how the Salvager handles RW volumes that are modified/corrected
+during salvage.  Choose one of the following values:
+
+=over 4
+
+=item keep
+
+Leaves the modified RW volume on the vice partition, This is the
+default if the B<-on-rw-error> argument is omitted.
+
+=item remove
+
+Removes (deletes) the modified RW volume, and prints a message to the
+F</usr/afs/logs/SalvageLog> file reporting which volume(s) were removed.
 
 =back
 

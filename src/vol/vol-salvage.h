@@ -117,6 +117,9 @@ struct SalvInfo;
 #define ORPH_REMOVE 1
 #define ORPH_ATTACH 2
 
+#define RW_IGNORE 0	/* prohibit RW changes or removal */
+#define RW_KEEP 1	/* keep changes to RW volumes */
+#define RW_REMOVE 2	/* remove changed RW volumes */
 
 /* command line options */
 extern int debug;			/* -d flag */
@@ -131,6 +134,7 @@ extern int ShowLog;		        /* -showlog flag */
 extern int ShowSuid;		        /* -showsuid flag */
 extern int ShowMounts;		        /* -showmounts flag */
 extern int orphans;	                /* -orphans option */
+extern int onRWerror;	                /* -on-rw-error option */
 extern int Showmode;
 
 #define	MAXPARALLEL	32

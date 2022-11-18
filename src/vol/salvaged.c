@@ -180,7 +180,8 @@ enum optionsList {
     OPT_syslogfacility,
     OPT_logfile,
     OPT_client,
-    OPT_transarc_logs
+    OPT_transarc_logs,
+    OPT_onRWerror
 };
 
 static int
@@ -283,6 +284,30 @@ handleit(struct cmd_syndesc *opts, void *arock)
 	    cmd_OptionAsString(opts, OPT_logfile, (char**)&logopts.lopt_filename);
 	else
 	    logopts.lopt_filename = AFSDIR_SERVER_SALSRVLOG_FILEPATH;
+    }
+
+    if (cmd_OptionAsString(opts, OPT_onRWerror, &optstring) == 0) {
+	if (Testing) {
+	    /* -nowrite overrides specified -on-rw-error */
+	    printf("-nowrite option overrides -on-rw-error %s\n", optstring);
+	    onRWerror = RW_IGNORE;
+	} else if (strcmp(optstring, "keep") == 0
+		   || strcmp(optstring, "k") == 0) {
+	    /* keep changed RW volumes */
+	    onRWerror = RW_KEEP;
+	} else if (strcmp(optstring, "remove") == 0
+		   || strcmp(optstring, "r") == 0) {
+	    /* remove changed RW volumes */
+	    onRWerror = RW_REMOVE;
+	} else {
+	    printf("Invalid argument -on-rw-error %s\n", optstring);
+	    exit(-1);
+	}
+	free(optstring);
+	optstring = NULL;
+    } else if (Testing) {
+	/* override default RW_KEEP */
+	onRWerror = RW_IGNORE;
     }
 
     if (cmd_OptionPresent(opts, OPT_client)) {
@@ -433,6 +458,9 @@ main(int argc, char **argv)
 
     cmd_AddParmAtOffset(ts, OPT_transarc_logs, "-transarc-logs", CMD_FLAG,
 			CMD_OPTIONAL, "enable Transarc style logging");
+
+    cmd_AddParmAtOffset(ts, OPT_onRWerror, "-on-rw-error", CMD_SINGLE,
+	    CMD_OPTIONAL, "keep | remove modified RW volumes");
 
     err = cmd_Dispatch(argc, argv);
     Exit(err);

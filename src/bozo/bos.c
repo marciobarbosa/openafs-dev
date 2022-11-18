@@ -41,7 +41,7 @@ static int DoStat(char *aname, struct rx_connection *aconn,
 #include "bosprototypes.h"
 
 /* command offsets for bos salvage command */
-#define ADDPARMOFFSET 11
+#define ADDPARMOFFSET 12
 
 /* dummy routine for the audit work.  It should do nothing since audits */
 /* occur at the server level and bos is not a server. */
@@ -1084,7 +1084,8 @@ StopServer(struct cmd_syndesc *as, void *arock)
 static afs_int32
 DoSalvage(struct rx_connection * aconn, char * aparm1, char * aparm2,
 	  char * aoutName, afs_int32 showlog, char * parallel,
-	  char * atmpDir, char * orphans, int dafs, int dodirs)
+	  char * atmpDir, char * orphans, char * onrwerror, int dafs,
+	  int dodirs)
 {
     afs_int32 code;
     char *parms[6];
@@ -1206,6 +1207,12 @@ DoSalvage(struct rx_connection * aconn, char * aparm1, char * aparm2,
 	/* add the salvagedirs option if given */
 	if (dodirs) {
 	    add_arg("-salvagedirs");
+	}
+
+	/* add the -on-rw-error option if given */
+	if (onrwerror != NULL) {
+	    add_arg("-on-rw-error");
+	    add_arg(onrwerror);
 	}
     }
 
@@ -1365,6 +1372,7 @@ SalvageCmd(struct cmd_syndesc *as, void *arock)
     char *parallel;
     char *tmpDir;
     char *orphans;
+    char *onrwerror;
     char * serviceName;
 
     /* parm 0 is machine name, 1 is partition, 2 is volume, 3 is -all flag */
@@ -1435,6 +1443,13 @@ SalvageCmd(struct cmd_syndesc *as, void *arock)
 	}
     }
 
+    /* -on-rw-error option */
+    onrwerror = NULL;
+    if (as->parms[11].items) {
+	onrwerror = as->parms[11].items->data;
+    }
+
+
     if (as->parms[4].items) {
 	/* salvage whole enchilada */
 	curGoal = GetServerGoal(tconn, serviceName);
@@ -1453,7 +1468,7 @@ SalvageCmd(struct cmd_syndesc *as, void *arock)
 	/* now do the salvage operation */
 	printf("Starting salvage.\n");
 	rc = DoSalvage(tconn, NULL, NULL, outName, showlog, parallel, tmpDir,
-		       orphans, dafs, dodirs);
+		       orphans, onrwerror, dafs, dodirs);
 	if (curGoal == BSTAT_NORMAL) {
 	    printf("bos: restarting %s.\n", serviceName);
 	    code = BOZO_SetTStatus(tconn, serviceName, BSTAT_NORMAL);
@@ -1495,7 +1510,7 @@ SalvageCmd(struct cmd_syndesc *as, void *arock)
 	/* now do the salvage operation */
 	printf("Starting salvage.\n");
 	rc = DoSalvage(tconn, as->parms[1].items->data, NULL, outName,
-		       showlog, parallel, tmpDir, orphans, dafs, 0);
+		       showlog, parallel, tmpDir, orphans, onrwerror, dafs, 0);
 	if (curGoal == BSTAT_NORMAL) {
 	    printf("bos: restarting '%s'.\n", serviceName);
 	    code = BOZO_SetTStatus(tconn, serviceName, BSTAT_NORMAL);
@@ -1563,7 +1578,7 @@ SalvageCmd(struct cmd_syndesc *as, void *arock)
 	}
 	printf("Starting salvage.\n");
 	rc = DoSalvage(tconn, as->parms[1].items->data, volume_name, outName,
-		       showlog, parallel, tmpDir, orphans, dafs, 0);
+		       showlog, parallel, tmpDir, orphans, onrwerror, dafs, 0);
 	free(volume_name);
 	if (rc)
 	    return rc;
@@ -2004,6 +2019,8 @@ main(int argc, char **argv)
 		"(DAFS) force salvage of demand attach fileserver");
     cmd_AddParm(ts, "-salvagedirs", CMD_FLAG, CMD_OPTIONAL,
 		"Force rebuild/salvage of all directories");
+    cmd_AddParm(ts, "-on-rw-error", CMD_SINGLE, CMD_OPTIONAL,
+		"keep | remove modified RW volumes");
     add_std_args(ts);
 
     ts = cmd_CreateSyntax("getrestricted", GetRestrict, NULL, 0,
