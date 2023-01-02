@@ -177,7 +177,6 @@ MAJOR DATA STRUCTURES
       by the database lock:
 
          + locktype - type of lock held by this transaction
-         + minCommitTime - unused
          + seekFile - file number of database file pointer
          + seekPos - position of database file pointer
          + flags

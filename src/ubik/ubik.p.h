@@ -103,7 +103,6 @@ struct ubik_trans {
     afs_int32 locktype;		/*!< transaction lock */
     struct ubik_trunc *activeTruncs;	/*!< queued truncates */
     struct ubik_tid tid;	/*!< transaction id of this trans (if write trans.) */
-    afs_int32 minCommitTime;	/*!< time before which this trans can't commit */
     afs_int32 seekFile;		/*!< seek ptr: file number */
     afs_int32 seekPos;		/*!< seek ptr: offset therein */
     short flags;		/*!< trans flag bits */
