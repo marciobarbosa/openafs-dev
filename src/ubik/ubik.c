@@ -1257,9 +1257,16 @@ ubik_SetLock(struct ubik_trans *atrans, afs_int32 apos, afs_int32 alen,
 static int
 ubik_CacheUpdate(struct ubik_trans *atrans)
 {
+    int updcache;
+
     if (!(atrans && atrans->dbase))
 	return -1;
-    return vcmp(atrans->dbase->cachedVersion, atrans->dbase->version) != 0;
+
+    DBHOLD(atrans->dbase);
+    updcache = vcmp(atrans->dbase->cachedVersion, atrans->dbase->version) != 0;
+    DBRELE(atrans->dbase);
+
+    return updcache;
 }
 
 /**
@@ -1310,10 +1317,22 @@ ubik_CheckCache(struct ubik_trans *atrans, ubik_updatecache_func cbf, void *rock
 	    BoostSharedLock(&atrans->dbase->cache_lock);
 
 	    ret = (*cbf) (atrans, rock);
-	    if (ret == 0) {
+	    DBHOLD(atrans->dbase);
+	    if (ret == 0 && (atrans->shr.states & (TRABORT | TRDONE)) != 0) {
+		/*
+		 * We may have received a new copy of the database while/after
+		 * running cbf. If so, dbase->version might not represent the
+		 * version of the database used to update the cache. To prevent
+		 * subsequent read-transactions from accessing an invalid cache
+		 * while this transaction isn't aborted, don't set cachedVersion
+		 * to the current database version.
+		 */
+		ret = UDONE;
+	    } else if (ret == 0) {
 		memcpy(&atrans->dbase->cachedVersion, &atrans->dbase->version,
 		       sizeof(atrans->dbase->cachedVersion));
 	    }
+	    DBRELE(atrans->dbase);
 	}
 
 	/* It would be nice if we could convert from a shared lock to a read
