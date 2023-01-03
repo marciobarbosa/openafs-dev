@@ -106,6 +106,7 @@ struct ubik_trans {
     afs_int32 seekFile;		/*!< seek ptr: file number */
     afs_int32 seekPos;		/*!< seek ptr: offset therein */
     short flags;		/*!< trans flag bits */
+    short states;		/*!< trans state bits */
     char type;			/*!< type of trans */
     iovec_wrt iovec_info;
     iovec_buf iovec_data;
@@ -232,9 +233,11 @@ extern int (*ubik_SyncWriterCacheProc) (void);
 #define	DBWRITING	    1	/*!< are any write trans. in progress */
 /*\}*/
 
-/*!\name ubik trans flags */
+/*!\name ubik trans states */
 #define	TRDONE		    1	/*!< commit or abort done */
 #define	TRABORT		    2	/*!< if #TRDONE, tells if aborted */
+
+/*!\name ubik trans flags */
 #define TRREADANY	    4	/*!< read any data available in trans */
 #define TRCACHELOCKED       32  /*!< this trans has locked dbase->cache_lock
                                  *   (meaning, this trans has called

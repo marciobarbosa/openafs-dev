@@ -682,7 +682,7 @@ udisk_read(struct ubik_trans *atrans, afs_int32 afile, void *abuffer,
     char *bp;
     afs_int32 offset, len;
 
-    if (atrans->flags & TRDONE)
+    if (atrans->states & TRDONE)
 	return UDONE;
     while (alen > 0) {
 	bp = DRead(atrans, afile, apos >> UBIK_LOGPAGESIZE);
@@ -711,7 +711,7 @@ udisk_truncate(struct ubik_trans *atrans, afs_int32 afile, afs_int32 alength)
     afs_int32 code;
     struct ubik_trunc *tt;
 
-    if (atrans->flags & TRDONE)
+    if (atrans->states & TRDONE)
 	return UDONE;
     if (atrans->type != UBIK_WRITETRANS)
 	return UBADTYPE;
@@ -748,7 +748,7 @@ udisk_write(struct ubik_trans *atrans, afs_int32 afile, void *abuffer,
     struct ubik_trunc *tt;
     afs_int32 code;
 
-    if (atrans->flags & TRDONE)
+    if (atrans->states & TRDONE)
 	return UDONE;
     if (atrans->type != UBIK_WRITETRANS)
 	return UBADTYPE;
@@ -832,7 +832,7 @@ udisk_commit(struct ubik_trans *atrans)
     struct ubik_version oldversion, newversion;
     afs_int32 now = FT_ApproxTime();
 
-    if (atrans->flags & TRDONE)
+    if (atrans->states & TRDONE)
 	return (UTWOENDS);
 
     if (atrans->type == UBIK_WRITETRANS) {
@@ -909,7 +909,7 @@ udisk_commit(struct ubik_trans *atrans)
     /* When the transaction is marked done, it also means the logfile
      * has been truncated.
      */
-    atrans->flags |= TRDONE;
+    atrans->states |= TRDONE;
     return code;
 }
 
@@ -922,7 +922,7 @@ udisk_abort(struct ubik_trans *atrans)
     struct ubik_dbase *dbase;
     afs_int32 code;
 
-    if (atrans->flags & TRDONE)
+    if (atrans->states & TRDONE)
 	return UTWOENDS;
 
     /* Check if we are the write trans before logging abort, lest we
@@ -944,7 +944,7 @@ udisk_abort(struct ubik_trans *atrans)
     /* When the transaction is marked done, it also means the logfile
      * has been truncated.
      */
-    atrans->flags |= (TRABORT | TRDONE);
+    atrans->states |= (TRABORT | TRDONE);
     return 0;
 }
 
@@ -959,7 +959,7 @@ udisk_end(struct ubik_trans *atrans)
 {
     struct ubik_dbase *dbase;
 
-    if (!(atrans->flags & TRDONE))
+    if (!(atrans->states & TRDONE))
 	udisk_abort(atrans);
     dbase = atrans->dbase;
 
