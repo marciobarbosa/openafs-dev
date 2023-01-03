@@ -62,10 +62,10 @@ unthread(struct ubik_trans *atrans)
 {
     struct ubik_trans **lt, *tt;
     lt = &atrans->dbase->activeTrans;
-    for (tt = *lt; tt; lt = &tt->next, tt = *lt) {
+    for (tt = *lt; tt; lt = &tt->shr.next, tt = *lt) {
 	if (tt == atrans) {
 	    /* found it */
-	    *lt = tt->next;
+	    *lt = tt->shr.next;
 	    return 0;
 	}
     }
@@ -682,7 +682,7 @@ udisk_read(struct ubik_trans *atrans, afs_int32 afile, void *abuffer,
     char *bp;
     afs_int32 offset, len;
 
-    if (atrans->states & TRDONE)
+    if (atrans->shr.states & TRDONE)
 	return UDONE;
     while (alen > 0) {
 	bp = DRead(atrans, afile, apos >> UBIK_LOGPAGESIZE);
@@ -711,7 +711,7 @@ udisk_truncate(struct ubik_trans *atrans, afs_int32 afile, afs_int32 alength)
     afs_int32 code;
     struct ubik_trunc *tt;
 
-    if (atrans->states & TRDONE)
+    if (atrans->shr.states & TRDONE)
 	return UDONE;
     if (atrans->type != UBIK_WRITETRANS)
 	return UBADTYPE;
@@ -748,7 +748,7 @@ udisk_write(struct ubik_trans *atrans, afs_int32 afile, void *abuffer,
     struct ubik_trunc *tt;
     afs_int32 code;
 
-    if (atrans->states & TRDONE)
+    if (atrans->shr.states & TRDONE)
 	return UDONE;
     if (atrans->type != UBIK_WRITETRANS)
 	return UBADTYPE;
@@ -807,7 +807,7 @@ udisk_begin(struct ubik_dbase *adbase, int atype, struct ubik_trans **atrans)
     }
     tt = calloc(1, sizeof(struct ubik_trans));
     tt->dbase = adbase;
-    tt->next = adbase->activeTrans;
+    tt->shr.next = adbase->activeTrans;
     adbase->activeTrans = tt;
     tt->type = atype;
     if (atype == UBIK_READTRANS)
@@ -817,6 +817,7 @@ udisk_begin(struct ubik_dbase *adbase, int atype, struct ubik_trans **atrans)
 	adbase->dbFlags |= DBWRITING;
 	UBIK_VERSION_UNLOCK;
     }
+    tt->cid = trans_get_creator();
     *atrans = tt;
     return 0;
 }
@@ -832,7 +833,7 @@ udisk_commit(struct ubik_trans *atrans)
     struct ubik_version oldversion, newversion;
     afs_int32 now = FT_ApproxTime();
 
-    if (atrans->states & TRDONE)
+    if (atrans->shr.states & TRDONE)
 	return (UTWOENDS);
 
     if (atrans->type == UBIK_WRITETRANS) {
@@ -909,7 +910,7 @@ udisk_commit(struct ubik_trans *atrans)
     /* When the transaction is marked done, it also means the logfile
      * has been truncated.
      */
-    atrans->states |= TRDONE;
+    atrans->shr.states |= TRDONE;
     return code;
 }
 
@@ -922,7 +923,7 @@ udisk_abort(struct ubik_trans *atrans)
     struct ubik_dbase *dbase;
     afs_int32 code;
 
-    if (atrans->states & TRDONE)
+    if (atrans->shr.states & TRDONE)
 	return UTWOENDS;
 
     /* Check if we are the write trans before logging abort, lest we
@@ -944,7 +945,7 @@ udisk_abort(struct ubik_trans *atrans)
     /* When the transaction is marked done, it also means the logfile
      * has been truncated.
      */
-    atrans->states |= (TRABORT | TRDONE);
+    atrans->shr.states |= (TRABORT | TRDONE);
     return 0;
 }
 
@@ -959,7 +960,7 @@ udisk_end(struct ubik_trans *atrans)
 {
     struct ubik_dbase *dbase;
 
-    if (!(atrans->states & TRDONE))
+    if (!(atrans->shr.states & TRDONE))
 	udisk_abort(atrans);
     dbase = atrans->dbase;
 

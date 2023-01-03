@@ -94,22 +94,68 @@ struct ubik_hdr {
     struct ubik_version version;	/*!< the version for this file */
 };
 
+#ifdef AFS_PTHREAD_ENV
+typedef pthread_t creator_t;
+
+static_inline creator_t
+trans_get_creator(void)
+{
+    return pthread_self();
+}
+
+static_inline int
+trans_is_creator(creator_t cid)
+{
+    return pthread_equal(cid, pthread_self());
+}
+#else
+typedef PROCESS creator_t;
+
+static_inline creator_t
+trans_get_creator(void)
+{
+    creator_t cr;
+    LWP_CurrentProcess(&cr);
+    return cr;
+}
+
+static_inline int
+trans_is_creator(creator_t cid)
+{
+    return cid == trans_get_creator();
+}
+#endif
+
 /*!
  * \brief representation of a ubik transaction
+ *
+ * Locking rules:
+ *
+ * dbase, tid, and type are immutable and don't have to be protected.
+ *
+ * seekFile, seekPos, iovec_info, iovec_data, locktype, activeTruncs, and flags
+ * are only accessed by the thread/lwp that created the transaction. Protection
+ * not required.
+ *
+ * shr.next and shr.states can be accessed/modified by other threads/lwps and
+ * must be protected by the database lock.
  */
 struct ubik_trans {
     struct ubik_dbase *dbase;	/*!< corresponding database */
-    struct ubik_trans *next;	/*!< in the list */
     afs_int32 locktype;		/*!< transaction lock */
     struct ubik_trunc *activeTruncs;	/*!< queued truncates */
     struct ubik_tid tid;	/*!< transaction id of this trans (if write trans.) */
     afs_int32 seekFile;		/*!< seek ptr: file number */
     afs_int32 seekPos;		/*!< seek ptr: offset therein */
     short flags;		/*!< trans flag bits */
-    short states;		/*!< trans state bits */
     char type;			/*!< type of trans */
     iovec_wrt iovec_info;
     iovec_buf iovec_data;
+    creator_t cid;		/*!< thread/lwp that created the transaction */
+    struct {
+	struct ubik_trans *next;	/*!< in the list */
+	short states;			/*!< trans state bits */
+    } shr;
 };
 
 /*!

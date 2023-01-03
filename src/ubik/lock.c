@@ -76,7 +76,7 @@ ulock_getLock(struct ubik_trans *atrans, int atype, int await)
     if ((atype != LOCKREAD) && (atype != LOCKWRITE))
 	return EINVAL;
 
-    if (atrans->states & TRDONE)
+    if (atrans->shr.states & TRDONE)
 	return UDONE;
 
     if (atype != LOCKREAD && (atrans->flags & TRREADWRITE)) {

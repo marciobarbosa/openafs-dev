@@ -135,7 +135,7 @@ urecovery_AbortAll(struct ubik_dbase *adbase)
     struct ubik_trans *tt;
     int reads = 0, writes = 0;
 
-    for (tt = adbase->activeTrans; tt; tt = tt->next) {
+    for (tt = adbase->activeTrans; tt; tt = tt->shr.next) {
 	if (tt->type == UBIK_WRITETRANS)
 	    writes++;
 	else

@@ -724,6 +724,10 @@ ubik_AbortTrans(struct ubik_trans *transPtr)
     afs_int32 code2;
     struct ubik_dbase *dbase;
 
+    if (!trans_is_creator(transPtr->cid)) {
+	return UIOERROR;
+    }
+
     dbase = transPtr->dbase;
 
     if (transPtr->flags & TRCACHELOCKED) {
@@ -800,6 +804,10 @@ ubik_EndTrans(struct ubik_trans *transPtr)
     afs_int32 now;
     int cachelocked = 0;
     struct ubik_dbase *dbase;
+
+    if (!trans_is_creator(transPtr->cid)) {
+	return UIOERROR;
+    }
 
     if (transPtr->type == UBIK_WRITETRANS) {
 	code = ubik_Flush(transPtr);
@@ -962,6 +970,10 @@ ubik_Read(struct ubik_trans *transPtr, void *buffer,
 {
     afs_int32 code;
 
+    if (!trans_is_creator(transPtr->cid)) {
+	return UIOERROR;
+    }
+
     /* reads are easy to do: handle locally */
     DBHOLD(transPtr->dbase);
     if (!urecovery_AllBetter(transPtr->dbase, transPtr->flags & TRREADANY)) {
@@ -990,16 +1002,19 @@ ubik_Flush(struct ubik_trans *transPtr)
 {
     afs_int32 code, error = 0;
 
+    if (!trans_is_creator(transPtr->cid)) {
+	return UIOERROR;
+    }
+
     if (transPtr->type != UBIK_WRITETRANS)
 	return UBADTYPE;
 
-    DBHOLD(transPtr->dbase);
     if (!transPtr->iovec_info.iovec_wrt_len
 	|| !transPtr->iovec_info.iovec_wrt_val) {
-	DBRELE(transPtr->dbase);
 	return 0;
     }
 
+    DBHOLD(transPtr->dbase);
     if (!urecovery_AllBetter(transPtr->dbase, transPtr->flags & TRREADANY))
 	ERROR_EXIT(UNOQUORUM);
     if (!ubeacon_AmSyncSite())	/* only sync site can write */
@@ -1036,6 +1051,10 @@ ubik_Write(struct ubik_trans *transPtr, void *vbuffer,
     afs_int32 pos, len, size;
     char * buffer = (char *)vbuffer;
 
+    if (!trans_is_creator(transPtr->cid)) {
+	return UIOERROR;
+    }
+
     if (transPtr->type != UBIK_WRITETRANS)
 	return UBADTYPE;
     if (!length)
@@ -1051,7 +1070,6 @@ ubik_Write(struct ubik_trans *transPtr, void *vbuffer,
 	return 0;
     }
 
-    DBHOLD(transPtr->dbase);
     if (!transPtr->iovec_info.iovec_wrt_val) {
 	transPtr->iovec_info.iovec_wrt_len = 0;
 	transPtr->iovec_info.iovec_wrt_val =
@@ -1066,7 +1084,6 @@ ubik_Write(struct ubik_trans *transPtr, void *vbuffer,
 	    if (transPtr->iovec_data.iovec_buf_val)
 		free(transPtr->iovec_data.iovec_buf_val);
 	    transPtr->iovec_data.iovec_buf_val = 0;
-	    DBRELE(transPtr->dbase);
 	    return UNOMEM;
 	}
     }
@@ -1075,13 +1092,12 @@ ubik_Write(struct ubik_trans *transPtr, void *vbuffer,
     if ((transPtr->iovec_info.iovec_wrt_len >= IOVEC_MAXWRT)
 	|| ((length + transPtr->iovec_data.iovec_buf_len) > IOVEC_MAXBUF)) {
 	/* Can't hold the DB lock over ubik_Flush */
-	DBRELE(transPtr->dbase);
 	code = ubik_Flush(transPtr);
 	if (code)
 	    return (code);
-	DBHOLD(transPtr->dbase);
     }
 
+    DBHOLD(transPtr->dbase);
     if (!urecovery_AllBetter(transPtr->dbase, transPtr->flags & TRREADANY))
 	ERROR_EXIT(UNOQUORUM);
     if (!ubeacon_AmSyncSite())	/* only sync site can write */
@@ -1130,6 +1146,10 @@ ubik_Seek(struct ubik_trans *transPtr, afs_int32 fileid,
 {
     afs_int32 code;
 
+    if (!trans_is_creator(transPtr->cid)) {
+	return UIOERROR;
+    }
+
     DBHOLD(transPtr->dbase);
     if (!urecovery_AllBetter(transPtr->dbase, transPtr->flags & TRREADANY)) {
 	code = UNOQUORUM;
@@ -1150,10 +1170,12 @@ int
 ubik_Tell(struct ubik_trans *transPtr, afs_int32 * fileid,
 	  afs_int32 * position)
 {
-    DBHOLD(transPtr->dbase);
+    if (!trans_is_creator(transPtr->cid)) {
+	return UIOERROR;
+    }
+
     *fileid = transPtr->seekFile;
     *position = transPtr->seekPos;
-    DBRELE(transPtr->dbase);
     return 0;
 }
 
@@ -1165,6 +1187,10 @@ int
 ubik_Truncate(struct ubik_trans *transPtr, afs_int32 length)
 {
     afs_int32 code, error = 0;
+
+    if (!trans_is_creator(transPtr->cid)) {
+	return UIOERROR;
+    }
 
     /* Will also catch if not UBIK_WRITETRANS */
     code = ubik_Flush(transPtr);
@@ -1206,6 +1232,10 @@ ubik_SetLock(struct ubik_trans *atrans, afs_int32 apos, afs_int32 alen,
 	     int atype)
 {
     afs_int32 code = 0, error = 0;
+
+    if (!trans_is_creator(atrans->cid)) {
+	return UIOERROR;
+    }
 
     if (atype == LOCKWRITE) {
 	if (atrans->type == UBIK_READTRANS)
@@ -1291,6 +1321,10 @@ int
 ubik_CheckCache(struct ubik_trans *atrans, ubik_updatecache_func cbf, void *rock)
 {
     int ret = 0;
+
+    if (!trans_is_creator(atrans->cid)) {
+	return UIOERROR;
+    }
 
     if (!(atrans && atrans->dbase))
 	return -1;
