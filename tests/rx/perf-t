@@ -22,6 +22,8 @@ if ($pid == -1) {
 	 "rxperf", "server", "-p", $port, "-u", "1024", "-H", "-N");
     die("Kabooom ?");
 }
+# Give the server some time to initialize
+sleep(1);
 pass("Started rxperf server");
 
 # Start up an rxperf client, and run a test
