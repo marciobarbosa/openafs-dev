@@ -604,8 +604,12 @@ main(int argc, char **argv)
 
     bsso.dir = prdir;
     bsso.logger = FSLog;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
-					   &numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
+						  &numClasses);
+    if (code) {
+	afs_com_err(whoami, code, "Failed to create server security objects");
+	PT_EXIT(2);
+    }
 
     tservice =
 	rx_NewServiceHost(host, 0, PRSRV, "Protection Server", securityClasses,

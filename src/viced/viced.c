@@ -2035,8 +2035,13 @@ main(int argc, char *argv[])
 
     bsso.dir = confDir;
     bsso.logger = FSLog;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
-					   &numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
+						  &numClasses);
+    if (code) {
+	ViceLog(0, ("Failed to build server security objects: code %d\n",
+		code));
+	exit(-1);
+    }
 
     tservice = rx_NewServiceHost(rx_bindhost,  /* port */ 0, /* service id */
 				 1,	/*service name */

@@ -76,7 +76,8 @@ main(int argc, char **argv)
     /* Server Security objects */
 
     bsso.dir = dir;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &classes, &numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &classes, &numClasses);
+    opr_Assert(code == 0);
     is_int(5, numClasses, "5 security classes are returned, as expected");
     ok(classes[1] == NULL, "The rxvab class is undefined, as requested");
     free(classes);

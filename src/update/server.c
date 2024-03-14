@@ -203,6 +203,7 @@ main(int argc, char *argv[])
     afs_uint32 host = htonl(INADDR_ANY);
 
     int a = 0;
+    int code;
     rxkad_level level;
     rxkad_level newLevel;
     struct afsconf_bsso_info bsso;
@@ -319,7 +320,10 @@ main(int argc, char *argv[])
 	Quit("rx_init");
 
     bsso.dir = cdir;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses, &numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses, &numClasses);
+    if (code) {
+	Quit("Failed to build server security objects");
+    }
 
     if (securityClasses[2] == NULL)
 	Quit("rxkad_NewServerSecurityObject");

@@ -126,6 +126,13 @@ struct rxgk_cconn {
 ssize_t rxgk_etype_to_len(int etype);
 afs_int32 rxgk_default_enctypes(RXGK_Enctypes *enctypes);
 
+/* rxgk_gss.c */
+afs_int32 SGSSNegotiate(struct rx_call *z_call, RXGK_StartParams *client_start,
+			RXGK_Data *input_token_buffer, RXGK_Data *opaque_in,
+			RXGK_Data *output_token_buffer, RXGK_Data *opaque_out,
+			u_int *gss_major_status, u_int *gss_minor_status,
+			RXGK_Data *rxgk_info);
+
 /* rxgk_token.c */
 afs_int32 rxgk_extract_token(RXGK_Data *tc, RXGK_Token *out,
 			     rxgk_getkey_func getkey, void *rock)
@@ -135,6 +142,8 @@ afs_int32 rxgk_extract_token(RXGK_Data *tc, RXGK_Token *out,
 afs_int32 rxgk_security_overhead(struct rx_connection *aconn, RXGK_Level level,
 				 rxgk_key k0);
 afs_int32 rxgk_key_number(afs_uint16 wire, afs_uint32 local, afs_uint32 *real);
+afs_int32 rxgk_choose_level(RXGK_Level *levels, int n_levels,
+			    RXGK_Level *a_level);
 
 /* rxgk_packet.c */
 int rxgk_mic_packet(rxgk_key tk, afs_int32 keyusage,

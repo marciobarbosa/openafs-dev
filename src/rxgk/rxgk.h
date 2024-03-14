@@ -56,6 +56,9 @@ typedef afs_int32 (*rxgk_getkey_func)(void *rock, afs_int32 *kvno,
 #define RXGK_STATS_UNALLOC 0x1
 #define RXGK_STATS_AUTH    0x2
 
+/* Indices for our rx service-specific data. */
+#define RXGK_SSPECIFIC_GSSNEGO 2
+
 /* rxgk_server.c */
 struct rx_securityClass * rxgk_NewServerSecurityObject(void *getkey_rock,
 						       rxgk_getkey_func getkey);
@@ -90,6 +93,8 @@ afs_int32 rxgk_derive_tk(rxgk_key *tk, rxgk_key k0, afs_uint32 epoch,
 afs_int32 rxgk_cipher_expansion(rxgk_key k0, afs_uint32 *len_out) AFS_NONNULL();
 afs_int32 rxgk_nonce(RXGK_Data *nonce, afs_uint32 len) AFS_NONNULL();
 int rxgk_enctype_better(afs_int32 old_enctype, afs_int32 new_enctype);
+afs_int32 rxgk_choose_enctype(RXGK_Enctypes *enctypes, afs_int32 *a_enctype)
+			      AFS_NONNULL();
 
 /* rxgk_gss.c */
 afs_int32 rxgk_NegotiateClientToken(struct rx_connection *conn, char *target,
@@ -97,6 +102,24 @@ afs_int32 rxgk_NegotiateClientToken(struct rx_connection *conn, char *target,
 				    RXGK_TokenInfo *return_info,
 				    RXGK_Data *return_k0,
 				    RXGK_Data *return_token) AFS_NONNULL();
+
+struct rxgk_gss_service_info {
+    /* The host-based service name that will be the GSS acceptor identity (e.g.
+     * afs-rxgk@_afs.example.com). */
+    char *acceptor;
+
+    /* Path to a krb5 keytab containing the GSS acceptor creds (optional). */
+    char *keytab;
+
+    /* Callback to get the cell-wide long-term key to use for encrypting
+     * tokens. */
+    rxgk_getkey_func getkey;
+    void *getkey_rock;
+
+};
+afs_int32 rxgk_setup_gss_service(struct rx_service *svc,
+				 struct rxgk_gss_service_info *info)
+				 AFS_NONNULL();
 
 /* rxgk_gss_ubik.c */
 struct ubik_client;

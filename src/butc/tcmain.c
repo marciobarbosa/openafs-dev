@@ -1149,7 +1149,11 @@ WorkerBee(struct cmd_syndesc *as, void *arock)
 	struct afsconf_bsso_info bsso;
 	memset(&bsso, 0, sizeof(bsso));
 	bsso.dir = butc_confdir;
-	afsconf_BuildServerSecurityObjects_int(&bsso, &allObjs, &numClasses);
+	code = afsconf_BuildServerSecurityObjects_int(&bsso, &allObjs, &numClasses);
+	if (code) {
+	    TapeLog(0, 0, code, 0, "Failed to create server security objects\n");
+	    exit(1);
+	}
 	secObjs = allObjs;
     }
 

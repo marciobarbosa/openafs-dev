@@ -255,8 +255,6 @@ extern void afsconf_BuildServerSecurityObjects(void *,
 					       struct rx_securityClass ***,
 					       afs_int32 *);
 
-
-
 /* userok.c */
 
 struct rx_call;
