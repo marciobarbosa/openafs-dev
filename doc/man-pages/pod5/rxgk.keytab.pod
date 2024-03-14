@@ -1,0 +1,39 @@
+=head1 NAME
+
+rxgk.keytab - Contains rxgk GSS acceptor creds
+
+=head1 DESCRIPTION
+
+The F<rxgk.keytab> file contains the krb5 credentials for the GSS acceptor for
+rxgk authentication. For rxgk-enabled cells, this file must exist on all
+vlservers for the cell in the directory F</usr/afs/etc>, and must contain keys
+for the principal C<afs-rxgk/_afs.I<cell>>.
+
+Note that the credentials in this file are unrelated to the keys in F<KeyFile>,
+F<KeyFileExt>, or F<rxkad.keytab>. Do not add the credentials in F<rxgk.keytab>
+to any of those files.
+
+=head1 EXAMPLES
+
+Using MIT Kerberos:
+
+    $ ktutil
+    ktutil:  rkt /usr/afs/etc/rxgk.keytab
+    ktutil:  l
+    slot KVNO Principal
+    ---- ---- ---------------------------------------------------------------------
+       1    2 afs-rxgk/_afs.cell.example.com@CELL.EXAMPLE.COM
+       2    2 afs-rxgk/_afs.cell.example.com@CELL.EXAMPLE.COM
+
+=head1 SEE ALSO
+
+The I<OpenAFS Administration Guide> at
+L<http://docs.openafs.org/AdminGuide/>.
+
+=head1 COPYRIGHT
+
+Copyright (c) 2019, Sine Nomine Associates.
+
+This documentation is covered by the BSD License as written in the
+doc/LICENSE file. This man page was written by Andrew Deason for
+OpenAFS.

@@ -570,8 +570,13 @@ main(int argc, char **argv)
 
     bsso.dir = BU_conf;
     bsso.logger = FSLog;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
-					   &numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
+						  &numClasses);
+    if (code) {
+	LogError(code, "Failed to build server security objects\n");
+	afs_com_err(whoami, code, "Failed to build server security objects");
+	ERROR(code);
+    }
 
     tservice =
 	rx_NewServiceHost(host, 0, BUDB_SERVICE, "BackupDatabase",

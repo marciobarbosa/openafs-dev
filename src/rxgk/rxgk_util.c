@@ -144,3 +144,33 @@ rxgk_key_number(afs_uint16 wire, afs_uint32 local, afs_uint32 *real)
     }
     return 0;
 }
+
+/**
+ * Choose an rxgk level out of a list
+ *
+ * Given a list of rxgk levels (ordered by preference), pick the first one
+ * that we understand and is allowed, and return it in 'a_level'. If we
+ * cannot find one, return RXGK_BADLEVEL.
+ *
+ * @param[in] levels	An array of levels, 'n_levels' long
+ * @param[in] n_levels	The length of 'levels'
+ * @param[out] a_level	The chosen level
+ *
+ * @return rxgk error codes
+ */
+afs_int32
+rxgk_choose_level(RXGK_Level *levels, int n_levels, RXGK_Level *a_level)
+{
+    int level_i;
+    for (level_i = 0; level_i < n_levels; level_i++) {
+	/* For now, only allow CRYPT. In the future, we should have runtime
+	 * options for different policies. */
+	if (levels[level_i] == RXGK_LEVEL_CRYPT) {
+	    *a_level = levels[level_i];
+	    return 0;
+	}
+    }
+
+    /* We couldn't find a valid level (or the list was empty). */
+    return RXGK_BADLEVEL;
+}

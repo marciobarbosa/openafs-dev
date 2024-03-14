@@ -1281,7 +1281,11 @@ main(int argc, char **argv, char **envp)
 
     bsso.dir = tdir;
     bsso.logger = FSLog;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses, &numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses, &numClasses);
+    if (code) {
+	ViceLog(0, ("Failed to create server security objects: code %d\n", code));
+	exit(1);
+    }
 
     if (DoPidFiles) {
 	bozo_CreatePidFile("bosserver", NULL, getpid());

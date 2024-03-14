@@ -209,7 +209,8 @@ afstest_StartTestRPCService(const char *configPath,
     }
 
     bsso.dir = dir;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &classes, &numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &classes, &numClasses);
+    opr_Assert(code == 0);
     service = rx_NewService(0, serviceId, "test", classes, numClasses,
                             proc);
     if (service == NULL) {

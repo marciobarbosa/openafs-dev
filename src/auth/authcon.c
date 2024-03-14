@@ -25,6 +25,8 @@
 #include <rx/rx.h>
 
 #include <afs/pthread_glock.h>
+#include <afs/afsutil.h>
+#include <afs/opr.h>
 
 #include "cellconfig.h"
 #include "keys.h"
@@ -423,21 +425,39 @@ afsconf_BuildServerSecurityObjects(void *rock,
 				   afs_int32 *numClasses)
 {
     struct afsconf_bsso_info info;
+    int code;
     memset(&info, 0, sizeof(info));
     info.dir = rock;
-    afsconf_BuildServerSecurityObjects_int(&info, classes, numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&info, classes, numClasses);
+    opr_Assert(code == 0);
 }
 
 /*!
  * Build a set of security classes suitable for a server accepting
  * incoming connections
  */
-void
+int
 afsconf_BuildServerSecurityObjects_int(struct afsconf_bsso_info *info,
 				       struct rx_securityClass ***classes,
 				       afs_int32 *numClasses)
 {
     struct afsconf_dir *dir = info->dir;
+    int code = 0;
+
+    if (dir == NULL || classes == NULL || numClasses == NULL) {
+	code = AFSCONF_FAILURE;
+	goto done;
+    }
+
+    switch (info->type) {
+    case AFSCONF_BSSO_DEFAULT:
+    case AFSCONF_BSSO_VLSERVER:
+	/* noop */
+	break;
+    default:
+	code = AFSCONF_FAILURE;
+	goto done;
+    }
 
     if (afsconf_GetLatestKey(dir, NULL, NULL) == 0) {
 	LogDesWarning(info);
@@ -449,6 +469,10 @@ afsconf_BuildServerSecurityObjects_int(struct afsconf_bsso_info *info,
     *numClasses = RX_SECIDX_GK+1;
 
     *classes = calloc(*numClasses, sizeof(**classes));
+    if (*classes == NULL) {
+	code = ENOMEM;
+	goto done;
+    }
 
     (*classes)[RX_SECIDX_NULL] = rxnull_NewServerSecurityObject();
     (*classes)[RX_SECIDX_KAD] =
@@ -462,7 +486,67 @@ afsconf_BuildServerSecurityObjects_int(struct afsconf_bsso_info *info,
 #ifdef AFS_RXGK_ENV
     (*classes)[RX_SECIDX_GK] =
 	rxgk_NewServerSecurityObject(dir, afsconf_GetRXGKKey);
+
+    if (info->type == AFSCONF_BSSO_VLSERVER) {
+	struct rx_service *service;
+	char *acceptor = NULL;
+	char *keytab = NULL;
+	char cellname[64];
+	struct rxgk_gss_service_info gss_info;
+
+	service = rx_NewServiceHost(info->host, 0, RXGK_SERVICE_ID, "RXGK",
+				    *classes, *numClasses, RXGK_ExecuteRequest);
+	if (service == NULL) {
+	    code = RXGK_INCONSISTENCY;
+	    goto gss_error;
+	}
+
+	code = afsconf_GetLocalCell(dir, cellname, sizeof(cellname));
+	if (code != 0) {
+	    goto gss_error;
+	}
+
+	code = asprintf(&acceptor, "afs-rxgk@_afs.%s", cellname);
+	if (code < 0) {
+	    acceptor = NULL;
+	    goto gss_error;
+	}
+
+	code = asprintf(&keytab, "%s/%s", dir->name, AFSDIR_RXGK_KEYTAB_FILE);
+	if (code < 0) {
+	    keytab = NULL;
+	    goto gss_error;
+	}
+
+	memset(&gss_info, 0, sizeof(gss_info));
+	gss_info.acceptor = acceptor;
+	gss_info.keytab = keytab;
+	gss_info.getkey = afsconf_GetRXGKKey;
+	gss_info.getkey_rock = dir;
+
+	code = rxgk_setup_gss_service(service, &gss_info);
+	if (code != 0) {
+	    goto gss_error;
+	}
+
+	rx_SetMinProcs(service, 2);
+	rx_SetMinProcs(service, 4);
+
+ gss_error:
+	free(acceptor);
+	free(keytab);
+	if (code != 0) {
+	    /* Don't treat gss errors as fatal errors; just leave gss broken
+	     * and continue as if we didn't encounter an error. */
+	    ViceLog(0, ("rxgk: Error %d while setting up gss security. "
+			"Non-localauth rxgk will probably not function "
+			"properly.\n", code));
+	    code = 0;
+	}
+    }
 #endif
+ done:
+    return code;
 }
 
 /*!

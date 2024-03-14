@@ -884,3 +884,47 @@ rxgk_default_enctypes(RXGK_Enctypes *enctypes)
     }
     return 0;
 }
+
+/**
+ * Choose a usable enctype out of a list
+ *
+ * Given a list of enctypes (ordered by preference), pick the first one that we
+ * understand, and return it in 'a_enctype'. If we cannot find one, return
+ * RXGK_BADETYPE.
+ *
+ * @param[in] enctypes   A list of enctypes, ordered by preference.
+ * @param[out] a_enctype The chosen enctype from the given list.
+ *
+ * @return rxgk error codes.
+ */
+afs_int32
+rxgk_choose_enctype(RXGK_Enctypes *enctypes, afs_int32 *a_enctype)
+{
+    krb5_context ctx = NULL;
+    afs_int32 code;
+    int etype_i;
+
+    code = krb5_init_context(&ctx);
+    if (code != 0) {
+	goto done;
+    }
+
+    for (etype_i = 0; etype_i < enctypes->len; etype_i++) {
+	afs_int32 enctype = enctypes->val[etype_i];
+
+	code = krb5_enctype_valid(ctx, enctype);
+	if (code == 0) {
+	    *a_enctype = enctype;
+	    goto done;
+	}
+    }
+
+    /* We couldn't find an enctype that we support (or the list was empty). */
+    code = RXGK_BADETYPE;
+
+ done:
+    if (ctx != NULL) {
+	krb5_free_context(ctx);
+    }
+    return ktor(code);
+}

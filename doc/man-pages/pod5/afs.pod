@@ -95,6 +95,8 @@ Administrative files:
 
 =item L<UserList(5)>
 
+=item L<rxgk.keytab(5)>
+
 =back
 
 Cache-related files:

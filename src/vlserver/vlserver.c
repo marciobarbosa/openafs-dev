@@ -529,10 +529,17 @@ main(int argc, char **argv)
     memset(wr_HostAddress, 0, sizeof(wr_HostAddress));
     initialize_dstats();
 
+    bsso.type = AFSCONF_BSSO_VLSERVER;
     bsso.dir = tdir;
     bsso.logger = FSLog;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
-					   &numClasses);
+    bsso.host = host;
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses,
+						  &numClasses);
+    if (code) {
+	VLog(0, ("vlserver: Error setting up server security objects: %s.\n",
+		 afs_error_message(code)));
+	exit(2);
+    }
 
     tservice =
 	rx_NewServiceHost(host, 0, USER_SERVICE_ID, "Vldb server",

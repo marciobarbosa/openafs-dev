@@ -599,7 +599,12 @@ main(int argc, char **argv)
 
     bsso.dir = tdir;
     bsso.logger = FSLog;
-    afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses, &numClasses);
+    code = afsconf_BuildServerSecurityObjects_int(&bsso, &securityClasses, &numClasses);
+    if (code) {
+	fprintf(stderr, "volser: Failed to create server security objects: code %d\n",
+		code);
+	VS_EXIT(1);
+    }
     if (securityClasses[0] == NULL)
 	Abort("rxnull_NewServerSecurityObject");
     service =

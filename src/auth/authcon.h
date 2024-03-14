@@ -34,13 +34,22 @@
 
 #include <afs/cellconfig.h>
 
-struct afsconf_bsso_info {
-    struct afsconf_dir *dir;
-    void (*logger)(const char *format, ...);
+enum afsconf_bsso_type {
+    AFSCONF_BSSO_DEFAULT = 0,
+    AFSCONF_BSSO_VLSERVER = 1,
 };
 
-void afsconf_BuildServerSecurityObjects_int(struct afsconf_bsso_info *info,
-					    struct rx_securityClass ***classes,
-					    afs_int32 *numClasses);
+struct afsconf_bsso_info {
+    enum afsconf_bsso_type type;
+
+    struct afsconf_dir *dir;
+    void (*logger)(const char *format, ...);
+
+    afs_uint32 host;
+};
+
+int afsconf_BuildServerSecurityObjects_int(struct afsconf_bsso_info *info,
+					   struct rx_securityClass ***classes,
+					   afs_int32 *numClasses);
 
 #endif /* OPENAFS_AUTH_AUTHCON_H */
