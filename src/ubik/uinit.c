@@ -33,7 +33,7 @@ static int
 internal_client_init(struct afsconf_dir *dir, struct afsconf_cell *info,
 		     int secFlags, struct ubik_client **uclientp,
 		     ugen_secproc_func secproc,
-		     int maxservers, const char *serviceid, int deadtime,
+		     int maxservers, int deadtime,
 		     afs_uint32 server, afs_uint32 port, afs_int32 usrvid)
 {
     int code, i;
@@ -52,7 +52,9 @@ internal_client_init(struct afsconf_dir *dir, struct afsconf_cell *info,
 	fprintf(stderr, "%s: could not initialize rx.\n", progname);
 	return code;
     }
-    rx_SetRxDeadTime(deadtime);
+    if (deadtime) {
+	rx_SetRxDeadTime(deadtime);
+    }
 
     code = afsconf_PickClientSecObj(dir, secFlags, info, NULL, &sc,
 				    &scIndex, NULL);
@@ -74,7 +76,7 @@ internal_client_init(struct afsconf_dir *dir, struct afsconf_cell *info,
 	serverconns[0] = rx_NewConnection(server, port,
 					  usrvid, sc, scIndex);
     } else {
-	if (info->numServers > maxservers) {
+	if (maxservers != 0 && info->numServers > maxservers) {
 	    fprintf(stderr,
 		    "%s: info.numServers=%d (> maxservers=%d)\n",
 		    progname, info->numServers, maxservers);
@@ -108,8 +110,22 @@ ugen_ClientInitCell(struct afsconf_dir *dir, struct afsconf_cell *info,
 		    int maxservers, const char *serviceid, int deadtime)
 {
     return internal_client_init(dir, info, secFlags, uclientp, NULL,
-			        maxservers, serviceid, deadtime, 0, 0,
+				maxservers, deadtime, 0, 0,
 				USER_SERVICE_ID);
+}
+
+int
+ugen_ClientInitService(struct afsconf_dir *dir, struct afsconf_cell *info,
+		      int secFlags, afs_int32 usrvid,
+		      struct ubik_client **uclientp)
+{
+    return internal_client_init(dir, info, secFlags, uclientp,
+				NULL /* secproc */,
+				0    /* maxservers */,
+				0    /* deadtime */,
+				0    /* server */,
+				0    /* port */,
+				usrvid);
 }
 
 static int
@@ -151,7 +167,7 @@ internal_client_init_dir(const char *confDir, char *cellName, int secFlags,
     }
 
     code = internal_client_init(dir, &info, secFlags, uclientp, secproc,
-			        maxservers, serviceid, deadtime, server,
+				maxservers, deadtime, server,
 				port, usrvid);
 
     afsconf_Close(dir);

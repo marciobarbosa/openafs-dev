@@ -91,6 +91,22 @@ afs_int32 rxgk_cipher_expansion(rxgk_key k0, afs_uint32 *len_out) AFS_NONNULL();
 afs_int32 rxgk_nonce(RXGK_Data *nonce, afs_uint32 len) AFS_NONNULL();
 int rxgk_enctype_better(afs_int32 old_enctype, afs_int32 new_enctype);
 
+/* rxgk_gss.c */
+afs_int32 rxgk_NegotiateClientToken(struct rx_connection *conn, char *target,
+				    RXGK_Level level,
+				    RXGK_TokenInfo *return_info,
+				    RXGK_Data *return_k0,
+				    RXGK_Data *return_token) AFS_NONNULL();
+
+/* rxgk_gss_ubik.c */
+struct ubik_client;
+afs_int32 ubik_rxgk_NegotiateClientToken(struct ubik_client *uclient,
+					 char *target, RXGK_Level level,
+					 RXGK_TokenInfo *return_info,
+					 RXGK_Data *return_k0,
+					 RXGK_Data *return_token)
+					 AFS_NONNULL();
+
 /* rxgk_token.c */
 afs_int32 rxgk_make_token(struct rx_opaque *out, RXGK_TokenInfo *info,
 			  struct rx_opaque *k0, PrAuthName *identities,

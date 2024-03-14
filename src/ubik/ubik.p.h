@@ -628,6 +628,11 @@ extern int ugen_ClientInitCell(struct afsconf_dir *dir,
 			       struct ubik_client **uclientp,
 			       int maxservers, const char *serviceid,
 			       int deadtime);
+extern int ugen_ClientInitService(struct afsconf_dir *dir,
+				  struct afsconf_cell *info,
+				  int secFlags,
+				  int usrvid,
+				  struct ubik_client **uclientp) AFS_NONNULL();
 extern int ugen_ClientInitServer(const char *confDir, char *cellName,
 				 int secFlags, struct ubik_client **uclientp,
 				 int maxservers, char *serviceid,
