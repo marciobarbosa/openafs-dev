@@ -1,0 +1,49 @@
+#
+# This Makefile in in the public domain
+#
+
+srcdir=@srcdir@
+include @TOP_OBJDIR@/src/config/Makefile.config
+include @TOP_OBJDIR@/src/config/Makefile.pthread
+
+
+MODULE_CFLAGS = $(CPPFLAGS_gssapi)
+
+AFSLIBS= ${TOP_LIBDIR}/libafshcrypto.a \
+	 $(top_builddir)/src/cmd/liboafs_cmd.la \
+	 $(top_builddir)/src/opr/liboafs_opr.la \
+	 $(top_builddir)/src/util/liboafs_util.la \
+	 $(top_builddir)/src/auth/liboafs_auth.la \
+	 $(top_builddir)/src/rxgk/liboafs_rxgk.la \
+	 $(top_builddir)/src/ubik/liboafs_ubik.la
+
+OBJS=gklog.o
+
+all: gklog
+
+gklog:	${OBJS} ${AFSLIBS}
+	$(LT_LDRULE_static) ${OBJS} ${AFSLIBS} $(LDFLAGS_gssapi) $(LIB_gssapi) ${MT_LIBS}
+
+#
+# Installation targets
+#
+install: gklog
+	if [ "@ENABLE_RXGK@" = yes ]; then \
+		${INSTALL} -d ${DESTDIR}${bindir} ; \
+		${LT_INSTALL_PROGRAM} gklog ${DESTDIR}${bindir}/gklog ; \
+	fi
+
+dest: gklog
+	if [ "@ENABLE_RXGK@" = yes ]; then \
+		${INSTALL} -d ${DEST}/bin ; \
+		${INSTALL_PROGRAM} gklog ${DEST}/bin/gklog ; \
+	fi
+
+#
+# Misc. targets
+#
+clean:
+	$(LT_CLEAN)
+	$(RM) -f *.o ${OBJS} gklog
+
+include ../config/Makefile.version

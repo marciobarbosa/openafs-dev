@@ -217,7 +217,7 @@ afs: config export comerr afs_depinstall
 sys: cmd comerr afs hcrypto rx rxstat fsint sys_depinstall
 	+${COMPILE_PART1} sys ${COMPILE_PART2}
 
-rxgk: cmd comerr hcrypto rfc3961 rx rxgk_depinstall
+rxgk: cmd comerr hcrypto rfc3961 rx rxgk_depinstall ubik_depinstall
 	+set -x; \
 	if test "@BUILD_RXGK@" = "yes"; then \
 		${COMPILE_PART1} rxgk ${COMPILE_PART2} ; \
@@ -391,6 +391,14 @@ tsm41: cmd comerr kauth rxkad
 		echo Skipping tsm41 for ${SYS_NAME} ;; \
 	esac
 
+gklog: auth ptserver ubik
+	+set -x; \
+	if test "@BUILD_RXGK@" = "yes"; then \
+		${COMPILE_PART1} gklog ${COMPILE_PART2} ; \
+	else \
+		echo Skipping gklog for ${SYS_NAME}; \
+	fi
+
 aklog: auth comerr ptserver libafsauthent
 	+set -x; \
 	if test "@BUILD_KRB5@" = "yes"; then \
@@ -399,7 +407,7 @@ aklog: auth comerr ptserver libafsauthent
 		echo Skipping aklog for ${SYS_NAME} ; \
 	fi
 
-authtools: pam tsm41 platform aklog
+authtools: pam tsm41 platform aklog gklog
 
 platform: config cmd vol
 	+${COMPILE_PART1} platform ${COMPILE_PART2}
@@ -738,6 +746,7 @@ clean2:
 	-${COMPILE_PART1} vfsck ${COMPILE_CLEAN}
 	-${COMPILE_PART1} tsm41 ${COMPILE_CLEAN}
 	-${COMPILE_PART1} aklog ${COMPILE_CLEAN}
+	-${COMPILE_PART1} gklog ${COMPILE_CLEAN}
 	-${COMPILE_PART1} pam ${COMPILE_CLEAN}
 	-${COMPILE_PART1} afsweb ${COMPILE_CLEAN}
 	-${COMPILE_PART1} update ${COMPILE_CLEAN}
@@ -853,6 +862,7 @@ distclean: clean
 	src/finale/Makefile \
 	src/fsint/Makefile \
 	src/fsprobe/Makefile \
+	src/gklog/Makefile \
 	src/gtx/Makefile \
 	src/JAVA/libjafs/Makefile \
 	src/kauth/Makefile \

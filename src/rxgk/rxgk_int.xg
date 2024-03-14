@@ -2,6 +2,9 @@
  * Protocol descriptions for core RXGK structures and RPCs.
  */
 
+/* The rx service ID for RXGK_ RPCs. */
+const RXGK_SERVICE_ID = 34567;
+
 package RXGK_
 prefix S
 
