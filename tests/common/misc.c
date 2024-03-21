@@ -87,3 +87,22 @@ is_pointer(void *left, void *right, const char *fmt, ...)
 
     return success;
 }
+
+int
+is_int64(afs_int64 left, afs_int64 right, const char *fmt, ...)
+{
+    int success;
+    va_list ap;
+
+    success = (left == right);
+    if (!success) {
+	diag(" left: %lld", left);
+	diag("right: %lld", right);
+    }
+
+    va_start(ap, fmt);
+    okv(success, fmt, ap);
+    va_end(ap);
+
+    return success;
+}
