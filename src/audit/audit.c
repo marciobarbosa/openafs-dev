@@ -26,6 +26,7 @@
 #include "afs/afsint.h"
 #include "afs/butc.h"
 #include <rx/rx.h>
+#include <rx/rx_identity.h>
 #include <rx/rxkad.h>
 #include "audit.h"
 #include "audit-api.h"
@@ -697,44 +698,42 @@ osi_auditU(struct rx_call *call, char *audEvent, int errCode, ...)
     hostId = 0;
 
     if (call) {
+	struct rx_identity *rxid = NULL;
 	conn = rx_ConnectionOf(call);	/* call -> conn) */
 	secClass = rx_SecurityClassOf(conn);	/* conn -> securityIndex */
+	code = rx_GetConnSecId(conn, &rxid);
 	if (secClass == RX_SECIDX_NULL) {	/* unauthenticated */
 	    osi_audit("AFS_Aud_Unauth", (-1), AUD_STR, audEvent, AUD_END);
 	    strcpy(afsName, "--UnAuth--");
-	} else if (secClass == RX_SECIDX_KAD || secClass == RX_SECIDX_KAE) {
-	    /* authenticated with rxkad */
-	    char tcell[MAXKTCREALMLEN];
-	    char name[MAXKTCNAMELEN];
-	    char inst[MAXKTCNAMELEN];
 
-	    code =
-		rxkad_GetServerInfo(conn, NULL, NULL, name, inst, tcell,
-				    NULL);
-	    if (code) {
-		osi_audit("AFS_Aud_NoAFSId", (-1), AUD_STR, audEvent, AUD_END);
-		strcpy(afsName, "--NoName--");
-	    } else {
-		afs_int32 islocal = 0;
-		if (audit_user_check.islocal) {
-		    islocal =
-			audit_user_check.islocal(audit_user_check.rock,
-						 name, inst, tcell);
-		}
-		strlcpy(afsName, name, sizeof(afsName));
-		if (inst[0]) {
-		    strlcat(afsName, ".", sizeof(afsName));
-		    strlcat(afsName, inst, sizeof(afsName));
-		}
-		if (tcell[0] && !islocal) {
-		    strlcat(afsName, "@", sizeof(afsName));
-		    strlcat(afsName, tcell, sizeof(afsName));
+	} else if (code != 0) {
+	    osi_audit("AFS_Aud_NoAFSId", (-1), AUD_STR, audEvent, AUD_END);
+	    strcpy(afsName, "--NoName--");
+
+	} else if (rxid->kind == RX_ID_KRB4 || rxid->kind == RX_ID_SUPERUSER) {
+	    /* authenticated with a krb4-like id */
+	    char *atsign;
+	    strlcpy(afsName, rxid->displayName, sizeof(afsName));
+	    atsign = strchr(afsName, '@');
+	    if (atsign != NULL && audit_user_check.islocal) {
+		int islocal;
+		/* Change afsName from "user@cell" to "user\0cell" */
+		char *cell = &atsign[1];
+		*atsign = '\0';
+		islocal =
+		    audit_user_check.islocal(audit_user_check.rock, afsName,
+					     NULL, cell);
+		if (!islocal) {
+		    /* If we're not a local user, change afsName back to
+		     * "name@cell". */
+		    *atsign = '@';
 		}
 	    }
 	} else {		/* Unauthenticated and/or unknown */
 	    osi_audit("AFS_Aud_UnknSec", (-1), AUD_STR, audEvent, AUD_END);
 	    strcpy(afsName, "--Unknown--");
 	}
+	rx_identity_free(&rxid);
 	peer = rx_PeerOf(conn);	/* conn -> peer */
 	hostId = rx_HostOf(peer);	/* peer -> host */
     } else {			/* null call */

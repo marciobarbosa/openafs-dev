@@ -1229,7 +1229,7 @@ static_inline afs_int32
 MakeClient(struct rx_call *acid, struct rx_securityClass **securityObject,
 	   afs_int32 *securityIndex)
 {
-    rxkad_level enc_level = rxkad_clear;
+    rx_connSecLevel enc_level = RX_LEVEL_CLEAR;
     int docrypt;
     int code;
 
@@ -1238,8 +1238,8 @@ MakeClient(struct rx_call *acid, struct rx_securityClass **securityObject,
 	docrypt = 1;
 	break;
     case VS2SC_INHERIT:
-	rxkad_GetServerInfo(rx_ConnectionOf(acid), &enc_level, 0, 0, 0, 0, 0);
-	docrypt = (enc_level == rxkad_crypt ? 1 : 0);
+	(void)rx_GetConnSecLevel(rx_ConnectionOf(acid), &enc_level);
+	docrypt = (enc_level == RX_LEVEL_CRYPT ? 1 : 0);
 	break;
     case VS2SC_NEVER:
 	docrypt = 0;

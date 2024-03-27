@@ -19,7 +19,6 @@
 
 #include <rx/xdr.h>
 #include <rx/rx.h>
-#include <rx/rxkad.h>
 #include <afs/cellconfig.h>
 #include <afs/keys.h>
 #include <afs/afsutil.h>
@@ -622,7 +621,7 @@ SBOZO_ListKeys(struct rx_call *acall, afs_int32 an, afs_int32 *akvno,
     struct stat tstat;
     int noauth = 0;
     char caller[MAXKTCNAMELEN];
-    rxkad_level enc_level = rxkad_clear;
+    rx_connSecLevel enc_level = RX_LEVEL_CLEAR;
 
     if (!afsconf_SuperUser(bozo_confdir, acall, caller)) {
 	code = BZACCESS;
@@ -643,12 +642,12 @@ SBOZO_ListKeys(struct rx_call *acall, afs_int32 an, afs_int32 *akvno,
     memset(akeyinfo, 0, sizeof(struct bozo_keyInfo));
 
     noauth = afsconf_GetNoAuthFlag(bozo_confdir);
-    rxkad_GetServerInfo(rx_ConnectionOf(acall), &enc_level, 0, 0, 0, 0, 0);
+    (void)rx_GetConnSecLevel(rx_ConnectionOf(acall), &enc_level);
     /*
      * only return actual keys in noauth or if this is an encrypted connection
      */
 
-    if ((noauth) || (enc_level == rxkad_crypt)) {
+    if ((noauth) || (enc_level == RX_LEVEL_CRYPT)) {
 	memcpy(akey, tkeys.key[an].key, 8);
     } else
 	memset(akey, 0, 8);
@@ -675,7 +674,7 @@ SBOZO_AddKey(struct rx_call *acall, afs_int32 an, struct bozo_key *akey)
 {
     afs_int32 code;
     char caller[MAXKTCNAMELEN];
-    rxkad_level enc_level = rxkad_clear;
+    rx_connSecLevel enc_level = RX_LEVEL_CLEAR;
     int noauth;
 
     if (!afsconf_SuperUser(bozo_confdir, acall, caller)) {
@@ -683,8 +682,8 @@ SBOZO_AddKey(struct rx_call *acall, afs_int32 an, struct bozo_key *akey)
 	goto fail;
     }
     noauth = afsconf_GetNoAuthFlag(bozo_confdir);
-    rxkad_GetServerInfo(rx_ConnectionOf(acall), &enc_level, 0, 0, 0, 0, 0);
-    if ((!noauth) && (enc_level != rxkad_crypt)) {
+    (void)rx_GetConnSecLevel(rx_ConnectionOf(acall), &enc_level);
+    if ((!noauth) && (enc_level != RX_LEVEL_CRYPT)) {
 	code = BZENCREQ;
 	goto fail;
     }

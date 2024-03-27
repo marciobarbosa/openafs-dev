@@ -17,6 +17,7 @@
 #include <ubik.h>
 #include <rx/xdr.h>
 #include <rx/rx.h>
+#include <rx/rx_identity.h>
 #include <rx/rxkad.h>
 #include <afs/keys.h>
 #include <afs/cellconfig.h>
@@ -148,46 +149,34 @@ multiHomedExtent(struct vl_ctx *ctx, int srvidx, struct extentaddr **exp)
 
 #define AFS_RXINFO_LEN 217
 static char *
-rxkadInfo(char *str, struct rx_connection *conn, struct in_addr hostAddr)
-{
-    int code;
-    char tname[64] = "";
-    char tinst[64] = "";
-    char tcell[64] = "";
-
-    code = rxkad_GetServerInfo(conn, NULL, NULL, tname, tinst, tcell,
-			       NULL);
-    if (!code)
-	snprintf(str, AFS_RXINFO_LEN,
-		 "%s rxkad:%s%s%s%s%s", inet_ntoa(hostAddr), tname,
-		(tinst[0] == '\0') ? "" : ".",
-		(tinst[0] == '\0') ? "" : tinst,
-		(tcell[0] == '\0') ? "" : "@",
-		(tcell[0] == '\0') ? "" : tcell);
-    else
-	snprintf(str, AFS_RXINFO_LEN, "%s noauth", inet_ntoa(hostAddr));
-    return (str);
-}
-
-static char *
 rxinfo(char *str, struct rx_call *rxcall)
 {
     struct rx_connection *conn;
     struct in_addr hostAddr;
-    rx_securityIndex authClass;
+    struct rx_identity *rxid = NULL;
+    int code;
 
     conn = rx_ConnectionOf(rxcall);
-    authClass = rx_SecurityClassOf(conn);
     hostAddr.s_addr = rx_HostOf(rx_PeerOf(conn));
 
-    switch(authClass) {
-    case RX_SECIDX_KAD:
-	return rxkadInfo(str, conn, hostAddr);
-    default:
-	;
+    code = rx_GetConnSecId(conn, &rxid);
+    if (code != 0) {
+	snprintf(str, AFS_RXINFO_LEN, "%s noauth", inet_ntoa(hostAddr));
+    } else {
+	char *prefix;
+	switch (rxid->kind) {
+	case RX_ID_KRB4:
+	    prefix = "rxkad:";
+	    break;
+	default:
+	    prefix = "unknown:";
+	}
+	snprintf(str, AFS_RXINFO_LEN, "%s %s:%s", inet_ntoa(hostAddr), prefix,
+		 rxid->displayName);
     }
 
-    snprintf(str, AFS_RXINFO_LEN, "%s noauth", inet_ntoa(hostAddr));
+    rx_identity_free(&rxid);
+
     return str;
 }
 

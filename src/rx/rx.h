@@ -53,6 +53,7 @@
 struct rx_connection;
 struct rx_call;
 struct rx_packet;
+struct rx_identity;
 
 /* Connection management */
 
@@ -74,6 +75,15 @@ extern u_short rx_ServiceIdOf(struct rx_connection *);
 extern int rx_SecurityClassOf(struct rx_connection *);
 extern struct rx_service *rx_ServiceOf(struct rx_connection *);
 extern int rx_ConnError(struct rx_connection *);
+
+typedef enum {
+    RX_LEVEL_CLEAR = 0,
+    RX_LEVEL_AUTH  = 1,
+    RX_LEVEL_CRYPT = 2,
+} rx_connSecLevel;
+extern int rx_GetConnSecLevel(struct rx_connection *conn, rx_connSecLevel *a_level);
+extern int rx_GetConnSecExpiration(struct rx_connection *conn, struct afs_time64 *a_expires);
+extern int rx_GetConnSecId(struct rx_connection *conn, struct rx_identity **a_id);
 
 /* Call management */
 extern struct rx_connection *rx_ConnectionOf(struct rx_call *call);
@@ -600,7 +610,11 @@ struct rx_securityClass {
 				    rx_securityConfigVariables atype,
 				    void * avalue,
 				    void ** acurrentValue);
-	int (*op_Spare2) (void);
+	int (*op_GetConnSecInfo) (struct rx_securityClass *aobj,
+				  struct rx_connection *aconn,
+				  rx_connSecLevel *a_level,
+				  struct afs_time64 *a_expires,
+				  struct rx_identity **a_id);
 	int (*op_Spare3) (void);
     } *ops;
     void *privateData;
@@ -628,6 +642,10 @@ struct rx_securityClass {
 #define RXS_GetStats(obj,conn,stats) RXS_OP(obj,GetStats,(obj,conn,stats))
 #define RXS_SetConfiguration(obj, conn, type, value, currentValue) \
 		RXS_OP(obj, SetConfiguration,(obj,conn,type,value,currentValue))
+/*
+ * We deliberately do not define an RXS_GetConnSecInfo here. That function
+ * needs different handling if op_GetConnSecInfo is not defined.
+ */
 
 /* Structure for keeping rx statistics.  Note that this structure is returned
  * by rxdebug, so, for compatibility reasons, new fields should be appended (or
